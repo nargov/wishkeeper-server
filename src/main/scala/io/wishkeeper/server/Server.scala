@@ -2,58 +2,71 @@ package io.wishkeeper.server
 
 import java.util.UUID
 
-import akka.actor.ActorSystem
+import akka.actor.{Actor, ActorRef, ActorSystem, Props}
 import akka.http.scaladsl.Http
-import akka.http.scaladsl.marshallers.sprayjson.SprayJsonSupport
-import akka.http.scaladsl.model.{HttpResponse, StatusCodes}
+import akka.http.scaladsl.model.StatusCodes
 import akka.http.scaladsl.server.Directives._
 import akka.http.scaladsl.server.Route
+import akka.pattern._
 import akka.stream.ActorMaterializer
-import spray.json.{DefaultJsonProtocol, JsString, JsValue, RootJsonFormat, deserializationError}
+import akka.util.Timeout
+import de.heikoseeberger.akkahttpcirce.CirceSupport._
+import io.circe.generic.auto._
+import io.wishkeeper.server.Commands.AddWish
+import io.wishkeeper.server.EventStoreMessages.PersistUserEvent
 
 import scala.concurrent.ExecutionContextExecutor
+import scala.concurrent.duration._
 
-trait JsonSupport extends SprayJsonSupport with DefaultJsonProtocol {
-
-  implicit object UuidJsonFormat extends RootJsonFormat[UUID] {
-    def write(x: UUID) = JsString(x.toString)
-
-    def read(value: JsValue) = value match {
-      case JsString(x) => UUID.fromString(x)
-      case x => deserializationError("Expected UUID as JsString, but got " + x)
-    }
-  }
-
-  implicit val wishProtocol: RootJsonFormat[Wish] = jsonFormat1(Wish)
-  implicit val newWishRequestProtocol: RootJsonFormat[NewWishRequest] = jsonFormat2(NewWishRequest)
-}
-
-
-object Server extends JsonSupport {
+object Server {
 
   implicit val system = ActorSystem("server-system")
   implicit val materializer = ActorMaterializer()
   implicit val executionContext: ExecutionContextExecutor = system.dispatcher
-
+  private val eventStoreActor = system.actorOf(Props(classOf[EventStoreActor], new CassandraEventStore))
 
   val route: Route =
     path("wishes") {
       post {
-        entity(as[NewWishRequest]) { req =>
-          complete(HttpResponse(StatusCodes.Created))
+        entity(as[AddWish]) { addWish =>
+          val userAggregate = system.actorOf(Props(classOf[UserAggregateActor], addWish.userId, eventStoreActor))
+          implicit val timeout: Timeout = 4.seconds
+          onSuccess((userAggregate ? addWish).mapTo[WishCreated]) { wishCreated ⇒
+            complete(StatusCodes.Created, wishCreated.id)
+          }
         }
       } ~
-      get {
-        complete("ok")
-      }
+        get {
+          complete(StatusCodes.OK, Array.empty[Wish])
+        }
     }
 
   def main(args: String*): Unit = {
     Http().bindAndHandle(route, "localhost", 12300)
   }
+}
+
+class UserAggregateActor(userId: UUID, eventStoreActor: ActorRef) extends Actor {
+
+  private var state = User(userId)
+
+  override def receive: Receive = {
+    case AddWish(_, wish) ⇒
+      implicit val timeout: Timeout = 4.seconds
+      val wishCreated = WishCreated(userId, wish.id, wish.name)
+      eventStoreActor ? PersistUserEvent(userId, wishCreated)
+      state = state.copy(wishes = state.wishes :+ wish)
+      sender() ! wishCreated
+  }
+}
+
+object Commands {
+
+  case class AddWish(userId: UUID, wish: Wish)
 
 }
 
-case class Wish(name: String)
+case class User(id: UUID, wishes: Vector[Wish] = Vector.empty)
 
-case class NewWishRequest(wish: Wish, userId: UUID)
+
+case class Wish(name: String, id: UUID = UUID.randomUUID())

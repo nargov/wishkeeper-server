@@ -1,16 +1,29 @@
 package io.wishkeeper.server
 
+import java.nio.ByteBuffer
 import java.util.UUID
 
 import com.datastax.driver.core.{Cluster, Session}
 import com.whisk.docker.impl.spotify.DockerKitSpotify
 import com.whisk.docker.scalatest.DockerTestKit
-import com.whisk.docker.{DockerContainer, DockerKit, DockerReadyChecker}
+import io.circe.generic.auto._
+import io.circe.parser.decode
+import io.circe.syntax._
 import org.joda.time.DateTime
 import org.scalatest.{FlatSpec, Matchers}
+
 import scala.collection.JavaConverters._
 
+
 class CassandraLearningTest extends FlatSpec with DockerTestKit with DockerKitSpotify with CassandraDocker with Matchers {
+
+  case class User(id: UUID, created: DateTime, firstName: String, lastName: String)
+
+  case class EventInstance(id: UUID, created: DateTime, sequenceNumber: Long, event: Event)
+
+  sealed trait Event
+  case class UserDidSomethingEvent(whatHeDo: String) extends Event
+  case class UserDIdSomethingElseEvent(whatHeDo: String) extends Event
 
   val cluster = Cluster.builder().addContactPoint("localhost").build()
   var session: Session = _
@@ -46,10 +59,10 @@ class CassandraLearningTest extends FlatSpec with DockerTestKit with DockerKitSp
       """
         |create table if not exists test.events(
         |userId UUID,
+        |seq bigint,
         |time timestamp,
-        |seq int,
         |event blob,
-        |PRIMARY KEY(userId, time, seq)
+        |PRIMARY KEY((userId), seq)
         |)
       """.stripMargin)
     createTable.wasApplied() shouldBe true
@@ -72,20 +85,39 @@ class CassandraLearningTest extends FlatSpec with DockerTestKit with DockerKitSp
       row.getString("lastName")))
     users should have size 1
     users.head shouldEqual expectedUser
+  }
 
+  it should "insert and read multiple events" in {
+    val userId = UUID.randomUUID()
+
+    val events = (1 to 3).map(index ⇒ EventInstance(
+      userId,
+      DateTime.now(),
+      index,
+      UserDidSomethingEvent("something silly")))
+    val insertEventStatement = session.prepare("insert into test.events (userId, time, seq, event) values (:userId, :time, :seq, :event)")
+    val results = events.map(event ⇒ {
+      val boundStatement = insertEventStatement.bind()
+        .setUUID("userId", event.id)
+        .setTimestamp("time", event.created.toDate)
+        .setLong("seq", event.sequenceNumber)
+        .setBytes("event", ByteBuffer.wrap(event.event.asJson.noSpaces.getBytes))
+      session.execute(boundStatement)
+    })
+    results.forall(_.wasApplied) shouldBe true
+
+    val resultSet = session.execute("select * from test.events")
+    val readEvents = resultSet.asScala.map(row ⇒ {
+      val eventStr = new String(row.getBytes("event").array())
+      EventInstance(
+        row.getUUID("userId"),
+        new DateTime(row.getTimestamp("time")),
+        row.getLong("seq"),
+        decode[Event](eventStr).right.getOrElse(throw new IllegalStateException()))
+    })
+
+    readEvents.toStream should contain theSameElementsInOrderAs events
   }
 }
 
-case class User(id: UUID, created: DateTime, firstName: String, lastName: String)
 
-case class Event(id: UUID, created: DateTime, eventType: String, eventData: String)
-
-trait CassandraDocker extends DockerKit {
-  val DefaultCqlPort = 9042
-
-  val cassandraContainer: DockerContainer = DockerContainer("cassandra:3.9")
-    .withPorts(DefaultCqlPort -> Some(DefaultCqlPort))
-    .withReadyChecker(DockerReadyChecker.LogLineContains("Starting listening for CQL clients on"))
-
-  abstract override def dockerContainers: List[DockerContainer] = cassandraContainer :: super.dockerContainers
-}
