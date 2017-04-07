@@ -3,12 +3,16 @@ package io.wishkeeper.server
 import java.util.UUID
 
 import com.datastax.driver.core.Cluster
+import io.wishkeeper.server.Events.UserEvent
 import org.joda.time.DateTime
 
 
 trait EventStore {
   def persistUserEvent(userId: UUID, lastSequenceNumber: Long, time: DateTime, event: UserEvent)
+
   def lastSequenceNum(): Long
+
+  //  def UserEventsFor(userId: UUID): List[UserEvent]
 }
 
 class CassandraEventStore extends EventStore {
@@ -24,7 +28,14 @@ class CassandraEventStore extends EventStore {
 
   override def lastSequenceNum(): Long = {
     val resultSet = session.execute(s"select seq from $userEvents limit 1")
-    resultSet.one().getLong(0)
+    if (resultSet.getAvailableWithoutFetching > 0)
+      resultSet.one().getLong(0)
+    else
+      0
   }
+
+  //  override def UserEventsFor(userId: UUID): List[UserEvent] = {
+  //    val resultSet = session.execute(s"select userId, seq, time, event from $userEvents")
+  //  }
 }
 
