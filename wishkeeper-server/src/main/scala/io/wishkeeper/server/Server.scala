@@ -64,7 +64,6 @@ object Server {
 
 class UserAggregateActor(userId: UUID, eventStoreActor: ActorRef) extends Actor {
 
-  private var state: Option[User] = None
   implicit private val timeout: Timeout = 4.seconds
   implicit val executionContext = context.system.dispatcher
 

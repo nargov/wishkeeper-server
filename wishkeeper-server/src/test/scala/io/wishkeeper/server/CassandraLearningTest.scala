@@ -35,6 +35,7 @@ class CassandraLearningTest extends FlatSpec with DockerTestKit with DockerKitSp
 
   override def afterAll(): Unit = {
     session.close()
+    cluster.close()
     super.afterAll()
   }
 

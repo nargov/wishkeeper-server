@@ -28,14 +28,13 @@ class WishkeeperE2E extends FlatSpec with Matchers with BeforeAndAfter {
   driver.manage().timeouts().implicitlyWait(5, SECONDS)
 
   "Wishkeeper app" should "present a login screen" in {
-    driver.findElementByXPath("""//android.widget.TextView[@text="Wishkeeper"]""")
-    driver.findElementByXPath("""//android.widget.TextView[@text="Find out what gifts your friends actually want"]""")
-    driver.findElementByXPath("//android.widget.Button")
+    driver.findElementByXPath("""//android.widget.TextView[@text[starts-with(., "Give your friends")]]""")
+    driver.findElementByXPath("""//android.widget.TextView[@text="CONNECT WITH FACEBOOK"]""")
   }
 
   it should "allow user to login with facebook account" in {
     driver.resetApp()
-    driver.findElementByXPath("//android.widget.Button").click()
+    driver.findElementByXPath("""//android.widget.TextView[@text="CONNECT WITH FACEBOOK"]""").click()
     driver.findElementByXPath("""//android.widget.EditText[@password="false"]""").sendKeys("nimrod.argov@gmail.com")
     driver.findElementByXPath("""//android.widget.EditText[@password="true"]""").sendKeys("tatessectrcrn")
     driver.findElementByXPath("//android.widget.Button").click()

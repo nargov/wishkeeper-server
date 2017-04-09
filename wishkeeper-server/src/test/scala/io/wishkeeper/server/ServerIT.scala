@@ -46,6 +46,7 @@ class ServerIT extends FlatSpec with DockerTestKit with DockerKitSpotify with Ca
 
   override def afterAll(): Unit = {
     session.close()
+    cluster.close()
     super.afterAll()
   }
 
