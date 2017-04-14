@@ -1,10 +1,10 @@
-package io.wishkeeper.server
+package co.wishkeeper.server
 
 import java.util.UUID
 
 import akka.actor.Actor
-import io.wishkeeper.server.EventStoreMessages._
-import io.wishkeeper.server.Events.UserEvent
+import co.wishkeeper.server.EventStoreMessages.{PersistUserEvent, Persisted}
+import co.wishkeeper.server.Events.UserEvent
 import org.joda.time.DateTime
 
 import scala.util.Try

@@ -1,4 +1,4 @@
-package io.wishkeeper.server
+package co.wishkeeper.server
 
 import java.util.UUID
 
@@ -10,11 +10,11 @@ import akka.http.scaladsl.server.Route
 import akka.pattern._
 import akka.stream.ActorMaterializer
 import akka.util.Timeout
+import co.wishkeeper.server.Commands.ConnectUser
+import co.wishkeeper.server.EventStoreMessages.{EventStoreMessage, PersistUserEvent, Persisted}
+import co.wishkeeper.server.Events.UserConnected
 import de.heikoseeberger.akkahttpcirce.CirceSupport._
 import io.circe.generic.auto._
-import io.wishkeeper.server.Commands.ConnectUser
-import io.wishkeeper.server.EventStoreMessages.{EventStoreMessage, PersistUserEvent, Persisted}
-import io.wishkeeper.server.Events.UserConnected
 import org.joda.time.DateTime
 
 import scala.concurrent.ExecutionContextExecutor

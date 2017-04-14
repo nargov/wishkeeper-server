@@ -1,4 +1,4 @@
-package io.wishkeeper.server
+package co.wishkeeper.server
 
 import java.util.UUID
 

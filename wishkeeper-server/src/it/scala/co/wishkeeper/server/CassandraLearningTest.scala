@@ -1,21 +1,20 @@
-package io.wishkeeper.server
+package co.wishkeeper.server
 
 import java.nio.ByteBuffer
 import java.util.UUID
 
+import com.datastax.driver.core.policies.Policies
 import com.datastax.driver.core.{Cluster, Session}
-import com.whisk.docker.impl.spotify.DockerKitSpotify
-import com.whisk.docker.scalatest.DockerTestKit
 import io.circe.generic.auto._
 import io.circe.parser.decode
 import io.circe.syntax._
 import org.joda.time.DateTime
-import org.scalatest.{FlatSpec, Matchers}
+import org.scalatest.{BeforeAndAfterAll, FlatSpec, Matchers}
 
 import scala.collection.JavaConverters._
 
 
-class CassandraLearningTest extends FlatSpec with DockerTestKit with DockerKitSpotify with CassandraDocker with Matchers {
+class CassandraLearningTest extends FlatSpec with Matchers with BeforeAndAfterAll {
 
   case class User(id: UUID, created: DateTime, firstName: String, lastName: String)
 
@@ -25,18 +24,17 @@ class CassandraLearningTest extends FlatSpec with DockerTestKit with DockerKitSp
   case class UserDidSomethingEvent(whatHeDo: String) extends Event
   case class UserDIdSomethingElseEvent(whatHeDo: String) extends Event
 
-  val cluster = Cluster.builder().addContactPoint("localhost").build()
+  val cluster = Cluster.builder().addContactPoint("localhost").withLoadBalancingPolicy(Policies.defaultLoadBalancingPolicy()).build()
   var session: Session = _
 
   override def beforeAll(): Unit = {
-    super.beforeAll()
+    CassandraDocker.start()
     session = cluster.connect()
   }
 
   override def afterAll(): Unit = {
     session.close()
     cluster.close()
-    super.afterAll()
   }
 
   it should "create a keyspace" in {

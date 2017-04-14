@@ -1,4 +1,4 @@
-package io.wishkeeper.server
+package co.wishkeeper.server
 
 import java.util.UUID
 
@@ -7,26 +7,25 @@ import akka.http.scaladsl.Http
 import akka.http.scaladsl.model._
 import akka.http.scaladsl.unmarshalling.Unmarshal
 import akka.stream.ActorMaterializer
+import co.wishkeeper.server.Commands.ConnectUser
 import com.datastax.driver.core.{Cluster, Session}
-import com.whisk.docker.impl.spotify.DockerKitSpotify
-import com.whisk.docker.scalatest.DockerTestKit
 import de.heikoseeberger.akkahttpcirce.CirceSupport._
 import io.circe.generic.auto._
 import io.circe.syntax._
-import io.wishkeeper.server.Commands.ConnectUser
-import org.scalatest.{EitherValues, FlatSpec, Matchers}
+import org.scalatest.{BeforeAndAfterAll, EitherValues, FlatSpec, Matchers}
 
 import scala.concurrent.Await
 import scala.concurrent.duration._
 import scala.language.postfixOps
+import scala.concurrent.ExecutionContext.Implicits.global
 
-class ServerIT extends FlatSpec with DockerTestKit with DockerKitSpotify with CassandraDocker with Matchers with EitherValues {
+class ServerIT extends FlatSpec with Matchers with EitherValues with BeforeAndAfterAll {
 
   val cluster = Cluster.builder().addContactPoint("localhost").build()
   var session: Session = _
 
   override def beforeAll(): Unit = {
-    super.beforeAll()
+    CassandraDocker.start()
     session = cluster.connect()
 
     session.execute("create keyspace if not exists wishkeeper with replication = {'class': 'SimpleStrategy', 'replication_factor': 1}")
@@ -47,7 +46,6 @@ class ServerIT extends FlatSpec with DockerTestKit with DockerKitSpotify with Ca
   override def afterAll(): Unit = {
     session.close()
     cluster.close()
-    super.afterAll()
   }
 
   implicit val system = ActorSystem("test-system")

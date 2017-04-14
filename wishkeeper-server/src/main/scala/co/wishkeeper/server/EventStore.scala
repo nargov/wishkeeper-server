@@ -1,9 +1,9 @@
-package io.wishkeeper.server
+package co.wishkeeper.server
 
 import java.util.UUID
 
+import co.wishkeeper.server.Events.UserEvent
 import com.datastax.driver.core.Cluster
-import io.wishkeeper.server.Events.UserEvent
 import org.joda.time.DateTime
 
 
