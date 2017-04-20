@@ -10,16 +10,15 @@ object Events {
 
   case class UserConnected(userId: UUID, time: DateTime) extends UserEvent
 
+  case class UserFacebookIdSet(userId: UUID, facebookId: String) extends UserEvent
+
   case class WishCreated(userId: UUID, id: UUID) extends UserEvent
 
   case class WishNameSet(wishId: UUID, name: String) extends UserEvent
-
 }
 
 object Commands {
 
-  case class AddWish(userId: UUID, wish: Wish)
-
-  case class ConnectUser()
+  case class ConnectUser(facebookId: Option[String])
 
 }
