@@ -4,7 +4,7 @@ val logbackVersion = "1.2.1"
 
 val scalaVer = "2.11.8"
 
-lazy val integrationSettings = Defaults.itSettings ++ Seq(
+lazy val integrationSettings = inConfig(IntegrationTest)(Defaults.itSettings) ++ Seq(
   fork in IntegrationTest := false,
   parallelExecution in IntegrationTest := false
 )
@@ -27,7 +27,7 @@ lazy val commonSettings = Seq(
   ).map(_ % logbackVersion)
 ) ++ integrationSettings
 
-lazy val wishkeeper = (project in file(".")).aggregate(server, e2e, testUtils, common).settings(
+lazy val wishkeeper = (project in file(".")).aggregate(server, testUtils, common).settings(
   scalaVersion := scalaVer
 )
 
@@ -52,8 +52,9 @@ lazy val server = (project in file("wishkeeper-server")).
       "com.typesafe.akka" %% "akka-http" % "10.0.3",
       "de.heikoseeberger" %% "akka-http-circe" % "1.12.0",
       "com.datastax.cassandra" % "cassandra-driver-core" % "3.2.0",
-      "org.slf4j" % "slf4j-api" % "1.7.22"),
-
+      "org.slf4j" % "slf4j-api" % "1.7.22",
+      "io.appium" % "java-client" % "5.0.0-BETA6" % "it" exclude("com.codeborne", "phantomjsdriver")
+    ),
     libraryDependencies ++= Seq(
       "io.circe" %% "circe-core",
       "io.circe" %% "circe-generic",
@@ -61,18 +62,6 @@ lazy val server = (project in file("wishkeeper-server")).
     ).map(_ % circeVersion)
   ).
   dependsOn(common, testUtils % "it->compile")
-
-lazy val e2e = (project in file("wishkeeper-e2e")).
-  configs(IntegrationTest).
-  settings(
-    commonSettings,
-    integrationSettings,
-    name := "wishkeeper-e2e",
-    version := "1.0.0",
-    libraryDependencies ++= Seq(
-      "io.appium" % "java-client" % "5.0.0-BETA6" % "it" exclude("com.codeborne", "phantomjsdriver")
-    )
-  ).dependsOn(server, testUtils % "it->compile")
 
 lazy val testUtils = (project in file("test-utils")).
   configs(IntegrationTest).

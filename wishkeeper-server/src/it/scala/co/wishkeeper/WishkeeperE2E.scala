@@ -11,15 +11,15 @@ import akka.stream.{ActorMaterializer, Materializer}
 import cats.syntax.either._
 import co.wishkeeper.server.{CassandraDocker, FacebookData, Server, UserInfo}
 import com.datastax.driver.core.{Cluster, Session}
-import io.appium.java_client.remote.MobileCapabilityType.{APP, DEVICE_NAME, PLATFORM_NAME}
+import de.heikoseeberger.akkahttpcirce.CirceSupport._
+import io.appium.java_client.remote.MobileCapabilityType._
 import io.appium.java_client.remote.MobilePlatform.ANDROID
 import io.appium.java_client.service.local.flags.GeneralServerFlag
 import io.appium.java_client.service.local.{AppiumDriverLocalService, AppiumServiceBuilder}
 import io.appium.java_client.{AppiumDriver, MobileElement}
 import io.circe._
-import io.circe.parser._
 import io.circe.generic.auto._
-import de.heikoseeberger.akkahttpcirce.CirceSupport._
+import io.circe.parser._
 import org.openqa.selenium.remote.DesiredCapabilities
 import org.scalatest._
 import org.scalatest.concurrent.{Eventually, IntegrationPatience, ScalaFutures}

@@ -1,6 +1,6 @@
 package co.wishkeeper.server
 
-import java.util.concurrent.atomic.AtomicBoolean
+import java.util.concurrent.atomic.AtomicReference
 
 import com.spotify.docker.client.DefaultDockerClient
 import com.spotify.docker.client.DockerClient.ListContainersParam.allContainers
@@ -65,14 +65,14 @@ class CassandraDocker {
 
 object CassandraDocker {
   private val log = LoggerFactory.getLogger(classOf[CassandraDocker])
-  private var instance: CassandraDocker = _
-  private val initialized = new AtomicBoolean(false)
+  private val instance = new AtomicReference[Option[CassandraDocker]](None)
 
-  def start(): CassandraDocker = {
-    if (initialized.compareAndSet(false, true)) {
+  def start(): Unit = {
+    if (instance.compareAndSet(None, Some(new CassandraDocker().start()))) {
       log.info("Starting Cassandra Docker container.")
-      instance = new CassandraDocker().start()
     }
-    instance
+    else{
+      log.info("Cassandra Docker already started")
+    }
   }
 }
