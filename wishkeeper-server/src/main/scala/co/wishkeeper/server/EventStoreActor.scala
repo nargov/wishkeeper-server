@@ -12,17 +12,6 @@ import scala.util.Try
 class EventStoreActor(eventStore: EventStore) extends Actor {
 
   override def receive: Receive = {
-
-    case PersistUserEvent(userId, event) ⇒
-      val response = Try {
-        val lastSeq = eventStore.lastSequenceNum(userId)
-        //TODO add unit test that simulates exception here
-        //TODO handle optimistic locking
-        eventStore.persistUserEvent(userId, lastSeq, DateTime.now(), event)
-        Persisted
-      }.get
-      sender() ! response
-
     case PersistUserEvents(userId, events) ⇒
       val response = Try {
         val lastSeq = eventStore.lastSequenceNum(userId)
@@ -49,8 +38,6 @@ class EventStoreActor(eventStore: EventStore) extends Actor {
 object EventStoreMessages {
 
   sealed trait EventStoreMessage
-
-  case class PersistUserEvent(userId: UUID, event: UserEvent) extends EventStoreMessage
 
   case class PersistUserEvents(userId: UUID, events: Seq[UserEvent]) extends EventStoreMessage
 

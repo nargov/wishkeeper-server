@@ -101,8 +101,7 @@ class WishkeeperE2E extends AsyncFlatSpec with Matchers with BeforeAndAfterAll w
     val testUserEmail = extractTestUserProperty(cursor, "email")
     val testUserPassword = extractTestUserProperty(cursor, "password")
 
-    val port = Server.defaultPort
-    Server.start(port)
+    Server.start()
 
     driver.resetApp()
     driver.findElementByXPath("""//android.widget.TextView[@text="CONNECT WITH FACEBOOK"]""").click()
@@ -119,7 +118,7 @@ class WishkeeperE2E extends AsyncFlatSpec with Matchers with BeforeAndAfterAll w
     def isUserInfoWith(id: String) = have(facebookId(id)) compose { (userInfo: UserInfo) => userInfo.facebookData.get }
 
     eventually {
-      val response = Http().singleRequest(HttpRequest(uri = s"http://localhost:$port/users/facebook/$testUserId"))
+      val response = Http().singleRequest(HttpRequest(uri = s"http://localhost:${Server.defaultManagementPort}/users/facebook/$testUserId"))
       whenReady(response) { res =>
         res should (beSuccessful and haveJsonEntityThat(isUserInfoWith(testUserId)))
       }

@@ -15,7 +15,6 @@ import scala.collection.JavaConverters._
 
 
 trait EventStore {
-  def persistUserEvent(userId: UUID, lastSeqNum: Option[Long], time: DateTime, event: UserEvent): Boolean
 
   def persistUserEvents(userId: UUID, lastSeqNum: Option[Long], time: DateTime, events: Seq[UserEvent]): Unit
 
@@ -45,24 +44,6 @@ class CassandraEventStore extends EventStore {
   private lazy val updateUserInfoByFacebookId = session.prepare(
     s"update $userInfoByFacebookIdTable set userInfo = :userInfo, seq = :newSeq where facebookId = :fbId if seq = :oldSeq")
 
-  override def persistUserEvent(userId: UUID, lastSeqNum: Option[Long], time: DateTime, event: UserEvent): Boolean = {
-    val batch = new BatchStatement()
-
-    val newMax = lastSeqNum.map(_ + 1).getOrElse(1L)
-    val seqMaxQuery = lastSeqNum match {
-      case Some(oldMax) ⇒ updateMaxSeq.bind().setLong("oldMax", oldMax).setLong("newMax", newMax)
-      case None ⇒ insertMaxSeq.bind().setLong("newMax", newMax)
-    }
-
-    batch.add(seqMaxQuery.setUUID("userId", userId))
-
-    batch.add(insertEvent.bind().
-      setUUID("userId", userId).
-      setLong("seq", newMax).
-      setTimestamp("time", time.toDate).
-      setBytes("event", ByteBuffer.wrap(event.asJson.noSpaces.getBytes)))
-    session.execute(batch).wasApplied()
-  }
 
   override def persistUserEvents(userId: UUID, lastSeqNum: Option[Long], time: DateTime, events: Seq[UserEvent]): Unit = {
     val batch = new BatchStatement()

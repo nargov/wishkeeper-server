@@ -8,7 +8,7 @@ object Events {
 
   sealed trait UserEvent
 
-  case class UserConnected(userId: UUID, time: DateTime) extends UserEvent
+  case class UserConnected(userId: UUID, time: DateTime, sessionId: UUID) extends UserEvent
 
   case class UserFacebookIdSet(userId: UUID, facebookId: String) extends UserEvent
 
@@ -19,6 +19,6 @@ object Events {
 
 object Commands {
 
-  case class ConnectUser(facebookId: Option[String])
+  case class ConnectFacebookUser(facebookId: String, authToken: String)
 
 }
