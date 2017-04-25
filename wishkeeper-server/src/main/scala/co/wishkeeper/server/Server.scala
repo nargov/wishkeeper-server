@@ -2,7 +2,8 @@ package co.wishkeeper.server
 
 import java.util.UUID
 
-import akka.actor.{ActorSystem, Props}
+import akka.actor.Status.{Status, Success}
+import akka.actor.{ActorSystem, PoisonPill, Props}
 import akka.http.scaladsl.{Http, HttpExt}
 import akka.http.scaladsl.model.{HttpRequest, StatusCodes}
 import akka.http.scaladsl.server.Directives._
@@ -18,7 +19,7 @@ import co.wishkeeper.server.Events.UserConnected
 import de.heikoseeberger.akkahttpcirce.CirceSupport._
 import io.circe.generic.auto._
 
-import scala.concurrent.ExecutionContextExecutor
+import scala.concurrent.{ExecutionContextExecutor, Future}
 import scala.concurrent.duration._
 
 object Server {
@@ -44,23 +45,44 @@ object Server {
               val userId = UUID.randomUUID()
               val userAggregate = system.actorOf(Props(classOf[UserAggregateActor], userId, eventStoreActor), s"userAggregateActor-$userId")
               onSuccess((userAggregate ? connectUser).mapTo[UserConnected]) { userConnected ⇒
+                userAggregate ! PoisonPill
                 complete(StatusCodes.OK, ConnectResponse(userConnected.userId, userConnected.sessionId))
               }
             }
           }
-        }
+        } ~
+          headerValueByName("wsid") { sessionId =>
+            //TODO validate session
+            path("info" / "facebook") {
+              post {
+                entity(as[SetFacebookUserInfo]) { setFacebookUserInfo =>
+                  val futureMaybeUserId: Future[Option[User]] = (eventStoreActor ? UserFromSession(UUID.fromString(sessionId))).mapTo[Option[User]]
+                  val futureMaybeStatus = futureMaybeUserId.flatMap {
+                    case Some(user) =>
+                      val userAggregate = system.actorOf(Props(classOf[UserAggregateActor], user.id, eventStoreActor), s"userAggregateActor-${user.id}")
+                      userAggregate ? setFacebookUserInfo
+                  }
+                  onSuccess(futureMaybeStatus) { _ =>
+                    complete(StatusCodes.OK)
+                  }
+                }
+              }
+            }
+          }
       }
     }
 
   val managementRoute: Route =
     DebuggingDirectives.logRequestResult(LoggingMagnet(_ => printer)) {
       pathPrefix("users") {
-        path("facebook" / """\d+""".r) { facebookId ⇒
-          get {
-            onSuccess((eventStoreActor ? UserInfoForFacebookId(facebookId)).mapTo[Option[UserInfo]]) { maybeUserInfo ⇒
-              maybeUserInfo.map(info ⇒ complete(info)).get //TODO handle None case
+        path("facebook" / """\d+""".r) {
+          facebookId ⇒
+            get {
+              onSuccess((eventStoreActor ? UserInfoForFacebookId(facebookId)).mapTo[Option[UserInfo]]) {
+                maybeUserInfo ⇒
+                  maybeUserInfo.map(info ⇒ complete(info)).get //TODO handle None case
+              }
             }
-          }
         }
       }
     }
@@ -82,7 +104,7 @@ object Server {
 }
 
 
-case class User(id: UUID, wishes: Vector[Wish] = Vector.empty)
+case class User(id: UUID)
 
 case class Wish(name: String, id: UUID = UUID.randomUUID())
 
@@ -94,3 +116,17 @@ case class UserInfoInstance(userInfo: UserInfo, seq: Long)
 case class ConnectResponse(userId: UUID, sessionId: UUID) {
   //TODO add def fromUserConnected
 }
+
+case class SetFacebookUserInfo(age_range: Option[FacebookAgeRange],
+                               birthday: Option[String],
+                               email: Option[String],
+                               first_name: Option[String],
+                               last_name: Option[String],
+                               name: Option[String],
+                               gender: Option[String],
+                               locale: Option[String],
+                               timezone: Option[Int])
+
+case class FacebookAgeRange(min: Option[Int], max: Option[Int])
+
+case class UserFromSession(session: UUID)

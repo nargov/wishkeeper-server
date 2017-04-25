@@ -16,7 +16,11 @@ import scala.collection.JavaConverters._
 
 trait EventStore {
 
-  def persistUserEvents(userId: UUID, lastSeqNum: Option[Long], time: DateTime, events: Seq[UserEvent]): Unit
+  def userBySession(session: UUID): Option[UUID]
+
+  def saveUserSession(userId: UUID, sessionId: UUID, created: DateTime)
+
+  def saveUserEvents(userId: UUID, lastSeqNum: Option[Long], time: DateTime, events: Seq[UserEvent]): Unit
 
   def lastSequenceNum(userId: UUID): Option[Long]
 
@@ -28,11 +32,9 @@ trait EventStore {
 }
 
 class CassandraEventStore extends EventStore {
+  import CassandraEventStore._
   val cluster = Cluster.builder().addContactPoint("localhost").build()
   val session = cluster.connect()
-  private val keyspace = "wishkeeper"
-  private val userEventsTable = keyspace + ".user_events"
-  private val userInfoByFacebookIdTable = keyspace + ".user_info_by_facebook_id"
   private lazy val selectMaxSeq = session.prepare(s"select seqMax from $userEventsTable where userId = :userId")
   private lazy val insertMaxSeq = session.prepare(s"insert into $userEventsTable (userId, seqMax) values (:userId, :newMax) if not exists")
   private lazy val updateMaxSeq = session.prepare(s"update $userEventsTable set seqMax = :newMax where userId = :userId if seqMax = :oldMax")
@@ -43,9 +45,11 @@ class CassandraEventStore extends EventStore {
     s"insert into $userInfoByFacebookIdTable (facebookId, seq, userInfo) values (:fbId, 1, :userInfo) if not exists")
   private lazy val updateUserInfoByFacebookId = session.prepare(
     s"update $userInfoByFacebookIdTable set userInfo = :userInfo, seq = :newSeq where facebookId = :fbId if seq = :oldSeq")
+  private lazy val insertUserSession = session.prepare(s"insert into $userSession (sessionId, userId, created) values (:sessionId, :userId, :created)")
+  private lazy val selectUserSession = session.prepare(s"select * from $userSession where sessionId = :sessionId")
 
 
-  override def persistUserEvents(userId: UUID, lastSeqNum: Option[Long], time: DateTime, events: Seq[UserEvent]): Unit = {
+  override def saveUserEvents(userId: UUID, lastSeqNum: Option[Long], time: DateTime, events: Seq[UserEvent]): Unit = {
     val batch = new BatchStatement()
 
     val newMax = lastSeqNum.map(_ + events.size).getOrElse(events.size.toLong)
@@ -122,4 +126,22 @@ class CassandraEventStore extends EventStore {
     }
     else None
   }
+
+  override def userBySession(sessionId: UUID): Option[UUID] = {
+    val result = session.execute(selectUserSession.bind().setUUID("sessionId", sessionId))
+    if (result.getAvailableWithoutFetching > 0) {
+      Option(result.one().getUUID("userId"))
+    }
+    else None
+  }
+
+  override def saveUserSession(userId: UUID, sessionId: UUID, created: DateTime = DateTime.now()): Unit = {
+    session.execute(insertUserSession.bind().setUUID("userId", userId).setUUID("sessionId", sessionId).setTimestamp("created", created.toDate))
+  }
+}
+object CassandraEventStore {
+  val keyspace = "wishkeeper"
+  val userEventsTable = keyspace + ".user_events"
+  val userInfoByFacebookIdTable = keyspace + ".user_info_by_facebook_id"
+  val userSession = keyspace + ".user_session"
 }

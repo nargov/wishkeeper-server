@@ -34,9 +34,6 @@ class WishkeeperE2E extends AsyncFlatSpec with Matchers with BeforeAndAfterAll w
   implicit val system = ActorSystem("test-system")
   implicit val materializer = ActorMaterializer()
 
-  val cluster = Cluster.builder().addContactPoint("localhost").build()
-  var session: Session = _
-
   val appiumService = AppiumDriverLocalService.buildService(new AppiumServiceBuilder().withArgument(GeneralServerFlag.LOG_LEVEL, "warn"))
   val apkFile = new File("/home/nimrod/dev/wishkeeper-mobile/android/app/build/outputs/apk/app-release.apk")
   val capabilities = new DesiredCapabilities(
@@ -47,57 +44,33 @@ class WishkeeperE2E extends AsyncFlatSpec with Matchers with BeforeAndAfterAll w
     ).asJava)
   var driver: AppiumDriver[MobileElement] = _
 
+  val fbAppId = "1376924702342472"
+  val fbAppSecret = "3f5ee9ef27bd152217246ab02bed5725"
+  val access_token = s"$fbAppId|$fbAppSecret"
+
+  var testUserId: String = _
+
   override protected def beforeAll(): Unit = {
     appiumService.start()
     driver = new AppiumDriver[MobileElement](capabilities)
     driver.manage().timeouts().implicitlyWait(5, SECONDS)
 
     CassandraDocker.start()
-    session = cluster.connect()
-
-    session.execute("create keyspace if not exists wishkeeper with replication = {'class': 'SimpleStrategy', 'replication_factor': 1}")
-      .wasApplied() shouldBe true
-
-    session.execute(
-      """
-        |create table if not exists wishkeeper.user_events(
-        | userId UUID,
-        | seq bigint,
-        | seqMax bigint STATIC,
-        | time timestamp,
-        | event blob,
-        | PRIMARY KEY((userId), seq)
-        |)
-      """.stripMargin).wasApplied() shouldBe true
-
-    session.execute(
-      """
-        |create table if not exists wishkeeper.user_info_by_facebook_id(
-        | facebookId text,
-        | seq bigint,
-        | userInfo blob,
-        | PRIMARY KEY(facebookId)
-        |)
-      """.stripMargin
-    )
-
+    EventStoreTestHelper().createSchema()
   }
 
 
   it should "allow user to login with facebook account" in {
-    val fbAppId = "1376924702342472"
-    val fbAppSecret = "3f5ee9ef27bd152217246ab02bed5725"
-    val access_token = s"$fbAppId|$fbAppSecret"
     val eventualTestUserResponse = Http().singleRequest(HttpRequest().
       withMethod(HttpMethods.POST).
-      withUri(s"https://graph.facebook.com/v2.8/$fbAppId/accounts/test-users").
+      withUri(s"https://graph.facebook.com/v2.9/$fbAppId/accounts/test-users").
       withEntity(s"access_token=$access_token&installed=false"))
     val testUserResponse = Await.result(eventualTestUserResponse, 20.seconds)
     val eventualJson: Future[String] = testUserResponse.entity.dataBytes.runFold("")(_ + _.utf8String)
     val json = Await.result(eventualJson, 5.seconds)
     val doc = parse(json).getOrElse(Json.Null)
     val cursor = doc.hcursor
-    val testUserId = extractTestUserProperty(cursor, "id")
+    testUserId = extractTestUserProperty(cursor, "id")
     val testUserEmail = extractTestUserProperty(cursor, "email")
     val testUserPassword = extractTestUserProperty(cursor, "password")
 
@@ -131,6 +104,12 @@ class WishkeeperE2E extends AsyncFlatSpec with Matchers with BeforeAndAfterAll w
 
   override protected def afterAll(): Unit = {
     appiumService.stop()
+    if (testUserId != null) {
+      val deleteResponse = Http().singleRequest(
+        HttpRequest().withMethod(HttpMethods.DELETE).withUri(s"https://graph.facebook.com/v2.9/$testUserId").
+          withEntity(s"access_token=$access_token"))
+      Await.ready(deleteResponse, 10.seconds)
+    }
     system.terminate()
   }
 
@@ -151,3 +130,4 @@ class WishkeeperE2E extends AsyncFlatSpec with Matchers with BeforeAndAfterAll w
     }
   }
 }
+
