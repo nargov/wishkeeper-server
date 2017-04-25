@@ -9,8 +9,7 @@ import akka.http.scaladsl.model._
 import akka.http.scaladsl.unmarshalling.{Unmarshal, Unmarshaller}
 import akka.stream.{ActorMaterializer, Materializer}
 import cats.syntax.either._
-import co.wishkeeper.server.{CassandraDocker, FacebookData, Server, UserInfo}
-import com.datastax.driver.core.{Cluster, Session}
+import co.wishkeeper.server._
 import de.heikoseeberger.akkahttpcirce.CirceSupport._
 import io.appium.java_client.remote.MobileCapabilityType._
 import io.appium.java_client.remote.MobilePlatform.ANDROID
@@ -74,7 +73,7 @@ class WishkeeperE2E extends AsyncFlatSpec with Matchers with BeforeAndAfterAll w
     val testUserEmail = extractTestUserProperty(cursor, "email")
     val testUserPassword = extractTestUserProperty(cursor, "password")
 
-    Server.start()
+    new WishkeeperServer().start()
 
     driver.resetApp()
     driver.findElementByXPath("""//android.widget.TextView[@text="CONNECT WITH FACEBOOK"]""").click()
@@ -91,7 +90,7 @@ class WishkeeperE2E extends AsyncFlatSpec with Matchers with BeforeAndAfterAll w
     def isUserInfoWith(id: String) = have(facebookId(id)) compose { (userInfo: UserInfo) => userInfo.facebookData.get }
 
     eventually {
-      val response = Http().singleRequest(HttpRequest(uri = s"http://localhost:${Server.defaultManagementPort}/users/facebook/$testUserId"))
+      val response = Http().singleRequest(HttpRequest(uri = s"http://localhost:${WebApi.defaultManagementPort}/users/facebook/$testUserId"))
       whenReady(response) { res =>
         res should (beSuccessful and haveJsonEntityThat(isUserInfoWith(testUserId)))
       }

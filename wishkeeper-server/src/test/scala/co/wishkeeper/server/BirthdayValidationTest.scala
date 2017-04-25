@@ -3,7 +3,7 @@ package co.wishkeeper.server
 import co.wishkeeper.server.Events.UserBirthdaySet
 import org.scalatest.{FlatSpec, Matchers}
 
-class UserAggregateActorTest extends FlatSpec with Matchers {
+class BirthdayValidationTest extends FlatSpec with Matchers {
 
   it should "successfully parse a full date" in {
     val birthday = "01/02/1980"
@@ -31,10 +31,10 @@ class UserAggregateActorTest extends FlatSpec with Matchers {
   }
 
   private def shouldParseSuccessfully(birthday: String) = {
-    UserAggregateActor.getValidUserBirthdayEvent(birthday) shouldBe Some(UserBirthdaySet(birthday))
+    WebApi.getValidUserBirthdayEvent(birthday) shouldBe Some(UserBirthdaySet(birthday))
   }
 
   private def shouldFailToParse(birthday: String) = {
-    UserAggregateActor.getValidUserBirthdayEvent(birthday) shouldBe None
+    WebApi.getValidUserBirthdayEvent(birthday) shouldBe None
   }
 }
