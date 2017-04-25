@@ -31,10 +31,10 @@ class BirthdayValidationTest extends FlatSpec with Matchers {
   }
 
   private def shouldParseSuccessfully(birthday: String) = {
-    WebApi.getValidUserBirthdayEvent(birthday) shouldBe Some(UserBirthdaySet(birthday))
+    WishkeeperServer.getValidUserBirthdayEvent(birthday) shouldBe Some(UserBirthdaySet(birthday))
   }
 
   private def shouldFailToParse(birthday: String) = {
-    WebApi.getValidUserBirthdayEvent(birthday) shouldBe None
+    WishkeeperServer.getValidUserBirthdayEvent(birthday) shouldBe None
   }
 }

@@ -40,4 +40,17 @@ object Commands {
 
   case class ConnectFacebookUser(facebookId: String, authToken: String)
 
+  case class SetFacebookUserInfo(age_range: Option[FacebookAgeRange],
+                                 birthday: Option[String],
+                                 email: Option[String],
+                                 first_name: Option[String],
+                                 last_name: Option[String],
+                                 name: Option[String],
+                                 gender: Option[String],
+                                 locale: Option[String],
+                                 timezone: Option[Int])
+
+
 }
+
+case class FacebookAgeRange(min: Option[Int], max: Option[Int])
