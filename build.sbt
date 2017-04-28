@@ -1,6 +1,7 @@
 val circeVersion = "0.7.0"
 val dockerTestKitVersion = "0.9.0"
 val logbackVersion = "1.2.1"
+val specs2Version = "3.8.9"
 
 val scalaVer = "2.11.8"
 
@@ -18,13 +19,19 @@ lazy val commonSettings = Seq(
     "joda-time" % "joda-time" % "2.9.7",
     "org.joda" % "joda-convert" % "1.8.1",
     "org.scalactic" %% "scalactic" % "3.0.1",
-    "org.scalatest" %% "scalatest" % "3.0.1" % "test, it"
+    "org.scalatest" %% "scalatest" % "3.0.1" % "test, it",
+    "org.jmock" % "jmock-junit4" % "2.8.2" % Test,
+    "org.jmock" % "jmock-legacy" % "2.8.2" % Test,
+    "org.specs2" %% "specs2-core" % specs2Version % Test,
+    "org.specs2" %% "specs2-matcher-extra" % specs2Version % Test,
+    "com.wix" %% "specs2-jmock" % "1.0.0" % Test
   ),
 
   libraryDependencies ++= Seq(
     "ch.qos.logback" % "logback-core",
     "ch.qos.logback" % "logback-classic"
-  ).map(_ % logbackVersion)
+  ).map(_ % logbackVersion),
+  scalacOptions in Test ++= Seq("-Yrangepos")
 ) ++ integrationSettings
 
 lazy val wishkeeper = (project in file(".")).aggregate(server, testUtils, common).settings(

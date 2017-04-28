@@ -55,7 +55,7 @@ class WishkeeperE2E extends AsyncFlatSpec with Matchers with BeforeAndAfterAll w
     driver.manage().timeouts().implicitlyWait(5, SECONDS)
 
     CassandraDocker.start()
-    EventStoreTestHelper().createSchema()
+    DataStoreTestHelper().createSchema()
   }
 
 

@@ -8,9 +8,9 @@ object Events {
 
   sealed trait UserEvent
 
-  case class UserConnected(userId: UUID, time: DateTime, sessionId: UUID) extends UserEvent
+  case class UserConnected(time: DateTime, sessionId: UUID) extends UserEvent
 
-  case class UserFacebookIdSet(userId: UUID, facebookId: String) extends UserEvent
+  case class UserFacebookIdSet(facebookId: String) extends UserEvent
 
   case class UserFirstNameSet(name: String) extends UserEvent
 
@@ -30,27 +30,10 @@ object Events {
 
   case class UserAgeRangeSet(min: Option[Int], max: Option[Int]) extends UserEvent
 
-  case class WishCreated(userId: UUID, id: UUID) extends UserEvent
-
-  case class WishNameSet(wishId: UUID, name: String) extends UserEvent
+  case object NoOp extends UserEvent
 
 }
 
-object Commands {
 
-  case class ConnectFacebookUser(facebookId: String, authToken: String)
-
-  case class SetFacebookUserInfo(age_range: Option[FacebookAgeRange],
-                                 birthday: Option[String],
-                                 email: Option[String],
-                                 first_name: Option[String],
-                                 last_name: Option[String],
-                                 name: Option[String],
-                                 gender: Option[String],
-                                 locale: Option[String],
-                                 timezone: Option[Int])
-
-
-}
 
 case class FacebookAgeRange(min: Option[Int], max: Option[Int])

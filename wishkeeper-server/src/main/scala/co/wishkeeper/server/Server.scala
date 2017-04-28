@@ -3,47 +3,28 @@ package co.wishkeeper.server
 import java.util.UUID
 
 import co.wishkeeper.json._
-import co.wishkeeper.server.Commands.{ConnectFacebookUser, SetFacebookUserInfo}
+import co.wishkeeper.server.Commands.SetFacebookUserInfo
 import co.wishkeeper.server.Events._
 import co.wishkeeper.server.WishkeeperServer.getValidUserBirthdayEvent
 import org.joda.time.DateTime
 
-import scala.util.Try
 
-trait SessionManager {
-  def saveUserSessionConnected(connectUser: ConnectFacebookUser): UserSession
-
-  def userIdForSession(sessionId: UUID): Option[UUID]
-
-  def decodeSession(encoded: String): Option[UUID]
+trait UserInfoProvider {
+  def userInfoForFacebookId(facebookId: String): Option[UserInfo]
 
   def saveFacebookUserInfo(info: SetFacebookUserInfo, userId: UUID): Unit
 }
 
-class WishkeeperServer() extends SessionManager {
-  private val eventStore = new CassandraEventStore
-  private val webApi = new WebApi(eventStore, this)
+class WishkeeperServer() extends UserInfoProvider {
+  private val dataStore = new CassandraDataStore
+  private val sessionManager = new UserCommandProcessor(dataStore)
+  private val webApi = new WebApi(dataStore, sessionManager, this)
 
-  def start(): Unit = {
-    webApi.start()
+  override def userInfoForFacebookId(facebookId: String): Option[UserInfo] = {
+    dataStore.userInfoByFacebookId(facebookId).map(_.userInfo)
   }
 
-  override def saveUserSessionConnected(connectUser: ConnectFacebookUser): UserSession = {
-    val userId = UUID.randomUUID()
-    val sessionId = UUID.randomUUID()
-    val now = DateTime.now()
-    val userConnectedEvent = UserConnected(userId, now, sessionId)
-    val facebookIdSetEvent = UserFacebookIdSet(userId, connectUser.facebookId)
-    val events = List(userConnectedEvent, facebookIdSetEvent)
-    val lastSeqNum = eventStore.lastSequenceNum(userId)
-    eventStore.saveUserEvents(userId, lastSeqNum, now, events)
-    val userInfo = UserInfo(userId, Option(FacebookData(connectUser.facebookId)))
-    eventStore.updateFacebookIdToUserInfo(connectUser.facebookId, None, userInfo) //TODO get last seq number from table
-    eventStore.saveUserSession(userId, sessionId, now)
-    UserSession(userId, sessionId)
-  }
-
-  def saveFacebookUserInfo(info: SetFacebookUserInfo, userId: UUID): Unit = {
+  override def saveFacebookUserInfo(info: SetFacebookUserInfo, userId: UUID): Unit = {
     val events: Seq[UserEvent] = (info.age_range.map(range => UserAgeRangeSet(range.min, range.max)) ::
       info.birthday.flatMap(getValidUserBirthdayEvent) ::
       info.email.map(UserEmailSet) ::
@@ -54,12 +35,14 @@ class WishkeeperServer() extends SessionManager {
       info.last_name.map(UserLastNameSet) ::
       info.name.map(UserNameSet) :: Nil).flatten
 
-    eventStore.saveUserEvents(userId, eventStore.lastSequenceNum(userId), DateTime.now(), events)
+    dataStore.saveUserEvents(userId, dataStore.lastSequenceNum(userId), DateTime.now(), events)
   }
 
-  override def userIdForSession(sessionId: UUID): Option[UUID] = eventStore.userBySession(sessionId)
 
-  override def decodeSession(encoded: String): Option[UUID] = Try(UUID.fromString(encoded)).toOption
+
+  def start(): Unit = {
+    webApi.start()
+  }
 }
 
 object WishkeeperServer {

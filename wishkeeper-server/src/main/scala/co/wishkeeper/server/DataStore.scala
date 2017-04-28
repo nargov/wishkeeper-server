@@ -14,7 +14,11 @@ import org.joda.time.DateTime
 import scala.collection.JavaConverters._
 
 
-trait EventStore {
+trait DataStore {
+
+  def userIdByFacebookId(facebookId: String): Option[UUID]
+
+  def saveUserIdByFacebookId(facebookId: String, userId: UUID): Boolean
 
   def userBySession(session: UUID): Option[UUID]
 
@@ -29,10 +33,12 @@ trait EventStore {
   def userInfoByFacebookId(facebookId: String): Option[UserInfoInstance]
 
   def updateFacebookIdToUserInfo(facebookId: String, lastSeq: Option[Long], userInfo: UserInfo): Boolean
+
+  def close()
 }
 
-class CassandraEventStore extends EventStore {
-  import CassandraEventStore._
+class CassandraDataStore extends DataStore {
+  import CassandraDataStore._
   val cluster = Cluster.builder().addContactPoint("localhost").build()
   val session = cluster.connect()
   private lazy val selectMaxSeq = session.prepare(s"select seqMax from $userEventsTable where userId = :userId")
@@ -47,6 +53,8 @@ class CassandraEventStore extends EventStore {
     s"update $userInfoByFacebookIdTable set userInfo = :userInfo, seq = :newSeq where facebookId = :fbId if seq = :oldSeq")
   private lazy val insertUserSession = session.prepare(s"insert into $userSession (sessionId, userId, created) values (:sessionId, :userId, :created)")
   private lazy val selectUserSession = session.prepare(s"select * from $userSession where sessionId = :sessionId")
+  private lazy val insertUserByFacebookId = session.prepare(s"insert into $userByFacebookId (facebookId, userId) values (:facebookId, :userId)")
+  private lazy val selectUserByFacebookId = session.prepare(s"select userId from $userByFacebookId where facebookId = :facebookId")
 
 
   override def saveUserEvents(userId: UUID, lastSeqNum: Option[Long], time: DateTime, events: Seq[UserEvent]): Unit = {
@@ -138,10 +146,25 @@ class CassandraEventStore extends EventStore {
   override def saveUserSession(userId: UUID, sessionId: UUID, created: DateTime = DateTime.now()): Unit = {
     session.execute(insertUserSession.bind().setUUID("userId", userId).setUUID("sessionId", sessionId).setTimestamp("created", created.toDate))
   }
+
+  override def saveUserIdByFacebookId(facebookId: String, userId: UUID): Boolean = {
+    session.execute(insertUserByFacebookId.bind().setString("facebookId", facebookId).setUUID("userId", userId)).wasApplied()
+  }
+
+  override def userIdByFacebookId(facebookId: String): Option[UUID] = {
+    val resultSet = session.execute(selectUserByFacebookId.bind().setString("facebookId", facebookId))
+    Option(resultSet.one().getUUID("userId"))
+  }
+
+  override def close(): Unit = {
+    session.close()
+    cluster.close()
+  }
 }
-object CassandraEventStore {
+object CassandraDataStore {
   val keyspace = "wishkeeper"
   val userEventsTable = keyspace + ".user_events"
   val userInfoByFacebookIdTable = keyspace + ".user_info_by_facebook_id"
+  val userByFacebookId = keyspace + ".user_by_facebook_id"
   val userSession = keyspace + ".user_session"
 }

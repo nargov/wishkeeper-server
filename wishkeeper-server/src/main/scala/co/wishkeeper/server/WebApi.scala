@@ -18,7 +18,7 @@ import io.circe.generic.auto._
 import scala.concurrent.ExecutionContextExecutor
 import scala.concurrent.duration._
 
-class WebApi(eventStore: EventStore, sessionManager: SessionManager) {
+class WebApi(eventStore: DataStore, sessionManager: CommandProcessor, userInfoProvider: UserInfoProvider) {
   private implicit val system = ActorSystem("web-api")
   private implicit val materializer = ActorMaterializer()
   private implicit val executionContext: ExecutionContextExecutor = system.dispatcher
@@ -37,7 +37,7 @@ class WebApi(eventStore: EventStore, sessionManager: SessionManager) {
           post {
             entity(as[ConnectFacebookUser]) { connectUser ⇒
               //TODO validate facebook token
-              val userSession = sessionManager.saveUserSessionConnected(connectUser)
+              val userSession = sessionManager.processConnectFacebookUser(connectUser)
               complete(StatusCodes.OK, ConnectResponse(userSession.userId, userSession.sessionId))
             }
           }
@@ -49,7 +49,7 @@ class WebApi(eventStore: EventStore, sessionManager: SessionManager) {
                 entity(as[SetFacebookUserInfo]) { info =>
                   val maybeUserId: Option[UUID] = sessionManager.userIdForSession(UUID.fromString(sessionId))
                   maybeUserId.map { userId =>
-                    sessionManager.saveFacebookUserInfo(info, userId)
+                    userInfoProvider.saveFacebookUserInfo(info, userId)
                     complete(StatusCodes.OK)
                   }.getOrElse(complete(StatusCodes.Unauthorized))
                 }
@@ -65,8 +65,8 @@ class WebApi(eventStore: EventStore, sessionManager: SessionManager) {
       pathPrefix("users") {
         path("facebook" / """\d+""".r) { facebookId ⇒
           get {
-            val maybeUserInfo: Option[UserInfoInstance] = eventStore.userInfoByFacebookId(facebookId)
-            maybeUserInfo.map(info ⇒ complete(info.userInfo)).get //TODO handle None case
+            val maybeUserInfo: Option[UserInfo] = userInfoProvider.userInfoForFacebookId(facebookId)
+            maybeUserInfo.map(info ⇒ complete(info)).getOrElse(complete(StatusCodes.NotFound))
           }
         }
       }
