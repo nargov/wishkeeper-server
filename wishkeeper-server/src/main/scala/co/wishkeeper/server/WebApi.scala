@@ -42,20 +42,23 @@ class WebApi(eventStore: DataStore, sessionManager: CommandProcessor, userInfoPr
             }
           }
         } ~
-          headerValueByName("wsid") { sessionId =>
-             //TODO validate session
-            path("info" / "facebook") {
-              post {
-                entity(as[SetFacebookUserInfo]) { info =>
-                  val maybeUserId: Option[UUID] = sessionManager.userIdForSession(UUID.fromString(sessionId))
-                  maybeUserId.map { userId =>
-                    userInfoProvider.saveFacebookUserInfo(info, userId)
-                    complete(StatusCodes.OK)
-                  }.getOrElse(complete(StatusCodes.Unauthorized))
-                }
+        headerValueByName("wsid") { sessionId =>
+          //TODO validate session
+          path("info" / "facebook") {
+            post {
+              entity(as[SetFacebookUserInfo]) { info =>
+                val maybeUserId: Option[UUID] = sessionManager.userIdForSession(UUID.fromString(sessionId))
+                maybeUserId.map { userId =>
+                  userInfoProvider.saveFacebookUserInfo(info, userId)
+                  complete(StatusCodes.OK)
+                }.getOrElse(complete(StatusCodes.Unauthorized))
               }
             }
           }
+        }
+      } ~
+      (path("uuid") & get) {
+        complete(UUID.randomUUID())
       }
     }
 
