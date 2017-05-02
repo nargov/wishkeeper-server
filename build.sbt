@@ -56,7 +56,8 @@ lazy val server = (project in file("wishkeeper-server")).
     version := "1.0",
     resolvers += Resolver.bintrayRepo("hseeberger", "maven"),
     libraryDependencies ++= Seq(
-      "com.typesafe.akka" %% "akka-http" % "10.0.3",
+      "com.typesafe.akka" %% "akka-http" % "10.0.5",
+      "com.typesafe.akka" %% "akka-http-testkit" % "10.0.5",
       "de.heikoseeberger" %% "akka-http-circe" % "1.12.0",
       "com.datastax.cassandra" % "cassandra-driver-core" % "3.2.0",
       "org.slf4j" % "slf4j-api" % "1.7.22",

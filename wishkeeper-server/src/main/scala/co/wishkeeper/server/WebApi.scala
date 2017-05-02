@@ -18,7 +18,8 @@ import io.circe.generic.auto._
 import scala.concurrent.ExecutionContextExecutor
 import scala.concurrent.duration._
 
-class WebApi(eventStore: DataStore, sessionManager: CommandProcessor, userInfoProvider: UserInfoProvider) {
+class WebApi(eventStore: DataStore, commandProcessor: CommandProcessor, userIdByFacebookIdProjection: UserIdByFacebookIdProjection,
+             userProfileProjection: UserProfileProjection) {
   private implicit val system = ActorSystem("web-api")
   private implicit val materializer = ActorMaterializer()
   private implicit val executionContext: ExecutionContextExecutor = system.dispatcher
@@ -37,29 +38,25 @@ class WebApi(eventStore: DataStore, sessionManager: CommandProcessor, userInfoPr
           post {
             entity(as[ConnectFacebookUser]) { connectUser ⇒
               //TODO validate facebook token
-              val userSession = sessionManager.processConnectFacebookUser(connectUser)
-              complete(StatusCodes.OK, ConnectResponse(userSession.userId, userSession.sessionId))
+              commandProcessor.process(connectUser)
+              complete(StatusCodes.OK)
             }
           }
         } ~
-        headerValueByName("wsid") { sessionId =>
-          //TODO validate session
-          path("info" / "facebook") {
-            post {
-              entity(as[SetFacebookUserInfo]) { info =>
-                val maybeUserId: Option[UUID] = sessionManager.userIdForSession(UUID.fromString(sessionId))
-                maybeUserId.map { userId =>
-                  userInfoProvider.saveFacebookUserInfo(info, userId)
+          headerValueByName("wsid") { sessionId =>
+            path("info" / "facebook") {
+              post {
+                entity(as[SetFacebookUserInfo]) { info =>
+                  commandProcessor.process(info, Option(UUID.fromString(sessionId))) //TODO move the UUID parsing to a custom directive
                   complete(StatusCodes.OK)
-                }.getOrElse(complete(StatusCodes.Unauthorized))
+                }
               }
             }
           }
-        }
       } ~
-      (path("uuid") & get) {
-        complete(UUID.randomUUID())
-      }
+        (path("uuid") & get) {
+          complete(UUID.randomUUID())
+        }
     }
 
 
@@ -68,10 +65,16 @@ class WebApi(eventStore: DataStore, sessionManager: CommandProcessor, userInfoPr
       pathPrefix("users") {
         path("facebook" / """\d+""".r) { facebookId ⇒
           get {
-            val maybeUserInfo: Option[UserInfo] = userInfoProvider.userInfoForFacebookId(facebookId)
-            maybeUserInfo.map(info ⇒ complete(info)).getOrElse(complete(StatusCodes.NotFound))
+            userIdByFacebookIdProjection.get(facebookId).
+              map(id ⇒ complete(id)).
+              getOrElse(complete(StatusCodes.NotFound))
           }
-        }
+        } ~
+          get {
+            path(JavaUUID / "profile") { userId =>
+              complete(userProfileProjection.get(userId))
+            }
+          }
       }
     }
 
@@ -86,8 +89,4 @@ class WebApi(eventStore: DataStore, sessionManager: CommandProcessor, userInfoPr
 object WebApi {
   val defaultPort = 12300
   val defaultManagementPort = 12400
-}
-
-case class ConnectResponse(userId: UUID, sessionId: UUID) {
-  //TODO add def fromUserConnected
 }

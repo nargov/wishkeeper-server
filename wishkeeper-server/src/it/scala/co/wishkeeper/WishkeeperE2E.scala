@@ -1,6 +1,7 @@
 package co.wishkeeper
 
 import java.io.File
+import java.util.UUID
 import java.util.concurrent.TimeUnit.SECONDS
 
 import akka.actor.ActorSystem
@@ -17,17 +18,18 @@ import io.appium.java_client.service.local.flags.GeneralServerFlag
 import io.appium.java_client.service.local.{AppiumDriverLocalService, AppiumServiceBuilder}
 import io.appium.java_client.{AppiumDriver, MobileElement}
 import io.circe._
-import io.circe.generic.auto._
 import io.circe.parser._
+import io.circe.generic.auto._
 import org.openqa.selenium.remote.DesiredCapabilities
 import org.scalatest._
 import org.scalatest.concurrent.{Eventually, IntegrationPatience, ScalaFutures}
 import org.scalatest.exceptions.TestFailedException
-import org.scalatest.matchers.{HavePropertyMatchResult, HavePropertyMatcher, MatchResult, Matcher}
+import org.scalatest.matchers.{MatchResult, Matcher}
 
 import scala.collection.JavaConverters._
 import scala.concurrent.duration._
 import scala.concurrent.{Await, ExecutionContext, Future}
+import scala.util.Try
 
 class WishkeeperE2E extends AsyncFlatSpec with Matchers with BeforeAndAfterAll with Inside with Eventually with IntegrationPatience with ScalaFutures {
   implicit val system = ActorSystem("test-system")
@@ -66,7 +68,7 @@ class WishkeeperE2E extends AsyncFlatSpec with Matchers with BeforeAndAfterAll w
       withEntity(s"access_token=$access_token&installed=false"))
     val testUserResponse = Await.result(eventualTestUserResponse, 20.seconds)
     val eventualJson: Future[String] = testUserResponse.entity.dataBytes.runFold("")(_ + _.utf8String)
-    val json = Await.result(eventualJson, 5.seconds)
+    val json = Await.result(eventualJson, 10.seconds)
     val doc = parse(json).getOrElse(Json.Null)
     val cursor = doc.hcursor
     testUserId = extractTestUserProperty(cursor, "id")
@@ -83,18 +85,49 @@ class WishkeeperE2E extends AsyncFlatSpec with Matchers with BeforeAndAfterAll w
     driver.findElementByXPath("""//android.view.View[contains(@content-desc, 'Wishkeeper')]""")
     driver.findElementByXPath("""//android.widget.Button[@instance="1"]""").click()
 
-    def facebookId(id: String) = new HavePropertyMatcher[FacebookData, String] {
-      override def apply(facebookData: FacebookData) = new HavePropertyMatchResult(facebookData.id == id, "id", id, facebookData.id)
-    }
-
-    def isUserInfoWith(id: String) = have(facebookId(id)) compose { (userInfo: UserInfo) => userInfo.facebookData.get }
-
-    eventually {
+    val userId = eventually {
       val response = Http().singleRequest(HttpRequest(uri = s"http://localhost:${WebApi.defaultManagementPort}/users/facebook/$testUserId"))
       whenReady(response) { res =>
-        res should (beSuccessful and haveJsonEntityThat(isUserInfoWith(testUserId)))
+        res should (beSuccessful and haveBody(isUUID))
+        Await.result(Unmarshal(res.entity).to[UUID], 5.seconds)
       }
     }
+
+    val eventualTestUsers = Http().singleRequest(HttpRequest().
+      withUri(s"https://graph.facebook.com/v2.9/$fbAppId/accounts/test-users?access_token=$access_token"))
+    val testUsersResponse = Await.result(eventualTestUsers, 20.seconds)
+    val eventualTestUsersJson = testUsersResponse.entity.dataBytes.runFold("")(_ + _.utf8String)
+    val testUsersJson = Await.result(eventualTestUsersJson, 20.seconds)
+    println(testUsersJson)
+    val testUsers = parse(testUsersJson).getOrElse(Json.Null)
+    val testUsersCursor = testUsers.hcursor
+    val testUserAccessToken = testUsersCursor.downField("data").
+      downAt(_.hcursor.get[String]("id").right.get == testUserId).
+      get[String]("access_token").right.get
+    println(s"access token for test user: $testUserAccessToken")
+    val testUserDetailsResponse = Await.result(Http().singleRequest(HttpRequest().
+      withUri(s"https://graph.facebook.com/v2.9/$testUserId?access_token=$testUserAccessToken&fields=name,birthday,email,gender,locale")), 10.seconds)
+    val testUserDetails = Await.result(testUserDetailsResponse.entity.dataBytes.runFold("")(_ + _.utf8String), 10.seconds)
+    val testUserProfile = decode[UserProfile](testUserDetails).right.get
+    println(testUserProfile)
+
+
+    eventually {
+      val response = Http().singleRequest(HttpRequest().withUri(s"http://localhost:${WebApi.defaultManagementPort}/users/$userId/profile"))
+      whenReady(response) { res =>
+        whenReady(Unmarshal(res.entity).to[UserProfile]) { profile =>
+          inside(profile) { case UserProfile(_, _, birthday, email, _, _, name, gender, locale, _) =>
+            birthday shouldBe testUserProfile.birthday
+            email shouldBe testUserProfile.email
+            name shouldBe testUserProfile.name
+            gender shouldBe testUserProfile.gender
+            locale shouldBe testUserProfile.locale
+          }
+        }
+      }
+    }
+
+    succeed
   }
 
   private def extractTestUserProperty(cursor: HCursor, property: String) = {
@@ -120,13 +153,18 @@ class WishkeeperE2E extends AsyncFlatSpec with Matchers with BeforeAndAfterAll w
     )
   }
 
-  def haveJsonEntityThat[T](matcher: Matcher[T])
-                           (implicit um: Unmarshaller[ResponseEntity, T], ec: ExecutionContext, mat: Materializer): Matcher[HttpResponse] = {
+  def haveBody[T](matcher: Matcher[T])
+                 (implicit um: Unmarshaller[ResponseEntity, T], ec: ExecutionContext, mat: Materializer): Matcher[HttpResponse] =
     Matcher { response: HttpResponse =>
-      whenReady(Unmarshal(response.entity).to[T](um, ec, mat)) { entity =>
-        matcher.apply(entity)
+      whenReady(Unmarshal(response.entity).to[T](um, ec, mat)) { body =>
+        matcher.apply(body)
       }
     }
+
+  def isUUID: Matcher[String] = Matcher { str =>
+    MatchResult(Try(UUID.fromString(str)).isSuccess,
+      s"$str in not a UUID",
+      s"$str is a UUID")
   }
 }
 

@@ -26,17 +26,6 @@ class DataStoreTestHelper extends Matchers {
 
     session.execute(
       s"""
-         |create table if not exists ${CassandraDataStore.userInfoByFacebookIdTable} (
-         | facebookId text,
-         | seq bigint,
-         | userInfo blob,
-         | PRIMARY KEY(facebookId)
-         |)
-      """.stripMargin
-    )
-
-    session.execute(
-      s"""
          |create table if not exists ${CassandraDataStore.userByFacebookId} (
          |  facebookId text,
          |  userId UUID,

@@ -14,7 +14,7 @@ class CassandraDataStoreIT extends FlatSpec with Matchers with BeforeAndAfterAll
   val sessionId = randomUUID()
 
   it should "save a user event" in {
-    val event = UserConnected(DateTime.now(), sessionId)
+    val event = UserConnected(userId, DateTime.now(), sessionId)
     eventStore.saveUserEvents(userId, None, DateTime.now(), List(event))
     eventStore.userEventsFor(userId) should contain(event)
   }
@@ -28,6 +28,10 @@ class CassandraDataStoreIT extends FlatSpec with Matchers with BeforeAndAfterAll
     val facebookId = "facebook-id"
     eventStore.saveUserIdByFacebookId(facebookId, userId) shouldBe true
     eventStore.userIdByFacebookId(facebookId) shouldBe Some(userId)
+  }
+
+  it should "return None for a non existing facebook id" in {
+    eventStore.userIdByFacebookId("some-non-existing-id") shouldBe None
   }
 
   override protected def beforeAll(): Unit = {

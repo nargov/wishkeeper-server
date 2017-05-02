@@ -30,15 +30,13 @@ trait DataStore {
 
   def userEventsFor(userId: UUID): List[UserEvent]
 
-  def userInfoByFacebookId(facebookId: String): Option[UserInfoInstance]
-
-  def updateFacebookIdToUserInfo(facebookId: String, lastSeq: Option[Long], userInfo: UserInfo): Boolean
-
-  def close()
+  def close(): Unit
 }
 
 class CassandraDataStore extends DataStore {
+
   import CassandraDataStore._
+
   val cluster = Cluster.builder().addContactPoint("localhost").build()
   val session = cluster.connect()
   private lazy val selectMaxSeq = session.prepare(s"select seqMax from $userEventsTable where userId = :userId")
@@ -46,11 +44,6 @@ class CassandraDataStore extends DataStore {
   private lazy val updateMaxSeq = session.prepare(s"update $userEventsTable set seqMax = :newMax where userId = :userId if seqMax = :oldMax")
   private lazy val insertEvent = session.prepare(s"insert into $userEventsTable (userId, seq, time, event) values (:userId, :seq, :time, :event)")
   private lazy val selectUserEvents = session.prepare(s"select userId, seq, time, event from $userEventsTable where userId = :userId")
-  private lazy val selectUserInfoByFacebookId = session.prepare(s"select * from $userInfoByFacebookIdTable where facebookId = :fbId")
-  private lazy val insertUserInfoByFacebookId = session.prepare(
-    s"insert into $userInfoByFacebookIdTable (facebookId, seq, userInfo) values (:fbId, 1, :userInfo) if not exists")
-  private lazy val updateUserInfoByFacebookId = session.prepare(
-    s"update $userInfoByFacebookIdTable set userInfo = :userInfo, seq = :newSeq where facebookId = :fbId if seq = :oldSeq")
   private lazy val insertUserSession = session.prepare(s"insert into $userSession (sessionId, userId, created) values (:sessionId, :userId, :created)")
   private lazy val selectUserSession = session.prepare(s"select * from $userSession where sessionId = :sessionId")
   private lazy val insertUserByFacebookId = session.prepare(s"insert into $userByFacebookId (facebookId, userId) values (:facebookId, :userId)")
@@ -103,38 +96,6 @@ class CassandraDataStore extends DataStore {
     }
   }
 
-  override def updateFacebookIdToUserInfo(facebookId: String, lastSeq: Option[Long], userInfo: UserInfo): Boolean = {
-    lastSeq match {
-      case Some(oldSeq) ⇒
-        session.execute(updateUserInfoByFacebookId.bind().
-          setString("fbId", facebookId).
-          setLong("oldSeq", oldSeq).
-          setLong("newSeq", oldSeq + 1).
-          setBytes("userInfo", ByteBuffer.wrap(userInfo.asJson.noSpaces.getBytes()))).
-          wasApplied()
-      case None ⇒
-        session.execute(insertUserInfoByFacebookId.bind().
-          setString("fbId", facebookId).
-          setBytes("userInfo", ByteBuffer.wrap(userInfo.asJson.noSpaces.getBytes()))).
-          wasApplied()
-    }
-  }
-
-  override def userInfoByFacebookId(facebookId: String): Option[UserInfoInstance] = {
-    val result = session.execute(selectUserInfoByFacebookId.bind().setString("fbId", facebookId))
-    if (result.getAvailableWithoutFetching > 0) {
-      val row = result.one()
-      val json = new String(row.getBytes("userInfo").array())
-      val userInfoOrError = decode[UserInfo](json)
-      userInfoOrError match {
-        case Right(userInfo: UserInfo) ⇒ Option(UserInfoInstance(userInfo, row.getLong("seq")))
-        case Left(err: Throwable) ⇒ throw err
-        case Left(err) ⇒ throw new RuntimeException(s"Error decoding json: $json [${err.toString}]")
-      }
-    }
-    else None
-  }
-
   override def userBySession(sessionId: UUID): Option[UUID] = {
     val result = session.execute(selectUserSession.bind().setUUID("sessionId", sessionId))
     if (result.getAvailableWithoutFetching > 0) {
@@ -153,7 +114,10 @@ class CassandraDataStore extends DataStore {
 
   override def userIdByFacebookId(facebookId: String): Option[UUID] = {
     val resultSet = session.execute(selectUserByFacebookId.bind().setString("facebookId", facebookId))
-    Option(resultSet.one().getUUID("userId"))
+    if (resultSet.getAvailableWithoutFetching > 0)
+      Option(resultSet.one().getUUID("userId"))
+    else
+      None
   }
 
   override def close(): Unit = {
@@ -161,10 +125,10 @@ class CassandraDataStore extends DataStore {
     cluster.close()
   }
 }
+
 object CassandraDataStore {
   val keyspace = "wishkeeper"
   val userEventsTable = keyspace + ".user_events"
-  val userInfoByFacebookIdTable = keyspace + ".user_info_by_facebook_id"
   val userByFacebookId = keyspace + ".user_by_facebook_id"
   val userSession = keyspace + ".user_session"
 }
