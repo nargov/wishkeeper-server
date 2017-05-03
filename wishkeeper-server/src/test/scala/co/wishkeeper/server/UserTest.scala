@@ -83,4 +83,8 @@ class UserTest extends Specification with MatcherMacros with JMock {
     val events = List(UserConnected(user.id, DateTime.now(), UUID.randomUUID()), UserNameSet(user.id, name))
     User.replay(events) must beEqualTo(User(user.id, UserProfile(name = Option(name))))
   }
+
+  "throw exception if first event is not UserConnected" in {
+    User.replay(Nil) must throwAn[IllegalArgumentException]
+  }
 }

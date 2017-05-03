@@ -2,7 +2,7 @@ package co.wishkeeper.server
 
 import java.util.UUID
 
-import co.wishkeeper.server.Commands.{ConnectFacebookUser, SetFacebookUserInfo, UserCommand}
+import co.wishkeeper.server.Commands.{ConnectFacebookUser, UserCommand}
 import co.wishkeeper.server.Events._
 import org.joda.time.DateTime
 
@@ -18,17 +18,20 @@ class UserCommandProcessor(dataStore: DataStore, eventProcessors: List[EventProc
   override def process(command: UserCommand, sessionId: Option[UUID]): Unit = {
     command match {
       case connectUser: ConnectFacebookUser =>
-        val user = User.createNew()
-        val events = command.process(user)
-        val lastSeqNum = dataStore.lastSequenceNum(user.id)
         val now = DateTime.now()
+        val userId = dataStore.userIdByFacebookId(connectUser.facebookId)
+        val (user: User, lastSeqNum: Option[Long]) = userId.map(id =>
+          (User.replay(dataStore.userEventsFor(id)), dataStore.lastSequenceNum(id))
+        ).getOrElse((User.createNew(), None))
+        val events = command.process(user)
         dataStore.saveUserEvents(user.id, lastSeqNum, now, events)
         dataStore.saveUserSession(user.id, connectUser.sessionId, now)
         events.foreach(event => eventProcessors.foreach(_.process(event)))
 
-      case _: SetFacebookUserInfo =>
+      case _ =>
         val userId = sessionId.flatMap(userIdForSession).getOrElse(throw new SessionNotFoundException(sessionId))
-        val events: Seq[UserEvent] = command.process(User(userId)) //TODO replace with user loaded from datastore
+        val user = User.replay(dataStore.userEventsFor(userId))
+        val events: Seq[UserEvent] = command.process(user)
 
         dataStore.saveUserEvents(userId, dataStore.lastSequenceNum(userId), DateTime.now(), events)
     }

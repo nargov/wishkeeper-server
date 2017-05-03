@@ -10,7 +10,7 @@ object Events {
 
   sealed trait UserEvent extends Event
 
-  case class UserConnected(userId: UUID, time: DateTime, sessionId: UUID) extends UserEvent
+  case class UserConnected(userId: UUID, time: DateTime = DateTime.now(), sessionId: UUID) extends UserEvent
 
   case class UserFacebookIdSet(userId: UUID, facebookId: String) extends UserEvent
 
