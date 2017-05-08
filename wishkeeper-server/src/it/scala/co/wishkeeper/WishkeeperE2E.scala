@@ -27,7 +27,8 @@ import scala.concurrent.duration._
 import scala.concurrent.{Await, ExecutionContext}
 import scala.util.Try
 
-class WishkeeperE2E extends AsyncFlatSpec with Matchers with BeforeAndAfterAll with Inside with Eventually with IntegrationPatience with ScalaFutures {
+class WishkeeperE2E extends AsyncFlatSpec with Matchers with BeforeAndAfterAll with Inside with Eventually
+  with IntegrationPatience with ScalaFutures with OptionValues {
   implicit val system = ActorSystem("test-system")
   implicit val materializer = ActorMaterializer()
   override implicit val executionContext: ExecutionContext = system.dispatcher
@@ -56,7 +57,7 @@ class WishkeeperE2E extends AsyncFlatSpec with Matchers with BeforeAndAfterAll w
   }
 
   it should "allow user to login with facebook account" in {
-    val testUser = facebookTestHelper.createTestUsers().head
+    val testUser = facebookTestHelper.createTestUser()
 
     new WishkeeperServer().start()
 
@@ -76,18 +77,21 @@ class WishkeeperE2E extends AsyncFlatSpec with Matchers with BeforeAndAfterAll w
       }
     }
 
-    val testUserProfile = facebookTestHelper.addUserDetails(testUser).userProfile
+    whenReady(facebookTestHelper.addAccessToken(testUser)) {testUserWithAccessToken =>
 
-    eventually {
-      val response = Http().singleRequest(HttpRequest().withUri(s"http://localhost:${WebApi.defaultManagementPort}/users/$userId/profile"))
-      whenReady(response) { res =>
-        whenReady(Unmarshal(res.entity).to[UserProfile]) { profile =>
-          inside(profile) { case UserProfile(_, _, birthday, email, _, _, name, gender, locale, _) =>
-            birthday shouldBe testUserProfile.birthday
-            email shouldBe testUserProfile.email
-            name shouldBe testUserProfile.name
-            gender shouldBe testUserProfile.gender
-            locale shouldBe testUserProfile.locale
+      val testUserProfile = facebookTestHelper.addUserDetails(testUserWithAccessToken).userProfile
+
+      eventually {
+        val response = Http().singleRequest(HttpRequest().withUri(s"http://localhost:${WebApi.defaultManagementPort}/users/$userId/profile"))
+        whenReady(response) { res =>
+          whenReady(Unmarshal(res.entity).to[UserProfile]) { profile =>
+            inside(profile) { case UserProfile(_, _, birthday, email, _, _, name, gender, locale, _) =>
+              birthday shouldBe testUserProfile.value.birthday
+              email shouldBe testUserProfile.value.email
+              name shouldBe testUserProfile.value.name
+              gender shouldBe testUserProfile.value.gender
+              locale shouldBe testUserProfile.value.locale
+            }
           }
         }
       }

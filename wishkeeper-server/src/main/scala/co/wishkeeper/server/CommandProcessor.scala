@@ -72,7 +72,7 @@ class ReplayingUserProfileProjection(dataStore: DataStore) extends UserProfilePr
   }
 }
 
-case class PotentialFriend(userId: UUID, name: String, pictureLink: String)
+case class PotentialFriend(userId: UUID, name: String, image: String, requestSent: Boolean = false)
 
 trait UserFriendsProjection {
   def potentialFacebookFriends(facebookId: String, accessToken: String): Future[List[PotentialFriend]]
