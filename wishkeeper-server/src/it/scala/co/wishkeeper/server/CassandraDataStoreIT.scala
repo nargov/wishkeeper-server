@@ -34,14 +34,29 @@ class CassandraDataStoreIT extends FlatSpec with Matchers with BeforeAndAfterAll
     eventStore.userIdByFacebookId("some-non-existing-id") shouldBe None
   }
 
+  it should "return a map of facebook ids to user ids" in {
+    val userId1 = randomUUID()
+    val userId2 = randomUUID()
+    val facebookId1 = "fbid-1"
+    val facebookId2 = "fbid-2"
+    eventStore.saveUserIdByFacebookId(facebookId1, userId1) shouldBe true
+    eventStore.saveUserIdByFacebookId(facebookId2, userId2) shouldBe true
+
+    eventStore.userIdsByFacebookIds(List(facebookId1, facebookId2)) shouldBe Map(facebookId1 -> userId1, facebookId2 -> userId2)
+  }
+
+  val dataStoreTestHelper = DataStoreTestHelper()
+
   override protected def beforeAll(): Unit = {
     CassandraDocker.start()
-    DataStoreTestHelper().createSchema()
+    dataStoreTestHelper.start()
+    dataStoreTestHelper.createSchema()
 
     eventStore = new CassandraDataStore
   }
 
   override protected def afterAll(): Unit = {
     eventStore.close()
+    dataStoreTestHelper.terminate()
   }
 }

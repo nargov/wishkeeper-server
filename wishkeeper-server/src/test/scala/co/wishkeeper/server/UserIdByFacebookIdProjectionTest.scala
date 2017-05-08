@@ -11,7 +11,7 @@ class UserIdByFacebookIdProjectionTest extends Specification with JMock {
 
   trait Context extends Scope {
     val dataStore = mock[DataStore]
-    val facebookIdProjection = new UserIdByFacebookIdProjection(dataStore)
+    val facebookIdProjection = new DataStoreUserIdByFacebookIdProjection(dataStore)
     val userId = UUID.randomUUID()
     val facebookId = "facebook-id"
   }
@@ -39,5 +39,18 @@ class UserIdByFacebookIdProjectionTest extends Specification with JMock {
     }
 
     facebookIdProjection.get(facebookId) must beSome(userId)
+  }
+
+  "return a list of users for given list of facebook ids" in new Context {
+    val anotherFacebookId = "another-facebook-id"
+    val anotherUserId = UUID.randomUUID()
+    val facebookIds = List(facebookId, anotherFacebookId)
+    val expectedMap: Map[String, UUID] = Map(facebookId -> userId, anotherFacebookId -> anotherUserId)
+
+    checking {
+      allowing(dataStore).userIdsByFacebookIds(facebookIds).willReturn(expectedMap)
+    }
+
+    facebookIdProjection.get(facebookIds) must beEqualTo(expectedMap)
   }
 }

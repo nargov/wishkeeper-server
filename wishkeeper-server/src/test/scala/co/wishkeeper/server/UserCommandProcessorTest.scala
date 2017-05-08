@@ -86,5 +86,17 @@ class UserCommandProcessorTest extends Specification with JMock with MatcherMacr
     commandProcessor.process(SetFacebookUserInfo(), Some(sessionId))
   }
 
+  "save user session on connect" in new Context {
+    checking {
+      allowing(dataStore).userIdByFacebookId(facebookId).willReturn(Some(userId))
+      allowing(dataStore).userEventsFor(userId).willReturn(UserConnected(userId, DateTime.now().minusDays(1), UUID.randomUUID()) :: Nil)
+      allowing(dataStore).lastSequenceNum(userId).willReturn(Some(3L))
+      ignoring(dataStore).saveUserEvents(having(any), having(any), having(any), having(any))
+      oneOf(dataStore).saveUserSession(having(===(userId)), having(===(sessionId)), having(any[DateTime]))
+    }
+
+    commandProcessor.process(ConnectFacebookUser(facebookId, authToken, sessionId))
+  }
+
   def aUserConnectedEventFor(userId: UUID): Matcher[UserConnected] = ===(userId) ^^ {(_:UserConnected).userId}
 }

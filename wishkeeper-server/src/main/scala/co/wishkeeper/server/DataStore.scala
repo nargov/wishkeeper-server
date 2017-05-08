@@ -16,6 +16,8 @@ import scala.collection.JavaConverters._
 
 trait DataStore {
 
+  def userIdsByFacebookIds(facebookIds: List[String]): Map[String, UUID]
+
   def userIdByFacebookId(facebookId: String): Option[UUID]
 
   def saveUserIdByFacebookId(facebookId: String, userId: UUID): Boolean
@@ -48,6 +50,7 @@ class CassandraDataStore extends DataStore {
   private lazy val selectUserSession = session.prepare(s"select * from $userSession where sessionId = :sessionId")
   private lazy val insertUserByFacebookId = session.prepare(s"insert into $userByFacebookId (facebookId, userId) values (:facebookId, :userId)")
   private lazy val selectUserByFacebookId = session.prepare(s"select userId from $userByFacebookId where facebookId = :facebookId")
+  private lazy val selectUsersByFacebookIds = session.prepare(s"select facebookId, userId from $userByFacebookId where facebookId in :idList")
 
 
   override def saveUserEvents(userId: UUID, lastSeqNum: Option[Long], time: DateTime, events: Seq[UserEvent]): Unit = {
@@ -118,6 +121,11 @@ class CassandraDataStore extends DataStore {
       Option(resultSet.one().getUUID("userId"))
     else
       None
+  }
+
+  override def userIdsByFacebookIds(facebookIds: List[String]): Map[String, UUID] = {
+    val resultSet = session.execute(selectUsersByFacebookIds.bind().setList("idList", facebookIds.asJava))
+    resultSet.asScala.map(row => row.getString("facebookId") -> row.getUUID("userId")).toMap
   }
 
   override def close(): Unit = {

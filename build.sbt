@@ -22,8 +22,8 @@ lazy val commonSettings = Seq(
     "org.scalatest" %% "scalatest" % "3.0.1" % "test, it",
     "org.jmock" % "jmock-junit4" % "2.8.2" % Test,
     "org.jmock" % "jmock-legacy" % "2.8.2" % Test,
-    "org.specs2" %% "specs2-core" % specs2Version % Test,
-    "org.specs2" %% "specs2-matcher-extra" % specs2Version % Test,
+    "org.specs2" %% "specs2-core" % specs2Version % "test, it",
+    "org.specs2" %% "specs2-matcher-extra" % specs2Version % "test, it",
     "com.wix" %% "specs2-jmock" % "1.0.0" % Test
   ),
 

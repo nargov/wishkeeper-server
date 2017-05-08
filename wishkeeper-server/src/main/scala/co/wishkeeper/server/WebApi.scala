@@ -18,11 +18,9 @@ import io.circe.generic.auto._
 import scala.concurrent.ExecutionContextExecutor
 import scala.concurrent.duration._
 
-class WebApi(eventStore: DataStore, commandProcessor: CommandProcessor, userIdByFacebookIdProjection: UserIdByFacebookIdProjection,
-             userProfileProjection: UserProfileProjection) {
-  private implicit val system = ActorSystem("web-api")
-  private implicit val materializer = ActorMaterializer()
-  private implicit val executionContext: ExecutionContextExecutor = system.dispatcher
+class WebApi(commandProcessor: CommandProcessor, userIdByFacebookIdProjection: DataStoreUserIdByFacebookIdProjection,
+             userProfileProjection: UserProfileProjection, dataStore: DataStore, userFriendsProjection: UserFriendsProjection)
+            (implicit system: ActorSystem, materializer: ActorMaterializer, executionContext: ExecutionContextExecutor) {
 
   private implicit val timeout: Timeout = 4.seconds
 
@@ -43,12 +41,28 @@ class WebApi(eventStore: DataStore, commandProcessor: CommandProcessor, userIdBy
             }
           }
         } ~
-          headerValueByName("wsid") { sessionId =>
+          headerValueByName(WebApi.sessionIdHeader) { sessionId =>
             path("info" / "facebook") {
               post {
                 entity(as[SetFacebookUserInfo]) { info =>
                   commandProcessor.process(info, Option(UUID.fromString(sessionId))) //TODO move the UUID parsing to a custom directive
                   complete(StatusCodes.OK)
+                }
+              }
+            } ~
+            path("friends" / "facebook") {
+              get {
+                headerValueByName(WebApi.facebookAccessTokenHeader) { accessToken =>
+                  val maybeFacebookId: Option[String] = for {
+                    userId <- dataStore.userBySession(UUID.fromString(sessionId))
+                    socialData <- userProfileProjection.get(userId).socialData
+                    facebookId <- socialData.facebookId
+                  } yield facebookId
+
+                  maybeFacebookId.
+                    map(userFriendsProjection.potentialFacebookFriends(_, accessToken)).
+                    map(complete(_)).
+                    get
                 }
               }
             }
@@ -89,4 +103,7 @@ class WebApi(eventStore: DataStore, commandProcessor: CommandProcessor, userIdBy
 object WebApi {
   val defaultPort = 12300
   val defaultManagementPort = 12400
+
+  val facebookAccessTokenHeader = "fbat"
+  val sessionIdHeader = "wsid"
 }

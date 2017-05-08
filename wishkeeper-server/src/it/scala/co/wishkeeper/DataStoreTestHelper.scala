@@ -5,10 +5,22 @@ import com.datastax.driver.core.{Cluster, Session}
 import org.scalatest.Matchers
 
 class DataStoreTestHelper extends Matchers {
-  val cluster = Cluster.builder().addContactPoint("localhost").build()
-  val session: Session = cluster.connect()
+
+  def terminate() = {
+    session.close()
+    cluster.close()
+  }
+
+  private var cluster: Cluster = _
+  private var session: Session = _
+
+  def start() = {
+    cluster = Cluster.builder().addContactPoint("localhost").build()
+    session = cluster.connect()
+  }
 
   def createSchema(): Unit = {
+    if(session == null) throw new IllegalStateException("DataStoreTestHelper not started. Did you forget to call start()?")
     session.execute("create keyspace if not exists wishkeeper with replication = {'class': 'SimpleStrategy', 'replication_factor': 1}")
       .wasApplied() shouldBe true
 

@@ -10,7 +10,7 @@ import org.specs2.mutable.Specification
 class UserProfileProjectionTest extends Specification with JMock {
   "return a user profile" in {
     val dataStore = mock[DataStore]
-    val projection: UserProfileProjection = new UserEventsUserProfileProjection(dataStore)
+    val projection: UserProfileProjection = new ReplayingUserProfileProjection(dataStore)
 
     val userId = UUID.randomUUID()
     val joe = "Joe"
