@@ -4,7 +4,7 @@ import java.util.UUID
 
 import co.wishkeeper.server.Events._
 
-case class User(id: UUID, userProfile: UserProfile = UserProfile()) {
+case class User(id: UUID, userProfile: UserProfile = UserProfile(), friends: Friends = Friends()) {
 
   def applyEvent(event: UserEvent): User = event match {
     case UserFirstNameSet(_, value) => this.copy(userProfile = this.userProfile.copy(firstName = Option(value)))
@@ -21,6 +21,8 @@ case class User(id: UUID, userProfile: UserProfile = UserProfile()) {
         case Some(data) => Option(data.copy(facebookId = Option(fbId)))
         case None => Option(SocialData(Option(fbId)))
       }))
+    case FriendRequestSent(_, friendId) => this.copy(friends = this.friends.copy(pending = this.friends.pending :+ friendId))
+    case FriendRequestReceived(_, friendId) => this.copy(friends = this.friends.copy(awaitingApproval = this.friends.awaitingApproval :+ friendId))
     case _ => this
   }
 
@@ -37,3 +39,5 @@ object User {
 
   def createNew() = new User(UUID.randomUUID())
 }
+
+case class Friends(current: List[UUID] = Nil, pending: List[UUID] = Nil, awaitingApproval: List[UUID] = Nil)

@@ -3,6 +3,7 @@ package co.wishkeeper.server
 import java.util.UUID
 
 import co.wishkeeper.server.Events.{Event, NoOp, UserFacebookIdSet}
+import co.wishkeeper.server.projections.DataStoreUserIdByFacebookIdProjection
 import com.wixpress.common.specs2.JMock
 import org.specs2.mutable.Specification
 import org.specs2.specification.Scope

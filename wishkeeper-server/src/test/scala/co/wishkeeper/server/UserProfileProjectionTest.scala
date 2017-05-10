@@ -3,6 +3,7 @@ package co.wishkeeper.server
 import java.util.UUID
 
 import co.wishkeeper.server.Events.{UserConnected, UserNameSet}
+import co.wishkeeper.server.projections.{ReplayingUserProfileProjection, UserProfileProjection}
 import com.wixpress.common.specs2.JMock
 import org.joda.time.DateTime
 import org.specs2.mutable.Specification

@@ -11,7 +11,8 @@ import akka.http.scaladsl.{Http, HttpExt}
 import akka.stream.ActorMaterializer
 import akka.util.Timeout
 import co.wishkeeper.json._
-import co.wishkeeper.server.Commands.{ConnectFacebookUser, SetFacebookUserInfo}
+import co.wishkeeper.server.Commands.{ConnectFacebookUser, SendFriendRequest, SetFacebookUserInfo}
+import co.wishkeeper.server.projections.{DataStoreUserIdByFacebookIdProjection, UserFriendsProjection, UserProfileProjection}
 import de.heikoseeberger.akkahttpcirce.CirceSupport._
 import io.circe.generic.auto._
 
@@ -29,7 +30,7 @@ class WebApi(commandProcessor: CommandProcessor, userIdByFacebookIdProjection: D
     system.log.info(res.toString)
   }
 
-  val route: Route =
+  val userRoute: Route =
     DebuggingDirectives.logRequestResult(LoggingMagnet(_ => printer)) {
       pathPrefix("users") {
         path("connect" / "facebook") {
@@ -50,22 +51,29 @@ class WebApi(commandProcessor: CommandProcessor, userIdByFacebookIdProjection: D
                 }
               }
             } ~
-            path("friends" / "facebook") {
-              get {
-                headerValueByName(WebApi.facebookAccessTokenHeader) { accessToken =>
-                  val maybeFacebookId: Option[String] = for {
-                    userId <- dataStore.userBySession(UUID.fromString(sessionId))
-                    socialData <- userProfileProjection.get(userId).socialData
-                    facebookId <- socialData.facebookId
-                  } yield facebookId
+              pathPrefix("friends") {
+                (path("facebook") & get) {
+                  headerValueByName(WebApi.facebookAccessTokenHeader) { accessToken =>
+                    val maybeFacebookId: Option[String] = for {
+                      userId <- dataStore.userBySession(UUID.fromString(sessionId))
+                      socialData <- userProfileProjection.get(userId).socialData
+                      facebookId <- socialData.facebookId
+                    } yield facebookId
 
-                  maybeFacebookId.
-                    map(userFriendsProjection.potentialFacebookFriends(_, accessToken)).
-                    map(complete(_)).
-                    get
+                    maybeFacebookId.
+                      map(userFriendsProjection.potentialFacebookFriends(_, accessToken)).
+                      map(complete(_)).
+                      get
+                  }
+                } ~
+                (path("request") & post) {
+                  entity(as[SendFriendRequest]) { sendFriendRequest =>
+                    commandProcessor.process(sendFriendRequest, Option(UUID.fromString(sessionId)))
+                    complete(StatusCodes.OK)
+                  }
                 }
               }
-            }
+
           }
       } ~
         (path("uuid") & get) {
@@ -94,7 +102,7 @@ class WebApi(commandProcessor: CommandProcessor, userIdByFacebookIdProjection: D
 
   def start(port: Int = WebApi.defaultPort, managementPort: Int = WebApi.defaultManagementPort): Unit = {
     val httpExt: HttpExt = Http()
-    httpExt.bindAndHandle(route, "localhost", port)
+    httpExt.bindAndHandle(userRoute, "localhost", port)
     httpExt.bindAndHandle(managementRoute, "localhost", managementPort)
   }
 

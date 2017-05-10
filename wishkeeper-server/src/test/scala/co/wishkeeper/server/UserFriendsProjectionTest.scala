@@ -2,6 +2,7 @@ package co.wishkeeper.server
 
 import java.util.UUID
 
+import co.wishkeeper.server.projections.{DelegatingUserFriendsProjection, UserFriendsProjection, UserIdByFacebookIdProjection}
 import com.wixpress.common.specs2.JMock
 import org.specs2.concurrent.ExecutionEnv
 import org.specs2.matcher.Matcher

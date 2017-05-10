@@ -87,4 +87,16 @@ class UserTest extends Specification with MatcherMacros with JMock {
   "throw exception if first event is not UserConnected" in {
     User.replay(Nil) must throwAn[IllegalArgumentException]
   }
+
+  "apply FriendRequestSent" in new Context {
+    private val potentialFriend = UUID.randomUUID()
+    val friendRequest = FriendRequestSent(user.id, potentialFriend)
+    user.applyEvent(friendRequest).friends.pending must contain(potentialFriend)
+  }
+
+  "apply FriendRequestReceived" in new Context {
+    private val potentialFriend = UUID.randomUUID()
+    val friendRequest = FriendRequestReceived(user.id, potentialFriend)
+    user.applyEvent(friendRequest).friends.awaitingApproval must contain(potentialFriend)
+  }
 }

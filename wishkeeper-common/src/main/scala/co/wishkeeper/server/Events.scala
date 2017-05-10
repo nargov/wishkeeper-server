@@ -10,6 +10,8 @@ object Events {
 
   sealed trait UserEvent extends Event
 
+  case object NoOp extends UserEvent
+
   case class UserConnected(userId: UUID, time: DateTime = DateTime.now(), sessionId: UUID) extends UserEvent
 
   case class UserFacebookIdSet(userId: UUID, facebookId: String) extends UserEvent
@@ -32,5 +34,8 @@ object Events {
 
   case class UserAgeRangeSet(userId: UUID, min: Option[Int], max: Option[Int]) extends UserEvent
 
-  case object NoOp extends UserEvent
+  case class FriendRequestSent(userId: UUID, to: UUID) extends UserEvent
+
+  case class FriendRequestReceived(userId: UUID, from: UUID) extends UserEvent
+
 }

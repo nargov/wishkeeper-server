@@ -3,6 +3,7 @@ package co.wishkeeper.server
 import akka.actor.ActorSystem
 import akka.stream.ActorMaterializer
 import co.wishkeeper.json._
+import co.wishkeeper.server.projections._
 
 import scala.concurrent.ExecutionContextExecutor
 

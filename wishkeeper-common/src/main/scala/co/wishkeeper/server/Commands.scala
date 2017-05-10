@@ -53,4 +53,7 @@ object Commands {
     }
   }
 
+  case class SendFriendRequest(friendId: UUID) extends UserCommand {
+    override def process(user: User): List[UserEvent] = List(FriendRequestSent(user.id, friendId))
+  }
 }

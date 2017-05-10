@@ -6,8 +6,6 @@ import co.wishkeeper.server.Commands.{ConnectFacebookUser, UserCommand}
 import co.wishkeeper.server.Events._
 import org.joda.time.DateTime
 
-import scala.concurrent.{ExecutionContext, Future}
-
 trait CommandProcessor {
   def process(command: UserCommand, sessionId: Option[UUID] = None): Unit
 
@@ -43,51 +41,22 @@ class UserCommandProcessor(dataStore: DataStore, eventProcessors: List[EventProc
   override def userIdForSession(sessionId: UUID): Option[UUID] = dataStore.userBySession(sessionId)
 }
 
-class SessionNotFoundException(sessionId: Option[UUID]) extends RuntimeException
-
 trait EventProcessor {
   def process(event: Event): Unit
 }
 
-class DataStoreUserIdByFacebookIdProjection(dataStore: DataStore) extends UserIdByFacebookIdProjection with EventProcessor {
+trait IncomingFriendRequestsProjection {
 
-  override def get(facebookId: String): Option[UUID] = dataStore.userIdByFacebookId(facebookId)
-
-  override def get(facebookIds: List[String]): Map[String, UUID] = dataStore.userIdsByFacebookIds(facebookIds)
-
-  override def process(event: Event): Unit = event match {
-    case UserFacebookIdSet(userId, facebookId) => dataStore.saveUserIdByFacebookId(facebookId, userId)
-    case _ => //ignore all other events
-  }
 }
 
-trait UserProfileProjection {
-  def get(userId: UUID): UserProfile
+class DataStoreIncomingFriendRequestsProjection(dataStore: DataStore) extends IncomingFriendRequestsProjection with EventProcessor {
+  override def process(event: Event): Unit = { event match {
+    case FriendRequestSent(sender, userId) =>
+      val lastSequenceNum = dataStore.lastSequenceNum(userId)
+      dataStore.saveUserEvents(userId, lastSequenceNum, DateTime.now(), FriendRequestReceived(userId, sender) :: Nil)
+  }}
 }
 
-class ReplayingUserProfileProjection(dataStore: DataStore) extends UserProfileProjection {
-  def get(userId: UUID): UserProfile = {
-    val events = dataStore.userEventsFor(userId)
-    User.replay(events).userProfile
-  }
-}
+class SessionNotFoundException(sessionId: Option[UUID]) extends RuntimeException
 
 case class PotentialFriend(userId: UUID, name: String, image: String, requestSent: Boolean = false)
-
-trait UserFriendsProjection {
-  def potentialFacebookFriends(facebookId: String, accessToken: String): Future[List[PotentialFriend]]
-}
-
-class DelegatingUserFriendsProjection(facebookConnector: FacebookConnector, userIdByFacebookId: UserIdByFacebookIdProjection)
-                                     (implicit ex: ExecutionContext) extends UserFriendsProjection {
-
-  override def potentialFacebookFriends(facebookId: String, accessToken: String): Future[List[PotentialFriend]] = {
-    val eventualFriends = facebookConnector.friendsFor(facebookId, accessToken)
-    eventualFriends.map { friends =>
-      val facebookIdsToUserIds = userIdByFacebookId.get(friends.map(_.id))
-      facebookIdsToUserIds.map {
-        case (fbId, userId) => PotentialFriend(userId, friends.find(_.id == fbId).get.name, s"https://graph.facebook.com/v2.9/$fbId/picture")
-      }.toList
-    }
-  }
-}
