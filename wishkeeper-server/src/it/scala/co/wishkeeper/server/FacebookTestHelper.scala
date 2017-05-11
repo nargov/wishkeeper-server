@@ -9,9 +9,9 @@ import akka.http.scaladsl.model.HttpMethods.POST
 import akka.http.scaladsl.model.{HttpMethods, HttpRequest, HttpResponse, StatusCodes}
 import akka.stream.ActorMaterializer
 import co.wishkeeper.server.FacebookTestHelper._
-import io.circe.generic.auto._
-import io.circe.parser._
-import org.joda.time.DateTime
+import io.circe.generic.extras.Configuration
+import io.circe.generic.extras.auto._
+import io.circe.parser.decode
 
 import scala.concurrent.duration._
 import scala.concurrent.{Await, ExecutionContext, Future}
@@ -19,6 +19,8 @@ import scala.util.Success
 
 
 class FacebookTestHelper(implicit ec: ExecutionContext, actorSystem: ActorSystem, materializer: ActorMaterializer) {
+
+  implicit val circeConfig = Configuration.default.withDefaults
 
   private val testFbUsers = new AtomicReference[Map[String, TestFacebookUser]](Map.empty)
 
@@ -45,7 +47,7 @@ class FacebookTestHelper(implicit ec: ExecutionContext, actorSystem: ActorSystem
     val eventualResponse = Http().singleRequest(HttpRequest().
       withUri(s"https://graph.facebook.com/v2.9/$wishkeeperFacebookTestAppId/accounts/test-users?access_token=$access_token"))
     val eventualJson: Future[String] = eventualResponse.flatMap(_.entity.dataBytes.runFold("")(_ + _.utf8String))
-    val eventualUsersAccessDataList = eventualJson.map(decode[TestUsersAccessDataList]).map {
+    val eventualUsersAccessDataList = eventualJson.map(json => decode[TestUsersAccessDataList](json)).map {
       case Right(list) => list
       case Left(err) => throw err
     }
@@ -63,7 +65,7 @@ class FacebookTestHelper(implicit ec: ExecutionContext, actorSystem: ActorSystem
         withUri(s"https://graph.facebook.com/v2.9/$wishkeeperFacebookTestAppId/accounts/test-users").
         withEntity(s"access_token=$access_token&installed=$installApp"))
       val eventualJson: Future[String] = eventualTestUserResponse.flatMap(_.entity.dataBytes.runFold("")(_ + _.utf8String))
-      val eventualUser = eventualJson.map(decode[TestFacebookUser]).map {
+      val eventualUser = eventualJson.map(json => decode[TestFacebookUser](json)).map {
         case Right(user) => user
         case Left(err) => throw err
       }
@@ -98,7 +100,7 @@ class FacebookTestHelper(implicit ec: ExecutionContext, actorSystem: ActorSystem
   }
 
   def deleteTestUsers(): Unit = {
-    println("deleting test users " + DateTime.now().toString)
+    println("Deleting test users...")
     val requests = testFbUsers.get().values.map { user =>
       Http().singleRequest(
         HttpRequest().withMethod(HttpMethods.DELETE).withUri(s"https://graph.facebook.com/v2.9/${user.id}").
@@ -111,7 +113,7 @@ class FacebookTestHelper(implicit ec: ExecutionContext, actorSystem: ActorSystem
       }
     }
     Await.ready(Future.sequence(requests), 10.seconds * testFbUsers.get().size)
-    println("test users deleted " + DateTime.now().toString)
+    println("Test users deleted.")
   }
 }
 

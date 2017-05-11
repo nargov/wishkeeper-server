@@ -54,6 +54,7 @@ class DataStoreIncomingFriendRequestsProjection(dataStore: DataStore) extends In
     case FriendRequestSent(sender, userId) =>
       val lastSequenceNum = dataStore.lastSequenceNum(userId)
       dataStore.saveUserEvents(userId, lastSequenceNum, DateTime.now(), FriendRequestReceived(userId, sender) :: Nil)
+    case _ =>
   }}
 }
 

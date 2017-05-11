@@ -1,4 +1,4 @@
-val circeVersion = "0.7.0"
+val circeVersion = "0.8.0"
 val dockerTestKitVersion = "0.9.0"
 val logbackVersion = "1.2.1"
 val specs2Version = "3.8.9"
@@ -66,7 +66,8 @@ lazy val server = (project in file("wishkeeper-server")).
     libraryDependencies ++= Seq(
       "io.circe" %% "circe-core",
       "io.circe" %% "circe-generic",
-      "io.circe" %% "circe-parser"
+      "io.circe" %% "circe-parser",
+      "io.circe" %% "circe-generic-extras"
     ).map(_ % circeVersion)
   ).
   dependsOn(common, testUtils % "it->compile")

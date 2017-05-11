@@ -16,7 +16,8 @@ import io.appium.java_client.remote.MobilePlatform.ANDROID
 import io.appium.java_client.service.local.flags.GeneralServerFlag
 import io.appium.java_client.service.local.{AppiumDriverLocalService, AppiumServiceBuilder}
 import io.appium.java_client.{AppiumDriver, MobileElement}
-import io.circe.generic.auto._
+import io.circe.generic.extras.Configuration
+import io.circe.generic.extras.auto._
 import org.openqa.selenium.remote.DesiredCapabilities
 import org.scalatest._
 import org.scalatest.concurrent.{Eventually, IntegrationPatience, ScalaFutures}
@@ -32,6 +33,7 @@ class WishkeeperE2E extends AsyncFlatSpec with Matchers with BeforeAndAfterAll w
   implicit val system = ActorSystem("test-system")
   implicit val materializer = ActorMaterializer()
   override implicit val executionContext: ExecutionContext = system.dispatcher
+  implicit val circeConfig = Configuration.default.withDefaults
 
   val appiumService = AppiumDriverLocalService.buildService(new AppiumServiceBuilder().withArgument(GeneralServerFlag.LOG_LEVEL, "warn"))
   val apkFile = new File("/home/nimrod/dev/wishkeeper-mobile/android/app/build/outputs/apk/app-release.apk")
