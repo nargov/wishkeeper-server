@@ -45,7 +45,7 @@ class FacebookTestHelper(implicit ec: ExecutionContext, actorSystem: ActorSystem
 
   def addAccessTokens(users: List[TestFacebookUser]): Future[List[TestFacebookUser]] = {
     val eventualResponse = Http().singleRequest(HttpRequest().
-      withUri(s"https://graph.facebook.com/v2.9/$wishkeeperFacebookTestAppId/accounts/test-users?access_token=$access_token"))
+      withUri(s"https://graph.facebook.com/v2.9/$testAppId/accounts/test-users?access_token=$access_token"))
     val eventualJson: Future[String] = eventualResponse.flatMap(_.entity.dataBytes.runFold("")(_ + _.utf8String))
     val eventualUsersAccessDataList = eventualJson.map(json => decode[TestUsersAccessDataList](json)).map {
       case Right(list) => list
@@ -55,14 +55,16 @@ class FacebookTestHelper(implicit ec: ExecutionContext, actorSystem: ActorSystem
     tokensMap.map(tokens => users.map(user => user.copy(access_token = tokens(user.id).access_token)))
   }
 
-  def createTestUser(installApp: Boolean = false): TestFacebookUser = createTestUsers(1, installApp).head
+  def createTestUser(): TestFacebookUser = createTestUsers().head
+
+  def createPreInstalledTestUser(): TestFacebookUser = createTestUsers(installApp = true).head
 
   def createTestUsers(numUsers: Int = 1, installApp: Boolean = false): List[TestFacebookUser] = {
     println(s"Creating $numUsers test user${if (numUsers > 1) "s" else ""}")
     val eventualUsers = Future.sequence((1 to numUsers).toList.map { _ =>
       val eventualTestUserResponse = Http().singleRequest(HttpRequest().
         withMethod(POST).
-        withUri(s"https://graph.facebook.com/v2.9/$wishkeeperFacebookTestAppId/accounts/test-users").
+        withUri(s"https://graph.facebook.com/v2.9/$testAppId/accounts/test-users").
         withEntity(s"access_token=$access_token&installed=$installApp"))
       val eventualJson: Future[String] = eventualTestUserResponse.flatMap(_.entity.dataBytes.runFold("")(_ + _.utf8String))
       val eventualUser = eventualJson.map(json => decode[TestFacebookUser](json)).map {
@@ -118,9 +120,9 @@ class FacebookTestHelper(implicit ec: ExecutionContext, actorSystem: ActorSystem
 }
 
 object FacebookTestHelper {
-  val wishkeeperFacebookTestAppId = "1376924702342472"
-  val wishkeeperFacebookTestAppSecret = "3f5ee9ef27bd152217246ab02bed5725"
-  val access_token = s"$wishkeeperFacebookTestAppId|$wishkeeperFacebookTestAppSecret"
+  val testAppId = "1376924702342472"
+  val testAppSecret = "3f5ee9ef27bd152217246ab02bed5725"
+  val access_token = s"$testAppId|$testAppSecret"
 }
 
 case class TestUsersAccessDataList(data: List[TestUserAccessToken])

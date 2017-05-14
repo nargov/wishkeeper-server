@@ -6,7 +6,7 @@ import akka.actor.ActorSystem
 import akka.http.scaladsl.model.{HttpRequest, StatusCodes}
 import akka.http.scaladsl.server.Directives.{as, complete, entity, get, headerValueByName, path, pathPrefix, post, _}
 import akka.http.scaladsl.server.directives.{DebuggingDirectives, LoggingMagnet}
-import akka.http.scaladsl.server.{Route, RouteResult}
+import akka.http.scaladsl.server.{AuthorizationFailedRejection, Route, RouteResult}
 import akka.http.scaladsl.{Http, HttpExt}
 import akka.stream.ActorMaterializer
 import akka.util.Timeout
@@ -20,7 +20,8 @@ import scala.concurrent.ExecutionContextExecutor
 import scala.concurrent.duration._
 
 class WebApi(commandProcessor: CommandProcessor, userIdByFacebookIdProjection: DataStoreUserIdByFacebookIdProjection,
-             userProfileProjection: UserProfileProjection, dataStore: DataStore, userFriendsProjection: UserFriendsProjection)
+             userProfileProjection: UserProfileProjection, dataStore: DataStore, userFriendsProjection: UserFriendsProjection,
+             facebookConnector: FacebookConnector)
             (implicit system: ActorSystem, materializer: ActorMaterializer, executionContext: ExecutionContextExecutor) {
 
   private implicit val timeout: Timeout = 4.seconds
@@ -36,9 +37,15 @@ class WebApi(commandProcessor: CommandProcessor, userIdByFacebookIdProjection: D
         path("connect" / "facebook") {
           post {
             entity(as[ConnectFacebookUser]) { connectUser ⇒
-              //TODO validate facebook token
-              commandProcessor.process(connectUser)
-              complete(StatusCodes.OK)
+              onSuccess(facebookConnector.isValid(connectUser.authToken)) { isValid =>
+                if (isValid) {
+                  commandProcessor.process(connectUser)
+                  complete(StatusCodes.OK)
+                }
+                else {
+                  reject(AuthorizationFailedRejection)
+                }
+              }
             }
           }
         } ~
@@ -66,12 +73,12 @@ class WebApi(commandProcessor: CommandProcessor, userIdByFacebookIdProjection: D
                       get
                   }
                 } ~
-                (path("request") & post) {
-                  entity(as[SendFriendRequest]) { sendFriendRequest =>
-                    commandProcessor.process(sendFriendRequest, Option(UUID.fromString(sessionId)))
-                    complete(StatusCodes.OK)
+                  (path("request") & post) {
+                    entity(as[SendFriendRequest]) { sendFriendRequest =>
+                      commandProcessor.process(sendFriendRequest, Option(UUID.fromString(sessionId)))
+                      complete(StatusCodes.OK)
+                    }
                   }
-                }
               }
 
           }

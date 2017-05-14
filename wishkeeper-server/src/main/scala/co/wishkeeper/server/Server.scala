@@ -4,6 +4,7 @@ import akka.actor.ActorSystem
 import akka.stream.ActorMaterializer
 import co.wishkeeper.json._
 import co.wishkeeper.server.projections._
+import com.typesafe.config.ConfigFactory
 
 import scala.concurrent.ExecutionContextExecutor
 
@@ -18,9 +19,12 @@ class WishkeeperServer() {
   private implicit val materializer = ActorMaterializer()
   private implicit val executionContext: ExecutionContextExecutor = system.dispatcher
 
-  private val facebookConnector: FacebookConnector = new AkkaHttpFacebookConnector
+  private val config = ConfigFactory.load("wishkeeper")
+  private val facebookConnector: FacebookConnector = new AkkaHttpFacebookConnector(
+    config.getString("wishkeeper.facebook.app-id"),
+    config.getString("wishkeeper.facebook.app-secret"))
   private val userFriendsProjection: UserFriendsProjection = new DelegatingUserFriendsProjection(facebookConnector, userIdByFacebookIdProjection)
-  private val webApi = new WebApi(commandProcessor, userIdByFacebookIdProjection, userProfileProjection, dataStore, userFriendsProjection)
+  private val webApi = new WebApi(commandProcessor, userIdByFacebookIdProjection, userProfileProjection, dataStore, userFriendsProjection, facebookConnector)
 
   def start(): Unit = {
     webApi.start()

@@ -4,14 +4,16 @@ import akka.actor.ActorSystem
 import akka.http.scaladsl.Http
 import akka.http.scaladsl.model.{HttpRequest, StatusCodes}
 import akka.stream.ActorMaterializer
-import io.circe.generic.auto._
+import io.circe.generic.extras.Configuration
+import io.circe.generic.extras.auto._
 import io.circe.parser._
 import org.joda.time.DateTime
 
-import scala.annotation.tailrec
 import scala.concurrent.{ExecutionContext, Future}
 
 trait FacebookConnector {
+  def isValid(token: String): Future[Boolean]
+
   def friendsFor(facebookId: String, accessToken: String): Future[List[FacebookFriend]]
 }
 
@@ -19,7 +21,24 @@ object FacebookConnector {
   val apiVersion = "v2.9"
 }
 
-class AkkaHttpFacebookConnector(implicit actorSystem: ActorSystem, ec: ExecutionContext, am: ActorMaterializer) extends FacebookConnector {
+class AkkaHttpFacebookConnector(appId: String, appSecret: String)
+                               (implicit actorSystem: ActorSystem, ec: ExecutionContext, am: ActorMaterializer) extends FacebookConnector {
+
+  implicit val circeConfig = Configuration.default.withDefaults.withSnakeCaseKeys
+
+  override def isValid(token: String): Future[Boolean] = {
+    val eventualResponse = Http().singleRequest(HttpRequest().
+      withUri(s"https://graph.facebook.com/debug_token?input_token=$token&access_token=$appId|$appSecret"))
+    val eventualResult = eventualResponse.
+      flatMap(_.entity.dataBytes.runFold("")(_ + _.utf8String)).
+      map(res => decode[FacebookDebugTokenResult](res))
+    eventualResult.map {
+      case Right(result) => result.data.isValid
+      case Left(err) =>
+        //TODO report error?
+        false
+    }
+  }
 
   private def friendsFor(url: String): Future[List[FacebookFriend]] = {
     println("request " + DateTime.now().toString)
@@ -35,7 +54,6 @@ class AkkaHttpFacebookConnector(implicit actorSystem: ActorSystem, ec: Execution
         result
       case Left(err) => throw err
     }
-
 
     eventualResult.flatMap { result =>
       result.paging.map { paging =>
@@ -60,3 +78,7 @@ case class FacebookPaging(cursors: FacebookCursors, previous: Option[String], ne
 case class FacebookCursors(before: String, after: String)
 
 case class FacebookSummary(total_count: Int)
+
+case class FacebookDebugTokenResult(data: FacebookTokenData)
+
+case class FacebookTokenData(appId: String, application: String, expiresAt: Long, isValid: Boolean, scopes: List[String], userId: Long)

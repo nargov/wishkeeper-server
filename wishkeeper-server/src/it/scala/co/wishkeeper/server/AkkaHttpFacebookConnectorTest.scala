@@ -1,13 +1,14 @@
 package co.wishkeeper.server
 
-import java.util.concurrent.{ExecutorService, Executors}
+import java.util.concurrent.Executors
 
 import akka.actor.ActorSystem
 import akka.stream.ActorMaterializer
+import co.wishkeeper.server.FacebookTestHelper.{testAppId, testAppSecret}
 import org.joda.time.DateTime
 import org.specs2.concurrent.ExecutionEnv
 import org.specs2.matcher.Matcher
-import org.specs2.mutable.{After, Specification}
+import org.specs2.mutable.Specification
 import org.specs2.specification.{AfterAll, Scope}
 
 import scala.concurrent.duration._
@@ -23,7 +24,7 @@ class AkkaHttpFacebookConnectorTest extends Specification with AfterAll {
   val facebookTestHelper = new FacebookTestHelper
 
   trait Context extends Scope {
-    val facebookAdapter: FacebookConnector = new AkkaHttpFacebookConnector()
+    val facebookAdapter: FacebookConnector = new AkkaHttpFacebookConnector(testAppId, testAppSecret)
   }
 
   "return the list of friends" in new Context {
@@ -36,7 +37,7 @@ class AkkaHttpFacebookConnectorTest extends Specification with AfterAll {
     }
   }
 
-  "return the list of many friends" in new Context with After {
+  "return the list of many friends" in new Context {
     val testUsers = facebookTestHelper.createTestUsers(30, installApp = true)
     testUsers.size must beEqualTo(30)
     println("make friends begin: " + DateTime.now().toString)
@@ -47,8 +48,13 @@ class AkkaHttpFacebookConnectorTest extends Specification with AfterAll {
       val friends = facebookAdapter.friendsFor(testUsers.head.id, testUsers.head.access_token)
       friends must beSameFriendsAs(testUsers.tail).await(80, 250.millis)
     }
+  }
 
-    override def after: Any = println("test ended: " + DateTime.now().toString)
+  "return true if user access token is valid" in new Context {
+    val testUser = facebookTestHelper.createPreInstalledTestUser()
+
+    val eventualResult = facebookAdapter.isValid(testUser.access_token)
+    eventualResult must beTrue.await(80, 250.millis)
   }
 
   def beSameFriendsAs(users: List[TestFacebookUser]): Matcher[List[FacebookFriend]] =
@@ -57,5 +63,6 @@ class AkkaHttpFacebookConnectorTest extends Specification with AfterAll {
   override def afterAll(): Unit = {
     facebookTestHelper.deleteTestUsers()
     system.terminate()
+    materializer.shutdown()
   }
 }
