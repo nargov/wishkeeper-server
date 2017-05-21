@@ -21,8 +21,8 @@ case class User(id: UUID, userProfile: UserProfile = UserProfile(), friends: Fri
         case Some(data) => Option(data.copy(facebookId = Option(fbId)))
         case None => Option(SocialData(Option(fbId)))
       }))
-    case FriendRequestSent(_, friendId) => this.copy(friends = this.friends.copy(pending = this.friends.pending :+ friendId))
-    case FriendRequestReceived(_, friendId) => this.copy(friends = this.friends.copy(awaitingApproval = this.friends.awaitingApproval :+ friendId))
+    case FriendRequestSent(_, friendId) => this.copy(friends = this.friends.copy(requestSent = this.friends.requestSent :+ friendId))
+    case FriendRequestReceived(_, friendId) => this.copy(friends = this.friends.copy(requestReceived = this.friends.requestReceived :+ friendId))
     case _ => this
   }
 
@@ -40,4 +40,4 @@ object User {
   def createNew() = new User(UUID.randomUUID())
 }
 
-case class Friends(current: List[UUID] = Nil, pending: List[UUID] = Nil, awaitingApproval: List[UUID] = Nil)
+case class Friends(current: List[UUID] = Nil, requestSent: List[UUID] = Nil, requestReceived: List[UUID] = Nil)

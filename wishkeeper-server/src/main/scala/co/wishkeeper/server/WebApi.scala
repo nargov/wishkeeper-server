@@ -3,6 +3,7 @@ package co.wishkeeper.server
 import java.util.UUID
 
 import akka.actor.ActorSystem
+import akka.http.scaladsl.Http.ServerBinding
 import akka.http.scaladsl.model.{HttpRequest, StatusCodes}
 import akka.http.scaladsl.server.Directives.{as, complete, entity, get, headerValueByName, path, pathPrefix, post, _}
 import akka.http.scaladsl.server.directives.{DebuggingDirectives, LoggingMagnet}
@@ -16,12 +17,12 @@ import co.wishkeeper.server.projections.{DataStoreUserIdByFacebookIdProjection, 
 import de.heikoseeberger.akkahttpcirce.CirceSupport._
 import io.circe.generic.auto._
 
-import scala.concurrent.ExecutionContextExecutor
+import scala.concurrent.{ExecutionContextExecutor, Future}
 import scala.concurrent.duration._
 
 class WebApi(commandProcessor: CommandProcessor, userIdByFacebookIdProjection: DataStoreUserIdByFacebookIdProjection,
              userProfileProjection: UserProfileProjection, dataStore: DataStore, userFriendsProjection: UserFriendsProjection,
-             facebookConnector: FacebookConnector)
+             facebookConnector: FacebookConnector, incomingFriendRequestsProjection: IncomingFriendRequestsProjection)
             (implicit system: ActorSystem, materializer: ActorMaterializer, executionContext: ExecutionContextExecutor) {
 
   private implicit val timeout: Timeout = 4.seconds
@@ -70,7 +71,7 @@ class WebApi(commandProcessor: CommandProcessor, userIdByFacebookIdProjection: D
                     maybeFacebookId.
                       map(userFriendsProjection.potentialFacebookFriends(_, accessToken)).
                       map(complete(_)).
-                      get
+                      get //TODO test for rejection if user not found
                   }
                 } ~
                   (path("request") & post) {
@@ -78,6 +79,12 @@ class WebApi(commandProcessor: CommandProcessor, userIdByFacebookIdProjection: D
                       commandProcessor.process(sendFriendRequest, Option(UUID.fromString(sessionId)))
                       complete(StatusCodes.OK)
                     }
+                  } ~
+                  (path("requests" / "incoming") & get) {
+                    dataStore.userBySession(UUID.fromString(sessionId)).
+                      map(incomingFriendRequestsProjection.awaitingApproval).
+                      map(complete(_)).
+                      get //TODO test for rejection if user not found
                   }
               }
 
@@ -107,12 +114,17 @@ class WebApi(commandProcessor: CommandProcessor, userIdByFacebookIdProjection: D
       }
     }
 
+  private var bindings: Seq[Future[ServerBinding]] = Seq.empty
+
   def start(port: Int = WebApi.defaultPort, managementPort: Int = WebApi.defaultManagementPort): Unit = {
     val httpExt: HttpExt = Http()
-    httpExt.bindAndHandle(userRoute, "localhost", port)
-    httpExt.bindAndHandle(managementRoute, "localhost", managementPort)
+    bindings = List(
+      httpExt.bindAndHandle(userRoute, "0.0.0.0", port), //TODO replace IP with parameter
+      httpExt.bindAndHandle(managementRoute, "0.0.0.0", managementPort)
+    )
   }
 
+  def stop() = bindings.foreach(_.map(_.unbind()))
 }
 
 object WebApi {

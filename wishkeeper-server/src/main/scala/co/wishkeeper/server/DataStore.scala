@@ -2,10 +2,11 @@ package co.wishkeeper.server
 
 import java.nio.ByteBuffer
 import java.util.UUID
+import java.util.concurrent.atomic.AtomicReference
 
 import co.wishkeeper.json._
 import co.wishkeeper.server.Events.UserEvent
-import com.datastax.driver.core.{BatchStatement, Cluster, ResultSet, Row}
+import com.datastax.driver.core._
 import io.circe.generic.auto._
 import io.circe.parser.decode
 import io.circe.syntax._
@@ -32,6 +33,8 @@ trait DataStore {
 
   def userEventsFor(userId: UUID): List[UserEvent]
 
+  def connect(): Unit
+
   def close(): Unit
 }
 
@@ -40,7 +43,9 @@ class CassandraDataStore extends DataStore {
   import CassandraDataStore._
 
   val cluster = Cluster.builder().addContactPoint("localhost").build()
-  val session = cluster.connect()
+  private val clusterSession: AtomicReference[Session] = new AtomicReference(null)
+  private def session = clusterSession.get()
+
   private lazy val selectMaxSeq = session.prepare(s"select seqMax from $userEventsTable where userId = :userId")
   private lazy val insertMaxSeq = session.prepare(s"insert into $userEventsTable (userId, seqMax) values (:userId, :newMax) if not exists")
   private lazy val updateMaxSeq = session.prepare(s"update $userEventsTable set seqMax = :newMax where userId = :userId if seqMax = :oldMax")
@@ -131,6 +136,10 @@ class CassandraDataStore extends DataStore {
   override def close(): Unit = {
     session.close()
     cluster.close()
+  }
+
+  override def connect(): Unit = {
+    clusterSession.compareAndSet(null, cluster.connect())
   }
 }
 

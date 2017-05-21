@@ -25,7 +25,7 @@ class RouteTest extends Specification with Specs2RouteTest with JMock {
     "Return a user profile" in {
       val userProfileProjection = mock[UserProfileProjection]
 
-      val webApi = new WebApi(null, null, userProfileProjection, null, null, null)
+      val webApi = new WebApi(null, null, userProfileProjection, null, null, null, null)
       val name = "Joe"
 
       checking {
@@ -40,10 +40,20 @@ class RouteTest extends Specification with Specs2RouteTest with JMock {
   }
 
   trait LoggedInUserContext {
-      val sessionId = randomUUID()
-      val userId = randomUUID()
-      val sessionIdHeader = RawHeader(WebApi.sessionIdHeader, sessionId.toString)
-      val dataStore = mock[DataStore]
+    val sessionId = randomUUID()
+    val userId = randomUUID()
+    val sessionIdHeader = RawHeader(WebApi.sessionIdHeader, sessionId.toString)
+    val dataStore = mock[DataStore]
+  }
+
+  trait NotLoggedInContext {
+    val commandProcessor = mock[CommandProcessor]
+    val dataStore = mock[DataStore]
+    val facebookConnector = mock[FacebookConnector]
+    val token = "auth-token"
+    val connectFacebookUser = ConnectFacebookUser("facebook-id", token, randomUUID()).asJson.noSpaces
+
+    val webApi = new WebApi(commandProcessor, null, null, dataStore, null, facebookConnector, null)
   }
 
   "Route" should {
@@ -54,9 +64,9 @@ class RouteTest extends Specification with Specs2RouteTest with JMock {
 
       val userProfileProjection = mock[UserProfileProjection]
       val userFriendsProjection = mock[UserFriendsProjection]
-      val webApi = new WebApi(null, null, userProfileProjection, dataStore, userFriendsProjection, null)
+      val webApi = new WebApi(null, null, userProfileProjection, dataStore, userFriendsProjection, null, null)
 
-      checking{
+      checking {
         allowing(dataStore).userBySession(sessionId).willReturn(Some(userId))
         allowing(userProfileProjection).get(userId).willReturn(UserProfile(Some(SocialData(Some(facebookId)))))
         allowing(userFriendsProjection).potentialFacebookFriends(having(===(facebookId)), having(any)).willReturn(Future.successful(potentialFriends))
@@ -73,7 +83,7 @@ class RouteTest extends Specification with Specs2RouteTest with JMock {
       val friendRequest = SendFriendRequest(potentialFriendId)
       val commandProcessor = mock[CommandProcessor]
 
-      val webApi = new WebApi(commandProcessor, null, null, dataStore, null, null)
+      val webApi = new WebApi(commandProcessor, null, null, dataStore, null, null, null)
 
       checking {
         ignoring(dataStore)
@@ -88,14 +98,7 @@ class RouteTest extends Specification with Specs2RouteTest with JMock {
       }
     }
 
-    "Validate facebook token" in {
-      val commandProcessor = mock[CommandProcessor]
-      val dataStore = mock[DataStore]
-      val facebookConnector = mock[FacebookConnector]
-      val token = "auth-token"
-      val connectFacebookUser = ConnectFacebookUser("facebook-id", token, randomUUID()).asJson.noSpaces
-
-      val webApi = new WebApi(commandProcessor, null, null, dataStore, null, facebookConnector)
+    "Validate facebook token" in new NotLoggedInContext {
 
       checking {
         ignoring(commandProcessor)
@@ -104,18 +107,11 @@ class RouteTest extends Specification with Specs2RouteTest with JMock {
       }
 
       Post("/users/connect/facebook").withEntity(`application/json`, connectFacebookUser) ~> webApi.userRoute ~> check {
-
+        ok
       }
     }
 
-    "Reject on invalid facebook token" in {
-      val commandProcessor = mock[CommandProcessor]
-      val dataStore = mock[DataStore]
-      val facebookConnector = mock[FacebookConnector]
-      val token = "auth-token"
-      val connectFacebookUser = ConnectFacebookUser("facebook-id", token, randomUUID()).asJson.noSpaces
-
-      val webApi = new WebApi(commandProcessor, null, null, dataStore, null, facebookConnector)
+    "Reject on invalid facebook token" in new NotLoggedInContext {
 
       checking {
         ignoring(commandProcessor)
@@ -127,9 +123,29 @@ class RouteTest extends Specification with Specs2RouteTest with JMock {
         status must beEqualTo(StatusCodes.Forbidden)
       }
     }
+
+    "return existing incoming friend requests" in new LoggedInUserContext {
+      val incomingFriendRequestsProjection = mock[IncomingFriendRequestsProjection]
+
+      val webApi = new WebApi(null, null, null, dataStore, null, null, incomingFriendRequestsProjection)
+      val friendRequestSender = randomUUID()
+
+      checking {
+        allowing(dataStore).userBySession(sessionId).willReturn(Option(userId))
+        oneOf(incomingFriendRequestsProjection).awaitingApproval(userId).willReturn(List(friendRequestSender))
+      }
+
+      Get("/users/friends/requests/incoming").withHeaders(sessionIdHeader) ~> webApi.userRoute ~> check {
+        responseAs[List[UUID]] must beEqualTo(List(friendRequestSender))
+      }
+    }
   }
 
   def aPotentialFriendWith(id: UUID, name: String): Matcher[PotentialFriend] =
-    (===(name) ^^ {(_:PotentialFriend).name}) and (===(id) ^^ {(_:PotentialFriend).userId})
+    (===(name) ^^ {
+      (_: PotentialFriend).name
+    }) and (===(id) ^^ {
+      (_: PotentialFriend).userId
+    })
 
 }

@@ -5,6 +5,7 @@ import java.util.concurrent.Executors
 import akka.actor.ActorSystem
 import akka.stream.ActorMaterializer
 import co.wishkeeper.server.FacebookTestHelper.{testAppId, testAppSecret}
+import com.typesafe.config.{ConfigFactory, ConfigValueFactory}
 import org.joda.time.DateTime
 import org.specs2.concurrent.ExecutionEnv
 import org.specs2.matcher.Matcher
@@ -18,7 +19,8 @@ class AkkaHttpFacebookConnectorTest extends Specification with AfterAll {
   implicit val executionEnv: ExecutionEnv = ExecutionEnv.fromExecutionContext(ExecutionEnv.createExecutionContext(
     Executors.newCachedThreadPool(), verbose = false, println))
 
-  implicit val system = ActorSystem("test-system")
+  implicit val system = ActorSystem("test-system",
+    ConfigFactory.load().withValue("akka.http.host-connection-pool.max-open-requests", ConfigValueFactory.fromAnyRef(64)))
   implicit val materializer = ActorMaterializer()
 
   val facebookTestHelper = new FacebookTestHelper

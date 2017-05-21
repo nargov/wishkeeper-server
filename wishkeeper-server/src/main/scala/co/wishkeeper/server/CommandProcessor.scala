@@ -25,8 +25,8 @@ class UserCommandProcessor(dataStore: DataStore, eventProcessors: List[EventProc
         ).getOrElse((User.createNew(), None))
         val events = command.process(user)
         dataStore.saveUserEvents(user.id, lastSeqNum, now, events)
-        dataStore.saveUserSession(user.id, connectUser.sessionId, now)
         events.foreach(event => eventProcessors.foreach(_.process(event)))
+        dataStore.saveUserSession(user.id, connectUser.sessionId, now)
 
       case _ =>
         val userId = sessionId.flatMap(userIdForSession).getOrElse(throw new SessionNotFoundException(sessionId))
@@ -34,6 +34,7 @@ class UserCommandProcessor(dataStore: DataStore, eventProcessors: List[EventProc
         val events: Seq[UserEvent] = command.process(user)
 
         dataStore.saveUserEvents(userId, dataStore.lastSequenceNum(userId), DateTime.now(), events)
+        events.foreach(event => eventProcessors.foreach(_.process(event)))
     }
   }
 
@@ -46,10 +47,12 @@ trait EventProcessor {
 }
 
 trait IncomingFriendRequestsProjection {
-
+  def awaitingApproval(userId: UUID): List[UUID]
 }
 
 class DataStoreIncomingFriendRequestsProjection(dataStore: DataStore) extends IncomingFriendRequestsProjection with EventProcessor {
+  def awaitingApproval(userId: UUID): List[UUID] = User.replay(dataStore.userEventsFor(userId)).friends.requestReceived
+
   override def process(event: Event): Unit = { event match {
     case FriendRequestSent(sender, userId) =>
       val lastSequenceNum = dataStore.lastSequenceNum(userId)

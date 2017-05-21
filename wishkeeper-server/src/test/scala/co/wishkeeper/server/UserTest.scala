@@ -91,12 +91,12 @@ class UserTest extends Specification with MatcherMacros with JMock {
   "apply FriendRequestSent" in new Context {
     private val potentialFriend = UUID.randomUUID()
     val friendRequest = FriendRequestSent(user.id, potentialFriend)
-    user.applyEvent(friendRequest).friends.pending must contain(potentialFriend)
+    user.applyEvent(friendRequest).friends.requestSent must contain(potentialFriend)
   }
 
   "apply FriendRequestReceived" in new Context {
     private val potentialFriend = UUID.randomUUID()
     val friendRequest = FriendRequestReceived(user.id, potentialFriend)
-    user.applyEvent(friendRequest).friends.awaitingApproval must contain(potentialFriend)
+    user.applyEvent(friendRequest).friends.requestReceived must contain(potentialFriend)
   }
 }

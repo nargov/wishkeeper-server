@@ -48,6 +48,7 @@ class WishkeeperE2E extends AsyncFlatSpec with Matchers with BeforeAndAfterAll w
   val facebookTestHelper = new FacebookTestHelper()
   val dataStoreTestHelper = DataStoreTestHelper()
 
+  val server = new WishkeeperServer()
   override protected def beforeAll(): Unit = {
     appiumService.start()
     driver = new AppiumDriver[MobileElement](capabilities)
@@ -56,12 +57,13 @@ class WishkeeperE2E extends AsyncFlatSpec with Matchers with BeforeAndAfterAll w
     CassandraDocker.start()
     dataStoreTestHelper.start()
     dataStoreTestHelper.createSchema()
+
+    server.start()
   }
 
   it should "allow user to login with facebook account" in {
     val testUser = facebookTestHelper.createTestUser()
 
-    new WishkeeperServer().start()
 
     driver.resetApp()
     driver.findElementByXPath("""//android.widget.TextView[@text="CONNECT WITH FACEBOOK"]""").click()
@@ -101,9 +103,10 @@ class WishkeeperE2E extends AsyncFlatSpec with Matchers with BeforeAndAfterAll w
   }
 
   override protected def afterAll(): Unit = {
+    server.stop()
     appiumService.stop()
     facebookTestHelper.deleteTestUsers()
-    dataStoreTestHelper.terminate()
+    dataStoreTestHelper.stop()
     system.terminate()
   }
 

@@ -53,10 +53,11 @@ class CassandraDataStoreIT extends FlatSpec with Matchers with BeforeAndAfterAll
     dataStoreTestHelper.createSchema()
 
     eventStore = new CassandraDataStore
+    eventStore.connect()
   }
 
   override protected def afterAll(): Unit = {
     eventStore.close()
-    dataStoreTestHelper.terminate()
+    dataStoreTestHelper.stop()
   }
 }

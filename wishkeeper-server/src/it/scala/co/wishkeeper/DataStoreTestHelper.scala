@@ -6,7 +6,7 @@ import org.scalatest.Matchers
 
 class DataStoreTestHelper extends Matchers {
 
-  def terminate() = {
+  def stop() = {
     session.close()
     cluster.close()
   }
