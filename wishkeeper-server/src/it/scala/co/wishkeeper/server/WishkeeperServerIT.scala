@@ -13,6 +13,7 @@ import org.specs2.specification.BeforeAfterAll
 import scala.concurrent.Future
 
 class WishkeeperServerIT(implicit ee: ExecutionEnv) extends Specification with BeforeAfterAll with ResponseMatchers {
+  sequential
 
   val dataStoreTestHelper = DataStoreTestHelper()
   val facebookTestHelper = new FacebookTestHelper
