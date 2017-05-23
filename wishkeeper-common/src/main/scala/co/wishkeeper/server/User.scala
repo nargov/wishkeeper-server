@@ -4,7 +4,7 @@ import java.util.UUID
 
 import co.wishkeeper.server.Events._
 
-case class User(id: UUID, userProfile: UserProfile = UserProfile(), friends: Friends = Friends()) {
+case class User(id: UUID, userProfile: UserProfile = UserProfile(), friends: Friends = Friends(), wishes: Map[UUID, Wish] = Map.empty) {
 
   def applyEvent(event: UserEvent): User = event match {
     case UserFirstNameSet(_, value) => this.copy(userProfile = this.userProfile.copy(firstName = Option(value)))
@@ -23,8 +23,16 @@ case class User(id: UUID, userProfile: UserProfile = UserProfile(), friends: Fri
       }))
     case FriendRequestSent(_, friendId) => this.copy(friends = this.friends.copy(requestSent = this.friends.requestSent :+ friendId))
     case FriendRequestReceived(_, friendId) => this.copy(friends = this.friends.copy(requestReceived = this.friends.requestReceived :+ friendId))
+    case WishNameSet(wishId, name) => updateWishProperty(wishId, _.withName(name))
+    case WishLinkSet(wishId, link) => updateWishProperty(wishId, _.withLink(link))
+    case WishImageLinkSet(wishId, link) => updateWishProperty(wishId, _.withImageLink(link))
+    case WishStoreSet(wishId, store) => updateWishProperty(wishId, _.withStore(store))
+    case WishOtherInfoSet(wishId, info) => updateWishProperty(wishId, _.withOtherInfo(info))
     case _ => this
   }
+
+  private def updateWishProperty(wishId: UUID, updater: Wish => Wish) =
+    this.copy(wishes = wishes + (wishId -> updater(wishes.getOrElse(wishId, Wish(wishId)))))
 
   lazy val facebookId: Option[String] = userProfile.socialData.flatMap(_.facebookId)
 }

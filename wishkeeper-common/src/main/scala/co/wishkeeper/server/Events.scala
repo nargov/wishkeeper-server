@@ -38,4 +38,13 @@ object Events {
 
   case class FriendRequestReceived(userId: UUID, from: UUID) extends UserEvent
 
+  case class WishNameSet(wishId: UUID, name: String) extends UserEvent
+
+  case class WishLinkSet(wishId: UUID, link: String) extends UserEvent
+
+  case class WishImageLinkSet(wishId: UUID, link: String) extends UserEvent
+
+  case class WishStoreSet(wishId: UUID, store: String) extends UserEvent
+
+  case class WishOtherInfoSet(wishId: UUID, otherInfo: String) extends UserEvent
 }

@@ -1,15 +1,13 @@
 package co.wishkeeper.server
 
 import java.util.UUID
-import java.util.concurrent.atomic.AtomicBoolean
+import java.util.UUID.randomUUID
 
-import co.wishkeeper.server.Commands.UserCommand
 import co.wishkeeper.server.Events._
 import com.wixpress.common.specs2.JMock
+import org.joda.time.DateTime
 import org.specs2.matcher.MatcherMacros
 import org.specs2.mutable.Specification
-import User._
-import org.joda.time.DateTime
 import org.specs2.specification.Scope
 
 import scala.language.experimental.macros
@@ -80,7 +78,7 @@ class UserTest extends Specification with MatcherMacros with JMock {
 
   "Recreate from Events" in new Context {
     val name = "Joe"
-    val events = List(UserConnected(user.id, DateTime.now(), UUID.randomUUID()), UserNameSet(user.id, name))
+    val events = List(UserConnected(user.id, DateTime.now(), randomUUID()), UserNameSet(user.id, name))
     User.replay(events) must beEqualTo(User(user.id, UserProfile(name = Option(name))))
   }
 
@@ -89,14 +87,44 @@ class UserTest extends Specification with MatcherMacros with JMock {
   }
 
   "apply FriendRequestSent" in new Context {
-    private val potentialFriend = UUID.randomUUID()
+    private val potentialFriend = randomUUID()
     val friendRequest = FriendRequestSent(user.id, potentialFriend)
     user.applyEvent(friendRequest).friends.requestSent must contain(potentialFriend)
   }
 
   "apply FriendRequestReceived" in new Context {
-    private val potentialFriend = UUID.randomUUID()
+    private val potentialFriend = randomUUID()
     val friendRequest = FriendRequestReceived(user.id, potentialFriend)
     user.applyEvent(friendRequest).friends.requestReceived must contain(potentialFriend)
+  }
+
+  "apply WishNameSet" in new Context {
+    private val name = "name"
+    val expectedWish = Wish(randomUUID(), name = Option(name))
+    user.applyEvent(WishNameSet(expectedWish.id, name)).wishes must havePair(expectedWish.id -> expectedWish)
+  }
+
+  "apply WishLinkSet" in new Context {
+    private val link = "link"
+    val expectedWish = Wish(randomUUID(), link = Option(link))
+    user.applyEvent(WishLinkSet(expectedWish.id, link)).wishes must havePair(expectedWish.id -> expectedWish)
+  }
+
+  "apply WishImageLinkSet" in new Context {
+    private val imageLink = "image"
+    val expectedWish = Wish(randomUUID(), imageLink = Option(imageLink))
+    user.applyEvent(WishImageLinkSet(expectedWish.id, imageLink)).wishes must havePair(expectedWish.id -> expectedWish)
+  }
+
+  "apply WishStoreSet" in new Context {
+    private val store = "store"
+    val expectedWish = Wish(randomUUID(), store = Option(store))
+    user.applyEvent(WishStoreSet(expectedWish.id, store)).wishes must havePair(expectedWish.id -> expectedWish)
+  }
+
+  "apply WishOtherInfoSet" in new Context {
+    private val otherInfo = "other info"
+    val expectedWish = Wish(randomUUID(), otherInfo = Option(otherInfo))
+    user.applyEvent(WishOtherInfoSet(expectedWish.id, otherInfo)).wishes must havePair(expectedWish.id -> expectedWish)
   }
 }

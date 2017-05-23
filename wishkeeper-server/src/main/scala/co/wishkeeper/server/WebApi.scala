@@ -3,6 +3,7 @@ package co.wishkeeper.server
 import java.util.UUID
 
 import akka.actor.ActorSystem
+import akka.http.javadsl.server.RejectionHandler
 import akka.http.scaladsl.Http.ServerBinding
 import akka.http.scaladsl.model.{HttpRequest, StatusCodes}
 import akka.http.scaladsl.server.Directives.{as, complete, entity, get, headerValueByName, path, pathPrefix, post, _}
@@ -12,7 +13,7 @@ import akka.http.scaladsl.{Http, HttpExt}
 import akka.stream.ActorMaterializer
 import akka.util.Timeout
 import co.wishkeeper.json._
-import co.wishkeeper.server.Commands.{ConnectFacebookUser, SendFriendRequest, SetFacebookUserInfo}
+import co.wishkeeper.server.Commands.{ConnectFacebookUser, SendFriendRequest, SetFacebookUserInfo, SetWishDetails}
 import co.wishkeeper.server.projections.{DataStoreUserIdByFacebookIdProjection, UserFriendsProjection, UserProfileProjection}
 import de.heikoseeberger.akkahttpcirce.CirceSupport._
 import io.circe.generic.auto._
@@ -50,67 +51,75 @@ class WebApi(commandProcessor: CommandProcessor, userIdByFacebookIdProjection: D
             }
           }
         } ~
-          headerValueByName(WebApi.sessionIdHeader) { sessionId =>
-            path("info" / "facebook") {
-              post {
-                entity(as[SetFacebookUserInfo]) { info =>
-                  commandProcessor.process(info, Option(UUID.fromString(sessionId))) //TODO move the UUID parsing to a custom directive
-                  complete(StatusCodes.OK)
-                }
+        headerValueByName(WebApi.sessionIdHeader) { sessionId =>
+          path("info" / "facebook") {
+            post {
+              entity(as[SetFacebookUserInfo]) { info =>
+                commandProcessor.process(info, Option(UUID.fromString(sessionId))) //TODO move the UUID parsing to a custom directive
+                complete(StatusCodes.OK)
+              }
+            }
+          } ~
+          pathPrefix("friends") {
+            (path("facebook") & get) {
+              headerValueByName(WebApi.facebookAccessTokenHeader) { accessToken =>
+                val maybeFacebookId: Option[String] = for {
+                  userId <- dataStore.userBySession(UUID.fromString(sessionId))
+                  socialData <- userProfileProjection.get(userId).socialData
+                  facebookId <- socialData.facebookId
+                } yield facebookId
+
+                maybeFacebookId.
+                  map(userFriendsProjection.potentialFacebookFriends(_, accessToken)).
+                  map(complete(_)).
+                  get //TODO test for rejection if user not found
               }
             } ~
-              pathPrefix("friends") {
-                (path("facebook") & get) {
-                  headerValueByName(WebApi.facebookAccessTokenHeader) { accessToken =>
-                    val maybeFacebookId: Option[String] = for {
-                      userId <- dataStore.userBySession(UUID.fromString(sessionId))
-                      socialData <- userProfileProjection.get(userId).socialData
-                      facebookId <- socialData.facebookId
-                    } yield facebookId
-
-                    maybeFacebookId.
-                      map(userFriendsProjection.potentialFacebookFriends(_, accessToken)).
-                      map(complete(_)).
-                      get //TODO test for rejection if user not found
-                  }
-                } ~
-                  (path("request") & post) {
-                    entity(as[SendFriendRequest]) { sendFriendRequest =>
-                      commandProcessor.process(sendFriendRequest, Option(UUID.fromString(sessionId)))
-                      complete(StatusCodes.OK)
-                    }
-                  } ~
-                  (path("requests" / "incoming") & get) {
-                    dataStore.userBySession(UUID.fromString(sessionId)).
-                      map(incomingFriendRequestsProjection.awaitingApproval).
-                      map(complete(_)).
-                      get //TODO test for rejection if user not found
-                  }
+            (path("request") & post) {
+              entity(as[SendFriendRequest]) { sendFriendRequest =>
+                commandProcessor.process(sendFriendRequest, Option(UUID.fromString(sessionId)))
+                complete(StatusCodes.OK)
               }
-
+            } ~
+            (path("requests" / "incoming") & get) {
+              dataStore.userBySession(UUID.fromString(sessionId)).
+                map(incomingFriendRequestsProjection.awaitingApproval).
+                map(complete(_)).
+                get //TODO test for rejection if user not found
+            }
+          } ~
+          pathPrefix("wishes") {
+            post {
+              entity(as[SetWishDetails]) { setWishDetails =>
+                commandProcessor.process(setWishDetails, Option(UUID.fromString(sessionId)))
+                complete(StatusCodes.OK)
+              }
+            }
           }
-      } ~
-        (path("uuid") & get) {
-          complete(UUID.randomUUID())
         }
+      } ~
+      (path("uuid") & get) {
+        complete(UUID.randomUUID())
+      }
     }
 
 
   val managementRoute: Route =
     DebuggingDirectives.logRequestResult(LoggingMagnet(_ => printer)) {
       pathPrefix("users") {
-        path("facebook" / """\d+""".r) { facebookId ⇒
-          get {
+        get {
+          path("facebook" / """\d+""".r) { facebookId ⇒
             userIdByFacebookIdProjection.get(facebookId).
               map(id ⇒ complete(id)).
               getOrElse(complete(StatusCodes.NotFound))
-          }
-        } ~
-          get {
-            path(JavaUUID / "profile") { userId =>
+          } ~
+          path(JavaUUID / "profile") { userId =>
               complete(userProfileProjection.get(userId))
-            }
+          } ~
+          path(JavaUUID / "wishes") { userId =>
+            complete(User.replay(dataStore.userEventsFor(userId)).wishes.values)
           }
+        }
       }
     }
 
@@ -124,7 +133,7 @@ class WebApi(commandProcessor: CommandProcessor, userIdByFacebookIdProjection: D
     )
   }
 
-  def stop() = bindings.foreach(_.map(_.unbind()))
+  def stop(): Unit = bindings.foreach(_.map(_.unbind()))
 }
 
 object WebApi {
