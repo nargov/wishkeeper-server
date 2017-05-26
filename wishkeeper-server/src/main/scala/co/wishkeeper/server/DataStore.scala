@@ -7,7 +7,8 @@ import java.util.concurrent.atomic.AtomicReference
 import co.wishkeeper.json._
 import co.wishkeeper.server.Events.UserEvent
 import com.datastax.driver.core._
-import io.circe.generic.auto._
+import io.circe.generic.extras
+import io.circe.generic.extras.auto._
 import io.circe.parser.decode
 import io.circe.syntax._
 import org.joda.time.DateTime
@@ -41,6 +42,8 @@ trait DataStore {
 class CassandraDataStore extends DataStore {
 
   import CassandraDataStore._
+
+  private implicit val circeConfig = extras.Configuration.default.withDefaults
 
   val cluster = Cluster.builder().addContactPoint("localhost").build()
   private val clusterSession: AtomicReference[Session] = new AtomicReference(null)

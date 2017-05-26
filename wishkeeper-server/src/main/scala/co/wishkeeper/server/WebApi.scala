@@ -3,7 +3,6 @@ package co.wishkeeper.server
 import java.util.UUID
 
 import akka.actor.ActorSystem
-import akka.http.javadsl.server.RejectionHandler
 import akka.http.scaladsl.Http.ServerBinding
 import akka.http.scaladsl.model.{HttpRequest, StatusCodes}
 import akka.http.scaladsl.server.Directives.{as, complete, entity, get, headerValueByName, path, pathPrefix, post, _}
@@ -16,10 +15,11 @@ import co.wishkeeper.json._
 import co.wishkeeper.server.Commands.{ConnectFacebookUser, SendFriendRequest, SetFacebookUserInfo, SetWishDetails}
 import co.wishkeeper.server.projections.{DataStoreUserIdByFacebookIdProjection, UserFriendsProjection, UserProfileProjection}
 import de.heikoseeberger.akkahttpcirce.CirceSupport._
-import io.circe.generic.auto._
+import io.circe.generic.extras.Configuration
+import io.circe.generic.extras.auto._
 
-import scala.concurrent.{ExecutionContextExecutor, Future}
 import scala.concurrent.duration._
+import scala.concurrent.{ExecutionContextExecutor, Future}
 
 class WebApi(commandProcessor: CommandProcessor, userIdByFacebookIdProjection: DataStoreUserIdByFacebookIdProjection,
              userProfileProjection: UserProfileProjection, dataStore: DataStore, userFriendsProjection: UserFriendsProjection,
@@ -27,6 +27,8 @@ class WebApi(commandProcessor: CommandProcessor, userIdByFacebookIdProjection: D
             (implicit system: ActorSystem, materializer: ActorMaterializer, executionContext: ExecutionContextExecutor) {
 
   private implicit val timeout: Timeout = 4.seconds
+
+  private implicit val circeConfig = Configuration.default.withDefaults
 
   val printer: HttpRequest => RouteResult => Unit = req => res => {
     system.log.info(req.toString)

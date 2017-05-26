@@ -27,6 +27,15 @@ lazy val commonSettings = Seq(
     "com.wix" %% "specs2-jmock" % "1.0.0" % Test
   ),
 
+  libraryDependencies += "org.typelevel" %% "cats" % "0.9.0",
+
+  libraryDependencies ++= Seq(
+    "io.circe" %% "circe-core",
+    "io.circe" %% "circe-generic",
+    "io.circe" %% "circe-parser",
+    "io.circe" %% "circe-generic-extras"
+  ).map(_ % circeVersion),
+
   libraryDependencies ++= Seq(
     "ch.qos.logback" % "logback-core",
     "ch.qos.logback" % "logback-classic"
@@ -62,13 +71,7 @@ lazy val server = (project in file("wishkeeper-server")).
       "com.datastax.cassandra" % "cassandra-driver-core" % "3.2.0",
       "org.slf4j" % "slf4j-api" % "1.7.22",
       "io.appium" % "java-client" % "5.0.0-BETA6" % "it" exclude("com.codeborne", "phantomjsdriver")
-    ),
-    libraryDependencies ++= Seq(
-      "io.circe" %% "circe-core",
-      "io.circe" %% "circe-generic",
-      "io.circe" %% "circe-parser",
-      "io.circe" %% "circe-generic-extras"
-    ).map(_ % circeVersion)
+    )
   ).
   dependsOn(common, testUtils % "it->compile")
 

@@ -61,4 +61,14 @@ class SetWishDetailsTest extends Specification {
 
     command.process(user) must contain(allOf(expectedEvents: _*))
   }
+
+  "should create event for price" in {
+    val price = "5.00"
+    SetWishDetails(Wish(wishId).withPrice(price)).process(user) must beEqualTo(List(WishPriceSet(wishId, price)))
+  }
+
+  "should create event for currency" in {
+    val currency = "USD"
+    SetWishDetails(Wish(wishId).withCurrency(currency)).process(user) must beEqualTo(List(WishCurrencySet(wishId, currency)))
+  }
 }

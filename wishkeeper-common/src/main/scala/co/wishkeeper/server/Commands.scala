@@ -63,7 +63,9 @@ object Commands {
       wish.link.map(WishLinkSet(wish.id, _)),
       wish.imageLink.map(WishImageLinkSet(wish.id, _)),
       wish.store.map(WishStoreSet(wish.id, _)),
-      wish.otherInfo.map(WishOtherInfoSet(wish.id, _))
+      wish.otherInfo.map(WishOtherInfoSet(wish.id, _)),
+      wish.price.map(WishPriceSet(wish.id, _)),
+      wish.currency.map(WishCurrencySet(wish.id, _))
     ).flatten
   }
 }

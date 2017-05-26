@@ -47,4 +47,8 @@ object Events {
   case class WishStoreSet(wishId: UUID, store: String) extends UserEvent
 
   case class WishOtherInfoSet(wishId: UUID, otherInfo: String) extends UserEvent
+
+  case class WishPriceSet(wishId: UUID, price: String) extends UserEvent
+
+  case class WishCurrencySet(wishId: UUID, currency: String) extends UserEvent
 }

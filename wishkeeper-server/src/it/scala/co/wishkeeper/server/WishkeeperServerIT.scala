@@ -13,7 +13,7 @@ import org.specs2.specification.BeforeAfterAll
 import scala.concurrent.Future
 
 class WishkeeperServerIT(implicit ee: ExecutionEnv) extends Specification with BeforeAfterAll with ResponseMatchers {
-  sequential
+  sequential //TODO remove this when thread safe - see CommandProcessor FIXME for more details.
 
   val dataStoreTestHelper = DataStoreTestHelper()
   val facebookTestHelper = new FacebookTestHelper
