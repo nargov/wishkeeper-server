@@ -1,5 +1,6 @@
 package co.wishkeeper.server
 
+import java.nio.ByteBuffer
 import java.util.concurrent.Executors
 
 import akka.actor.ActorSystem
@@ -12,6 +13,7 @@ import io.circe.parser.decode
 import io.circe.syntax._
 import org.specs2.matcher.{Matcher, MustThrownMatchers}
 
+import scala.collection.mutable.ListBuffer
 import scala.concurrent.duration._
 import scala.concurrent.{Await, ExecutionContext, Future}
 
@@ -67,6 +69,10 @@ object HttpTestKit {
         }
       Await.result(futureResult, timeout.duration)
     }
+
+    def bytes: Seq[Byte] = Await.result(response.entity.dataBytes.runFold(Vector.empty[Byte])(_ ++ _.toList), timeout.duration)
+
+    def contentType: String = response.entity.contentType.value
   }
 
   case class Timeout(duration: Duration)

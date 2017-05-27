@@ -70,6 +70,8 @@ lazy val server = (project in file("wishkeeper-server")).
       "de.heikoseeberger" %% "akka-http-circe" % "1.12.0",
       "com.datastax.cassandra" % "cassandra-driver-core" % "3.2.0",
       "org.slf4j" % "slf4j-api" % "1.7.22",
+      "com.google.api-client" % "google-api-client" % "1.22.0",
+      "com.google.cloud" % "google-cloud-storage" % "1.0.2",
       "io.appium" % "java-client" % "5.0.0-BETA6" % "it" exclude("com.codeborne", "phantomjsdriver")
     )
   ).
