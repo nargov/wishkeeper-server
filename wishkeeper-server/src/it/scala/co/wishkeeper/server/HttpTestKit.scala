@@ -1,19 +1,21 @@
 package co.wishkeeper.server
 
-import java.nio.ByteBuffer
+import java.util.UUID
 import java.util.concurrent.Executors
 
 import akka.actor.ActorSystem
+import akka.http.javadsl.model.BodyPartEntity
 import akka.http.scaladsl.Http
-import akka.http.scaladsl.model.headers.RawHeader
+import akka.http.scaladsl.marshalling.Marshal
+import akka.http.scaladsl.model.Multipart.FormData.BodyPart
 import akka.http.scaladsl.model._
+import akka.http.scaladsl.model.headers.RawHeader
 import akka.stream.ActorMaterializer
-import io.circe.{Decoder, Encoder}
 import io.circe.parser.decode
 import io.circe.syntax._
+import io.circe.{Decoder, Encoder}
 import org.specs2.matcher.{Matcher, MustThrownMatchers}
 
-import scala.collection.mutable.ListBuffer
 import scala.concurrent.duration._
 import scala.concurrent.{Await, ExecutionContext, Future}
 
@@ -53,6 +55,31 @@ object HttpTestKit {
                 (implicit encoder: Encoder[T]): Future[Response] = new Post(uri, headers, payload).response
   }
 
+  class ImagePost private(uri: String, testImage: TestImage, imageId: UUID, headers: Map[String, String])
+                         (implicit timeout: Timeout, materializer: ActorMaterializer) {
+    private val imageContentType = ContentType.parse(testImage.contentType).right.get
+    private val part = BodyPart("file", HttpEntity.fromPath(imageContentType, testImage.path), Map("filename" -> imageId.toString))
+    private val formData = Multipart.FormData(part)
+
+    private val response: Future[Response] = {
+      val eventualEntity: Future[RequestEntity] = Marshal(formData).to[RequestEntity]
+      eventualEntity.flatMap { entity =>
+        Http().singleRequest(
+          httpRequest(uri, headers).
+            withMethod(HttpMethods.POST).
+            withEntity(entity)
+        ).map(Response(_, timeout))
+      }
+    }
+
+    private def waitFor: Response = Await.result(response, timeout.duration)
+  }
+
+  object ImagePost {
+    def apply(uri: String, testImage: TestImage, imageId: UUID, headers: Map[String, String] = Map.empty): Response =
+      new ImagePost(uri, testImage, imageId, headers).waitFor
+  }
+
   private def httpRequest(uri: String, headers: Map[String, String]) =
     HttpRequest().withUri(uri).withHeaders(headers.map(h => RawHeader(h._1, h._2)).toList)
 
@@ -84,5 +111,9 @@ object HttpTestKit {
 trait ResponseMatchers extends MustThrownMatchers {
   def beOk: Matcher[HttpTestKit.Response] = beEqualTo(StatusCodes.OK) ^^ {
     (_: HttpTestKit.Response).status
+  }
+
+  def beSuccessful: Matcher[HttpTestKit.Response] = between(200, 300) ^^ {
+    (_: HttpTestKit.Response).status.intValue()
   }
 }

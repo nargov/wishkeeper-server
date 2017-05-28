@@ -64,6 +64,7 @@ class DataStoreIncomingFriendRequestsProjection(dataStore: DataStore) extends In
   }}
 }
 
-class SessionNotFoundException(sessionId: Option[UUID]) extends RuntimeException
+class SessionNotFoundException(sessionId: Option[UUID]) extends RuntimeException(
+  sessionId.map(id => s"Session ${id.toString} not found.").getOrElse("Session not found"))
 
 case class PotentialFriend(userId: UUID, name: String, image: String, requestSent: Boolean = false)

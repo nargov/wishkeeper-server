@@ -10,6 +10,7 @@ import akka.http.scaladsl.server.directives.{DebuggingDirectives, LoggingMagnet}
 import akka.http.scaladsl.server.{AuthorizationFailedRejection, Route, RouteResult}
 import akka.http.scaladsl.{Http, HttpExt}
 import akka.stream.ActorMaterializer
+import akka.stream.scaladsl.StreamConverters
 import akka.util.Timeout
 import co.wishkeeper.json._
 import co.wishkeeper.server.Commands.{ConnectFacebookUser, SendFriendRequest, SetFacebookUserInfo, SetWishDetails}
@@ -20,10 +21,12 @@ import io.circe.generic.extras.auto._
 
 import scala.concurrent.duration._
 import scala.concurrent.{ExecutionContextExecutor, Future}
+import scala.util.Try
 
 class WebApi(commandProcessor: CommandProcessor, userIdByFacebookIdProjection: DataStoreUserIdByFacebookIdProjection,
              userProfileProjection: UserProfileProjection, dataStore: DataStore, userFriendsProjection: UserFriendsProjection,
-             facebookConnector: FacebookConnector, incomingFriendRequestsProjection: IncomingFriendRequestsProjection)
+             facebookConnector: FacebookConnector, incomingFriendRequestsProjection: IncomingFriendRequestsProjection,
+             imageStore: ImageStore)
             (implicit system: ActorSystem, materializer: ActorMaterializer, executionContext: ExecutionContextExecutor) {
 
   private implicit val timeout: Timeout = 4.seconds
@@ -95,6 +98,19 @@ class WebApi(commandProcessor: CommandProcessor, userIdByFacebookIdProjection: D
               entity(as[SetWishDetails]) { setWishDetails =>
                 commandProcessor.process(setWishDetails, Option(UUID.fromString(sessionId)))
                 complete(StatusCodes.OK)
+              }
+            } ~
+            path(JavaUUID / "image") { wishId =>
+              post {
+                fileUpload("file") { case (metadata, byteSource) =>
+                  val inputStream = byteSource.runWith(StreamConverters.asInputStream(4.seconds))
+                  Try {
+                    imageStore.save(ImageData(inputStream, metadata.contentType.value), metadata.fileName)
+                    commandProcessor.process(
+                      SetWishDetails(Wish(wishId, imageLink = Option(s"http://wish.media.wishkeeper.co/${metadata.fileName}"))),
+                      Option(UUID.fromString(sessionId)))
+                  }.map(_ => complete(StatusCodes.Created)).get //TODO Handle upload failure
+                }
               }
             }
           }

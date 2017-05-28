@@ -1,6 +1,7 @@
 package co.wishkeeper.server
 
 import java.util.UUID
+import java.util.UUID.randomUUID
 
 import co.wishkeeper.DataStoreTestHelper
 import co.wishkeeper.server.Commands.{ConnectFacebookUser, SendFriendRequest, SetWishDetails}
@@ -20,11 +21,12 @@ class WishkeeperServerIT(implicit ee: ExecutionEnv) extends Specification with B
 
   val server = new WishkeeperServer
   val usersEndpoint = s"http://localhost:${WebApi.defaultPort}/users"
+  val usersManagementEndpoint = s"http://localhost:${WebApi.defaultManagementPort}/users"
 
   var testUsers: List[TestFacebookUser] = _
 
   "User should be able to send a friend request" in {
-    val connectRequests: Seq[ConnectFacebookUser] = testUsers.map(user => ConnectFacebookUser(user.id, user.access_token, UUID.randomUUID()))
+    val connectRequests: Seq[ConnectFacebookUser] = testUsers.map(user => ConnectFacebookUser(user.id, user.access_token, randomUUID()))
     val user1Connect :: user2Connect :: Nil = connectRequests
     Future.sequence(connectRequests.map(Post.async(s"$usersEndpoint/connect/facebook", _))) must forall(beOk).await
 
@@ -45,18 +47,34 @@ class WishkeeperServerIT(implicit ee: ExecutionEnv) extends Specification with B
 
   "User should be able to save Wish details" in {
     val facebookUser = testUsers.head
-    val sessionId = UUID.randomUUID()
+    val sessionId = randomUUID()
 
     Post(s"$usersEndpoint/connect/facebook", ConnectFacebookUser(facebookUser.id, facebookUser.access_token, sessionId))
 
-    val wish = Wish(UUID.randomUUID()).withName("Expected Name").withImageLink("expected image link")
+    val wish = Wish(randomUUID()).withName("Expected Name").withImageLink("expected image link")
     Post(s"$usersEndpoint/wishes", SetWishDetails(wish), Map(WebApi.sessionIdHeader -> sessionId.toString)) must beOk
 
-    val userId = Get(s"http://localhost:${WebApi.defaultManagementPort}/users/facebook/${facebookUser.id}").to[UUID]
+    val userId = Get(s"$usersManagementEndpoint/facebook/${facebookUser.id}").to[UUID]
 
-    val response = Get(s"http://localhost:${WebApi.defaultManagementPort}/users/$userId/wishes")
+    val response = Get(s"$usersManagementEndpoint/$userId/wishes")
     response must beOk
     response.to[List[Wish]] must contain(exactly(wish))
+  }
+
+  "Upload a wish image" in {
+    val facebookUser = testUsers.head
+    val sessionId = randomUUID()
+    val testImage = new TestImage
+    val wishId = randomUUID()
+    val imageId = new UUID(0, 0)
+
+    Post(s"$usersEndpoint/connect/facebook", ConnectFacebookUser(facebookUser.id, facebookUser.access_token, sessionId))
+
+    ImagePost(s"$usersEndpoint/wishes/$wishId/image", testImage, imageId, Map(WebApi.sessionIdHeader -> sessionId.toString)) must beSuccessful
+
+    val imageResponse = Get(s"http://wish.media.wishkeeper.co/$imageId")
+    imageResponse.contentType must beEqualTo(testImage.contentType)
+    imageResponse.bytes must containTheSameElementsAs(testImage.fileBytes)
   }
 
   override def beforeAll(): Unit = {

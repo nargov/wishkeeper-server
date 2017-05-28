@@ -25,7 +25,7 @@ class RouteTest extends Specification with Specs2RouteTest with JMock {
     "Return a user profile" in {
       val userProfileProjection = mock[UserProfileProjection]
 
-      val webApi = new WebApi(null, null, userProfileProjection, null, null, null, null)
+      val webApi = new WebApi(null, null, userProfileProjection, null, null, null, null, null)
       val name = "Joe"
 
       checking {
@@ -53,7 +53,7 @@ class RouteTest extends Specification with Specs2RouteTest with JMock {
     val token = "auth-token"
     val connectFacebookUser = ConnectFacebookUser("facebook-id", token, randomUUID()).asJson.noSpaces
 
-    val webApi = new WebApi(commandProcessor, null, null, dataStore, null, facebookConnector, null)
+    val webApi = new WebApi(commandProcessor, null, null, dataStore, null, facebookConnector, null, null)
   }
 
   "Route" should {
@@ -64,7 +64,7 @@ class RouteTest extends Specification with Specs2RouteTest with JMock {
 
       val userProfileProjection = mock[UserProfileProjection]
       val userFriendsProjection = mock[UserFriendsProjection]
-      val webApi = new WebApi(null, null, userProfileProjection, dataStore, userFriendsProjection, null, null)
+      val webApi = new WebApi(null, null, userProfileProjection, dataStore, userFriendsProjection, null, null, null)
 
       checking {
         allowing(dataStore).userBySession(sessionId).willReturn(Some(userId))
@@ -83,7 +83,7 @@ class RouteTest extends Specification with Specs2RouteTest with JMock {
       val friendRequest = SendFriendRequest(potentialFriendId)
       val commandProcessor = mock[CommandProcessor]
 
-      val webApi = new WebApi(commandProcessor, null, null, dataStore, null, null, null)
+      val webApi = new WebApi(commandProcessor, null, null, dataStore, null, null, null, null)
 
       checking {
         ignoring(dataStore)
@@ -127,7 +127,7 @@ class RouteTest extends Specification with Specs2RouteTest with JMock {
     "return existing incoming friend requests" in new LoggedInUserContext {
       val incomingFriendRequestsProjection = mock[IncomingFriendRequestsProjection]
 
-      val webApi = new WebApi(null, null, null, dataStore, null, null, incomingFriendRequestsProjection)
+      val webApi = new WebApi(null, null, null, dataStore, null, null, incomingFriendRequestsProjection,  null)
       val friendRequestSender = randomUUID()
 
       checking {

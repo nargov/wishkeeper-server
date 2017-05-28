@@ -26,8 +26,9 @@ class WishkeeperServer() {
     config.getString("wishkeeper.facebook.app-id"),
     config.getString("wishkeeper.facebook.app-secret"))
   private val userFriendsProjection: UserFriendsProjection = new DelegatingUserFriendsProjection(facebookConnector, userIdByFacebookIdProjection)
+  private val imageStore = new GoogleCloudStorageImageStore
   private val webApi = new WebApi(commandProcessor, userIdByFacebookIdProjection, userProfileProjection, dataStore, userFriendsProjection,
-    facebookConnector, incomingFriendRequestsProjection)
+    facebookConnector, incomingFriendRequestsProjection, imageStore)
 
   def start(): Unit = {
     dataStore.connect()
