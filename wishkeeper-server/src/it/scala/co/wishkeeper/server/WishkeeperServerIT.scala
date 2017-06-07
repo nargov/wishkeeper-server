@@ -12,6 +12,7 @@ import org.specs2.mutable.Specification
 import org.specs2.specification.BeforeAfterAll
 
 import scala.concurrent.Future
+import scala.concurrent.duration._
 
 class WishkeeperServerIT(implicit ee: ExecutionEnv) extends Specification with BeforeAfterAll with ResponseMatchers {
   sequential //TODO remove this when thread safe - see CommandProcessor FIXME for more details.
@@ -28,7 +29,7 @@ class WishkeeperServerIT(implicit ee: ExecutionEnv) extends Specification with B
   "User should be able to send a friend request" in {
     val connectRequests: Seq[ConnectFacebookUser] = testUsers.map(user => ConnectFacebookUser(user.id, user.access_token, randomUUID()))
     val user1Connect :: user2Connect :: Nil = connectRequests
-    Future.sequence(connectRequests.map(Post.async(s"$usersEndpoint/connect/facebook", _))) must forall(beOk).await
+    Future.sequence(connectRequests.map(Post.async(s"$usersEndpoint/connect/facebook", _))) must forall(beOk).await(20, 0.5.seconds)
 
     val user1SessionHeader = WebApi.sessionIdHeader -> user1Connect.sessionId.toString
     val user2SessionHeader = WebApi.sessionIdHeader -> user2Connect.sessionId.toString

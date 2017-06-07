@@ -13,8 +13,8 @@ import akka.stream.ActorMaterializer
 import akka.stream.scaladsl.StreamConverters
 import akka.util.Timeout
 import co.wishkeeper.json._
-import co.wishkeeper.server.Commands.{ConnectFacebookUser, SendFriendRequest, SetFacebookUserInfo, SetWishDetails}
-import co.wishkeeper.server.projections.{DataStoreUserIdByFacebookIdProjection, UserFriendsProjection, UserProfileProjection}
+import co.wishkeeper.server.Commands._
+import co.wishkeeper.server.projections.{UserFriendsProjection, UserIdByFacebookIdProjection, UserProfileProjection}
 import de.heikoseeberger.akkahttpcirce.CirceSupport._
 import io.circe.generic.extras.Configuration
 import io.circe.generic.extras.auto._
@@ -23,7 +23,7 @@ import scala.concurrent.duration._
 import scala.concurrent.{ExecutionContextExecutor, Future}
 import scala.util.Try
 
-class WebApi(commandProcessor: CommandProcessor, userIdByFacebookIdProjection: DataStoreUserIdByFacebookIdProjection,
+class WebApi(commandProcessor: CommandProcessor, userIdByFacebookIdProjection: UserIdByFacebookIdProjection,
              userProfileProjection: UserProfileProjection, dataStore: DataStore, userFriendsProjection: UserFriendsProjection,
              facebookConnector: FacebookConnector, incomingFriendRequestsProjection: IncomingFriendRequestsProjection,
              imageStore: ImageStore)
@@ -57,11 +57,21 @@ class WebApi(commandProcessor: CommandProcessor, userIdByFacebookIdProjection: D
           }
         } ~
         headerValueByName(WebApi.sessionIdHeader) { sessionId =>
-          path("info" / "facebook") {
-            post {
-              entity(as[SetFacebookUserInfo]) { info =>
-                commandProcessor.process(info, Option(UUID.fromString(sessionId))) //TODO move the UUID parsing to a custom directive
-                complete(StatusCodes.OK)
+          pathPrefix("profile") {
+            path("facebook") {
+              post {
+                entity(as[SetFacebookUserInfo]) { info =>
+                  commandProcessor.process(info, Option(UUID.fromString(sessionId))) //TODO move the UUID parsing to a custom directive
+                  complete(StatusCodes.OK)
+                }
+              }
+            } ~
+            pathEnd {
+              get {
+                dataStore.userBySession(UUID.fromString(sessionId)).
+                  map(userProfileProjection.get).
+                  map(complete(_)).
+                  getOrElse(reject(AuthorizationFailedRejection))
               }
             }
           } ~
@@ -111,6 +121,10 @@ class WebApi(commandProcessor: CommandProcessor, userIdByFacebookIdProjection: D
                       Option(UUID.fromString(sessionId)))
                   }.map(_ => complete(StatusCodes.Created)).get //TODO Handle upload failure
                 }
+              } ~
+              delete {
+                commandProcessor.process(DeleteWishImage(wishId))
+                complete(StatusCodes.OK)
               }
             }
           }

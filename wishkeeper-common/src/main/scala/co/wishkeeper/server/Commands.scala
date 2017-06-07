@@ -68,4 +68,8 @@ object Commands {
       wish.currency.map(WishCurrencySet(wish.id, _))
     ).flatten
   }
+
+  case class DeleteWishImage(wishId: UUID) extends UserCommand {
+    override def process(user: User): List[UserEvent] = List(WishImageDeleted(wishId))
+  }
 }

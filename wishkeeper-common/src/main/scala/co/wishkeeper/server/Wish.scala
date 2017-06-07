@@ -20,4 +20,5 @@ case class Wish(id: UUID,
   def withOtherInfo(info: String): Wish = this.copy(otherInfo = Option(info))
   def withPrice(price: String): Wish = this.copy(price = Option(price))
   def withCurrency(currency: String): Wish = this.copy(currency = Option(currency))
+  def withoutImageLink = this.copy(imageLink = None)
 }

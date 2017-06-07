@@ -127,4 +127,10 @@ class UserTest extends Specification with MatcherMacros with JMock {
     val expectedWish = Wish(randomUUID(), otherInfo = Option(otherInfo))
     user.applyEvent(WishOtherInfoSet(expectedWish.id, otherInfo)).wishes must havePair(expectedWish.id -> expectedWish)
   }
+
+  "apply WishImageDeleted" in new Context {
+    private val imageLink = "image"
+    val wish = Wish(randomUUID(), imageLink = Option(imageLink))
+    user.applyEvent(WishImageLinkSet(wish.id, imageLink)).applyEvent(WishImageDeleted(wish.id)).wishes(wish.id).imageLink must beNone
+  }
 }

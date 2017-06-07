@@ -51,4 +51,6 @@ object Events {
   case class WishPriceSet(wishId: UUID, price: String) extends UserEvent
 
   case class WishCurrencySet(wishId: UUID, currency: String) extends UserEvent
+
+  case class WishImageDeleted(wishId: UUID) extends UserEvent
 }
