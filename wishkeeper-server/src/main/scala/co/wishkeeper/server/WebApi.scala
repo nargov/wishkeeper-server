@@ -14,20 +14,14 @@ import akka.stream.scaladsl.StreamConverters
 import akka.util.Timeout
 import co.wishkeeper.json._
 import co.wishkeeper.server.Commands._
-import co.wishkeeper.server.projections.{UserFriendsProjection, UserIdByFacebookIdProjection, UserProfileProjection}
 import de.heikoseeberger.akkahttpcirce.CirceSupport._
 import io.circe.generic.extras.Configuration
 import io.circe.generic.extras.auto._
 
 import scala.concurrent.duration._
 import scala.concurrent.{ExecutionContextExecutor, Future}
-import scala.util.Try
 
-class WebApi(commandProcessor: CommandProcessor, userIdByFacebookIdProjection: UserIdByFacebookIdProjection,
-             userProfileProjection: UserProfileProjection, dataStore: DataStore, userFriendsProjection: UserFriendsProjection,
-             facebookConnector: FacebookConnector, incomingFriendRequestsProjection: IncomingFriendRequestsProjection,
-             imageStore: ImageStore)
-            (implicit system: ActorSystem, materializer: ActorMaterializer, executionContext: ExecutionContextExecutor) {
+class WebApi(publicApi: PublicApi, managementApi: ManagementApi)(implicit system: ActorSystem, mat: ActorMaterializer, ec: ExecutionContextExecutor) {
 
   private implicit val timeout: Timeout = 4.seconds
 
@@ -44,95 +38,77 @@ class WebApi(commandProcessor: CommandProcessor, userIdByFacebookIdProjection: U
         path("connect" / "facebook") {
           post {
             entity(as[ConnectFacebookUser]) { connectUser ⇒
-              onSuccess(facebookConnector.isValid(connectUser.authToken)) { isValid =>
-                if (isValid) {
-                  commandProcessor.process(connectUser)
-                  complete(StatusCodes.OK)
-                }
-                else {
-                  reject(AuthorizationFailedRejection)
-                }
+              onSuccess(publicApi.connectFacebookUser(connectUser)) { isValid =>
+                if (isValid) complete(StatusCodes.OK)
+                else reject(AuthorizationFailedRejection)
               }
             }
           }
         } ~
-        headerValueByName(WebApi.sessionIdHeader) { sessionId =>
-          pathPrefix("profile") {
-            path("facebook") {
-              post {
-                entity(as[SetFacebookUserInfo]) { info =>
-                  commandProcessor.process(info, Option(UUID.fromString(sessionId))) //TODO move the UUID parsing to a custom directive
-                  complete(StatusCodes.OK)
-                }
-              }
-            } ~
-            pathEnd {
-              get {
-                dataStore.userBySession(UUID.fromString(sessionId)).
-                  map(userProfileProjection.get).
-                  map(complete(_)).
-                  getOrElse(reject(AuthorizationFailedRejection))
-              }
-            }
-          } ~
-          pathPrefix("friends") {
-            (path("facebook") & get) {
-              headerValueByName(WebApi.facebookAccessTokenHeader) { accessToken =>
-                val maybeFacebookId: Option[String] = for {
-                  userId <- dataStore.userBySession(UUID.fromString(sessionId))
-                  socialData <- userProfileProjection.get(userId).socialData
-                  facebookId <- socialData.facebookId
-                } yield facebookId
-
-                maybeFacebookId.
-                  map(userFriendsProjection.potentialFacebookFriends(_, accessToken)).
-                  map(complete(_)).
-                  get //TODO test for rejection if user not found
-              }
-            } ~
-            (path("request") & post) {
-              entity(as[SendFriendRequest]) { sendFriendRequest =>
-                commandProcessor.process(sendFriendRequest, Option(UUID.fromString(sessionId)))
-                complete(StatusCodes.OK)
-              }
-            } ~
-            (path("requests" / "incoming") & get) {
-              dataStore.userBySession(UUID.fromString(sessionId)).
-                map(incomingFriendRequestsProjection.awaitingApproval).
-                map(complete(_)).
-                get //TODO test for rejection if user not found
-            }
-          } ~
-          pathPrefix("wishes") {
-            post {
-              entity(as[SetWishDetails]) { setWishDetails =>
-                commandProcessor.process(setWishDetails, Option(UUID.fromString(sessionId)))
-                complete(StatusCodes.OK)
-              }
-            } ~
-            path(JavaUUID / "image") { wishId =>
-              post {
-                fileUpload("file") { case (metadata, byteSource) =>
-                  val inputStream = byteSource.runWith(StreamConverters.asInputStream(4.seconds))
-                  Try {
-                    imageStore.save(ImageData(inputStream, metadata.contentType.value), metadata.fileName)
-                    commandProcessor.process(
-                      SetWishDetails(Wish(wishId, imageLink = Option(s"http://wish.media.wishkeeper.co/${metadata.fileName}"))),
-                      Option(UUID.fromString(sessionId)))
-                  }.map(_ => complete(StatusCodes.Created)).get //TODO Handle upload failure
+          headerValueByName(WebApi.sessionIdHeader) { sessionId =>
+            pathPrefix("profile") {
+              path("facebook") {
+                post {
+                  entity(as[SetFacebookUserInfo]) { info =>
+                    publicApi.processCommand(info, Option(UUID.fromString(sessionId))) //TODO move the UUID parsing to a custom directive
+                    complete(StatusCodes.OK)
+                  }
                 }
               } ~
-              delete {
-                commandProcessor.process(DeleteWishImage(wishId), Option(UUID.fromString(sessionId)))
-                complete(StatusCodes.OK)
+                pathEnd {
+                  get {
+                    publicApi.userProfileFor(UUID.fromString(sessionId)).
+                      map(complete(_)).
+                      getOrElse(reject(AuthorizationFailedRejection))
+                  }
+                }
+            } ~
+              pathPrefix("friends") {
+                (path("facebook") & get) {
+                  headerValueByName(WebApi.facebookAccessTokenHeader) { accessToken =>
+                    publicApi.potentialFriendsFor(accessToken, UUID.fromString(sessionId)).
+                      map(onSuccess(_) { listOfPotentialFriends =>
+                        complete(listOfPotentialFriends)
+                      }).get //TODO test for rejection if user not found
+                  }
+                } ~
+                  (path("request") & post) {
+                    entity(as[SendFriendRequest]) { sendFriendRequest =>
+                      publicApi.processCommand(sendFriendRequest, Option(UUID.fromString(sessionId)))
+                      complete(StatusCodes.OK)
+                    }
+                  } ~
+                  (path("requests" / "incoming") & get) {
+                    publicApi.incomingFriendRequestSenders(UUID.fromString(sessionId)).
+                      map(complete(_)).get //TODO test for rejection if user not found
+                  }
+              } ~
+              pathPrefix("wishes") {
+                post {
+                  entity(as[SetWishDetails]) { setWishDetails =>
+                    publicApi.processCommand(setWishDetails, Option(UUID.fromString(sessionId)))
+                    complete(StatusCodes.OK)
+                  }
+                } ~
+                  path(JavaUUID / "image") { wishId =>
+                    post {
+                      fileUpload("file") { case (metadata, byteSource) =>
+                        val inputStream = byteSource.runWith(StreamConverters.asInputStream(4.seconds))
+                        publicApi.uploadImage(inputStream, metadata.contentType.value, metadata.fileName, wishId, UUID.fromString(sessionId)).
+                          map(_ => complete(StatusCodes.Created)).get //TODO Handle upload failure
+                      }
+                    } ~
+                      delete {
+                        publicApi.processCommand(DeleteWishImage(wishId), Option(UUID.fromString(sessionId)))
+                        complete(StatusCodes.OK)
+                      }
+                  }
               }
-            }
           }
-        }
       } ~
-      (path("uuid") & get) {
-        complete(UUID.randomUUID())
-      }
+        (path("uuid") & get) {
+          complete(UUID.randomUUID())
+        }
     }
 
 
@@ -141,16 +117,16 @@ class WebApi(commandProcessor: CommandProcessor, userIdByFacebookIdProjection: U
       pathPrefix("users") {
         get {
           path("facebook" / """\d+""".r) { facebookId ⇒
-            userIdByFacebookIdProjection.get(facebookId).
-              map(id ⇒ complete(id)).
+            managementApi.userIdFor(facebookId).
+              map(complete(_)).
               getOrElse(complete(StatusCodes.NotFound))
           } ~
-          path(JavaUUID / "profile") { userId =>
-              complete(userProfileProjection.get(userId))
-          } ~
-          path(JavaUUID / "wishes") { userId =>
-            complete(User.replay(dataStore.userEventsFor(userId)).wishes.values)
-          }
+            path(JavaUUID / "profile") { userId =>
+              complete(managementApi.profileFor(userId))
+            } ~
+            path(JavaUUID / "wishes") { userId =>
+              complete(managementApi.wishesFor(userId))
+            }
         }
       }
     }

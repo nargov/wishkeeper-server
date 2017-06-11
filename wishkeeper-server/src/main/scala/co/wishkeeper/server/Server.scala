@@ -1,15 +1,21 @@
 package co.wishkeeper.server
 
+import java.io.InputStream
+import java.util.UUID
+
 import akka.actor.ActorSystem
 import akka.stream.ActorMaterializer
 import co.wishkeeper.json._
+import co.wishkeeper.server.Commands.{ConnectFacebookUser, SetWishDetails, UserCommand}
+import co.wishkeeper.server.Server.mediaServerBase
 import co.wishkeeper.server.projections._
 import com.typesafe.config.ConfigFactory
 
-import scala.concurrent.ExecutionContextExecutor
+import scala.concurrent.{ExecutionContextExecutor, Future}
+import scala.util.Try
 
 
-class WishkeeperServer() {
+class WishkeeperServer() extends PublicApi with ManagementApi {
   private val dataStore = new CassandraDataStore
   private val userIdByFacebookIdProjection = new DataStoreUserIdByFacebookIdProjection(dataStore)
   private val incomingFriendRequestsProjection = new DataStoreIncomingFriendRequestsProjection(dataStore)
@@ -27,8 +33,7 @@ class WishkeeperServer() {
     config.getString("wishkeeper.facebook.app-secret"))
   private val userFriendsProjection: UserFriendsProjection = new DelegatingUserFriendsProjection(facebookConnector, userIdByFacebookIdProjection)
   private val imageStore = new GoogleCloudStorageImageStore
-  private val webApi = new WebApi(commandProcessor, userIdByFacebookIdProjection, userProfileProjection, dataStore, userFriendsProjection,
-    facebookConnector, incomingFriendRequestsProjection, imageStore)
+  private val webApi = new WebApi(this, this)
 
   def start(): Unit = {
     dataStore.connect()
@@ -39,14 +44,75 @@ class WishkeeperServer() {
     webApi.stop()
     dataStore.close()
   }
+
+  override def connectFacebookUser(command: ConnectFacebookUser): Future[Boolean] = {
+    val eventualIsValid = facebookConnector.isValid(command.authToken)
+    eventualIsValid.map { isValid =>
+      if(isValid) commandProcessor.process(command)
+      isValid
+    }
+  }
+
+  override def processCommand(command: UserCommand, sessionId: Option[UUID]): Unit = {
+    commandProcessor.process(command, sessionId)
+  }
+
+  override def userProfileFor(sessionId: UUID): Option[UserProfile] = {
+    dataStore.userBySession(sessionId).map(profileFor)
+  }
+
+  override def potentialFriendsFor(facebookAccessToken: String, sessionId: UUID): Option[Future[List[PotentialFriend]]] = {
+    for {
+      userId <- dataStore.userBySession(sessionId)
+      socialData <- userProfileProjection.get(userId).socialData
+      facebookId <- socialData.facebookId
+    } yield userFriendsProjection.potentialFacebookFriends(facebookId, facebookAccessToken)
+  }
+
+  override def incomingFriendRequestSenders(sessionId: UUID): Option[List[UUID]] = {
+    dataStore.userBySession(sessionId).map(incomingFriendRequestsProjection.awaitingApproval)
+  }
+
+  override def uploadImage(inputStream: InputStream, contentType: String, fileName: String, wishId: UUID, sessionId: UUID): Try[Unit] = {
+    Try {
+      imageStore.save(ImageData(inputStream, contentType), fileName)
+      commandProcessor.process(SetWishDetails(Wish(wishId, imageLink = Option(s"$mediaServerBase/$fileName"))), Option(sessionId))
+    }
+  }
+
+  override def userIdFor(facebookId: String): Option[UUID] = userIdByFacebookIdProjection.get(facebookId)
+
+  override def profileFor(userId: UUID): UserProfile = userProfileProjection.get(userId)
+
+  override def wishesFor(userId: UUID): List[Wish] = User.replay(dataStore.userEventsFor(userId)).wishes.values.toList
 }
 
 object Server {
+  val mediaServerBase = "http://wish.media.wishkeeper.co"
 
   def main(args: Array[String] = Array.empty): Unit = {
     new WishkeeperServer().start()
   }
 }
 
-trait WishkeeperPublicApi {
+trait PublicApi {
+  def processCommand(command: UserCommand, sessionId: Option[UUID]): Unit
+
+  def connectFacebookUser(command: ConnectFacebookUser): Future[Boolean]
+
+  def userProfileFor(sessionId: UUID): Option[UserProfile]
+
+  def potentialFriendsFor(facebookAccessToken: String, sessionId: UUID): Option[Future[List[PotentialFriend]]]
+
+  def incomingFriendRequestSenders(sessionId: UUID): Option[List[UUID]]
+
+  def uploadImage(inputStream: InputStream, contentType: String, fileName: String, wishId: UUID, sessionId: UUID): Try[Unit]
+}
+
+trait ManagementApi {
+  def userIdFor(facebookId: String): Option[UUID]
+
+  def profileFor(userId: UUID): UserProfile
+
+  def wishesFor(userId: UUID): List[Wish]
 }
