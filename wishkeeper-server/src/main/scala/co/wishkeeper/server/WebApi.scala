@@ -3,6 +3,7 @@ package co.wishkeeper.server
 import java.util.UUID
 
 import akka.actor.ActorSystem
+import akka.http.javadsl.server.RejectionHandler
 import akka.http.scaladsl.Http.ServerBinding
 import akka.http.scaladsl.model.{HttpRequest, StatusCodes}
 import akka.http.scaladsl.server.Directives.{as, complete, entity, get, headerValueByName, path, pathPrefix, post, _}
@@ -14,6 +15,7 @@ import akka.stream.scaladsl.StreamConverters
 import akka.util.Timeout
 import co.wishkeeper.json._
 import co.wishkeeper.server.Commands._
+import co.wishkeeper.server.api.{ManagementApi, PublicApi}
 import de.heikoseeberger.akkahttpcirce.CirceSupport._
 import io.circe.generic.extras.Configuration
 import io.circe.generic.extras.auto._
@@ -46,11 +48,12 @@ class WebApi(publicApi: PublicApi, managementApi: ManagementApi)(implicit system
           }
         } ~
           headerValueByName(WebApi.sessionIdHeader) { sessionId =>
+            val sessionUUID = Option(UUID.fromString(sessionId))
             pathPrefix("profile") {
               path("facebook") {
                 post {
                   entity(as[SetFacebookUserInfo]) { info =>
-                    publicApi.processCommand(info, Option(UUID.fromString(sessionId))) //TODO move the UUID parsing to a custom directive
+                    publicApi.processCommand(info, sessionUUID) //TODO move the UUID parsing to a custom directive
                     complete(StatusCodes.OK)
                   }
                 }
@@ -66,7 +69,7 @@ class WebApi(publicApi: PublicApi, managementApi: ManagementApi)(implicit system
               pathPrefix("friends") {
                 (path("facebook") & get) {
                   headerValueByName(WebApi.facebookAccessTokenHeader) { accessToken =>
-                    publicApi.potentialFriendsFor(accessToken, UUID.fromString(sessionId)).
+                    publicApi.potentialFriendsFor(accessToken, sessionUUID.get).
                       map(onSuccess(_) { listOfPotentialFriends =>
                         complete(listOfPotentialFriends)
                       }).get //TODO test for rejection if user not found
@@ -74,7 +77,7 @@ class WebApi(publicApi: PublicApi, managementApi: ManagementApi)(implicit system
                 } ~
                   (path("request") & post) {
                     entity(as[SendFriendRequest]) { sendFriendRequest =>
-                      publicApi.processCommand(sendFriendRequest, Option(UUID.fromString(sessionId)))
+                      publicApi.processCommand(sendFriendRequest, sessionUUID)
                       complete(StatusCodes.OK)
                     }
                   } ~
@@ -86,7 +89,11 @@ class WebApi(publicApi: PublicApi, managementApi: ManagementApi)(implicit system
               pathPrefix("wishes") {
                 post {
                   entity(as[SetWishDetails]) { setWishDetails =>
-                    publicApi.processCommand(setWishDetails, Option(UUID.fromString(sessionId)))
+                    publicApi.processCommand(setWishDetails, sessionUUID)
+                    complete(StatusCodes.OK)
+                  } ~
+                  entity(as[CreateNewWish]) { createNewWish =>
+                    publicApi.processCommand(createNewWish, sessionUUID)
                     complete(StatusCodes.OK)
                   }
                 } ~
@@ -99,7 +106,7 @@ class WebApi(publicApi: PublicApi, managementApi: ManagementApi)(implicit system
                       }
                     } ~
                       delete {
-                        publicApi.processCommand(DeleteWishImage(wishId), Option(UUID.fromString(sessionId)))
+                        publicApi.processCommand(DeleteWishImage(wishId), sessionUUID)
                         complete(StatusCodes.OK)
                       }
                   }
