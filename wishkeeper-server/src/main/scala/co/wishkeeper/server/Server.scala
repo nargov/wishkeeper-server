@@ -49,5 +49,4 @@ object Server {
 }
 
 trait WishkeeperPublicApi {
-
 }

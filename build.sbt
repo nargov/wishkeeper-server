@@ -1,7 +1,7 @@
 val circeVersion = "0.8.0"
 val dockerTestKitVersion = "0.9.0"
 val logbackVersion = "1.2.1"
-val specs2Version = "3.8.9"
+val specs2Version = "3.9.0"
 
 val scalaVer = "2.11.8"
 
@@ -15,7 +15,6 @@ lazy val commonSettings = Seq(
   scalaVersion := scalaVer,
   libraryDependencies ++= Seq(
     "com.google.guava" % "guava" % "19.0",
-    "com.google.code.findbugs" % "jsr305" % "3.0.2",
     "joda-time" % "joda-time" % "2.9.7",
     "org.joda" % "joda-convert" % "1.8.1",
     "org.scalactic" %% "scalactic" % "3.0.1",
@@ -70,8 +69,12 @@ lazy val server = (project in file("wishkeeper-server")).
       "de.heikoseeberger" %% "akka-http-circe" % "1.12.0",
       "com.datastax.cassandra" % "cassandra-driver-core" % "3.2.0",
       "org.slf4j" % "slf4j-api" % "1.7.22",
-      "com.google.api-client" % "google-api-client" % "1.22.0",
-      "com.google.cloud" % "google-cloud-storage" % "1.0.2",
+      "com.google.api-client" % "google-api-client" % "1.22.0"
+        exclude("org.apache.httpcomponents", "httpclient")
+        exclude("com.google.guava", "guava-jdk5"),
+      "com.google.cloud" % "google-cloud-storage" % "1.0.2"
+        exclude("org.apache.httpcomponents", "httpclient")
+        exclude("com.google.guava", "guava-jdk5"),
       "io.appium" % "java-client" % "5.0.0-BETA6" % "it" exclude("com.codeborne", "phantomjsdriver")
     )
   ).
@@ -86,3 +89,5 @@ lazy val testUtils = (project in file("test-utils")).
       "com.spotify" % "docker-client" % "8.3.1"
     )
   )
+
+conflictManager := ConflictManager.latestCompatible

@@ -112,7 +112,6 @@ class RouteTest extends Specification with Specs2RouteTest with JMock {
     }
 
     "Reject on invalid facebook token" in new NotLoggedInContext {
-
       checking {
         ignoring(commandProcessor)
         ignoring(dataStore)
@@ -137,6 +136,26 @@ class RouteTest extends Specification with Specs2RouteTest with JMock {
 
       Get("/users/friends/requests/incoming").withHeaders(sessionIdHeader) ~> webApi.userRoute ~> check {
         responseAs[List[UUID]] must beEqualTo(List(friendRequestSender))
+      }
+    }
+
+    "return user profile" in new LoggedInUserContext {
+      val userProfileProjection = mock[UserProfileProjection]
+      val webApi = new WebApi(null, null, userProfileProjection, dataStore, null, null, null, null)
+      val expectedProfile = UserProfile(
+        socialData = Some(SocialData(Some("facebook-id"))),
+        ageRange = Some(AgeRange(Some(15), Some(20))),
+        email = Some("me@something.com"),
+        name = Some("My Name"),
+        gender = Some("female"))
+
+      checking {
+        allowing(dataStore).userBySession(sessionId).willReturn(Option(userId))
+        allowing(userProfileProjection).get(userId).willReturn(expectedProfile)
+      }
+
+      Get("/users/profile").withHeaders(sessionIdHeader) ~> webApi.userRoute ~> check {
+        responseAs[UserProfile] must beEqualTo(expectedProfile)
       }
     }
   }

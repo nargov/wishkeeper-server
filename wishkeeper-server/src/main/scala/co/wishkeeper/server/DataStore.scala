@@ -75,11 +75,12 @@ class CassandraDataStore extends DataStore {
     val offset = lastSeqNum.getOrElse(0L) + 1
 
     events.zipWithIndex.foreach { case (event, i) ⇒
+      val eventJson = event.asJson.noSpaces
       batch.add(insertEvent.bind().
         setUUID("userId", userId).
         setLong("seq", offset + i).
         setTimestamp("time", time.toDate).
-        setBytes("event", ByteBuffer.wrap(event.asJson.noSpaces.getBytes)))
+        setBytes("event", ByteBuffer.wrap(eventJson.getBytes)))
     }
     session.execute(batch)
   }

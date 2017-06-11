@@ -123,7 +123,7 @@ class WebApi(commandProcessor: CommandProcessor, userIdByFacebookIdProjection: U
                 }
               } ~
               delete {
-                commandProcessor.process(DeleteWishImage(wishId))
+                commandProcessor.process(DeleteWishImage(wishId), Option(UUID.fromString(sessionId)))
                 complete(StatusCodes.OK)
               }
             }
