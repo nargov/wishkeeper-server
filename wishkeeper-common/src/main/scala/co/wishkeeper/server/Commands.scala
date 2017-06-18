@@ -28,7 +28,8 @@ object Commands {
                                  name: Option[String] = None,
                                  gender: Option[String] = None,
                                  locale: Option[String] = None,
-                                 timezone: Option[Int] = None) extends UserCommand {
+                                 timezone: Option[Int] = None,
+                                 picture: Option[String] = None) extends UserCommand {
 
     override def process(user: User): List[UserEvent] = {
       val userId = user.id
@@ -41,7 +42,8 @@ object Commands {
         timezone.map(UserTimeZoneSet(userId, _)),
         first_name.map(UserFirstNameSet(userId, _)),
         last_name.map(UserLastNameSet(userId, _)),
-        name.map(UserNameSet(userId, _))).flatten
+        name.map(UserNameSet(userId, _)),
+        picture.map(UserPictureSet(userId, _))).flatten
     }
   }
 

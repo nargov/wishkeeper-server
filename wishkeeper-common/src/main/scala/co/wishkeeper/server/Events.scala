@@ -34,6 +34,8 @@ object Events {
 
   case class UserAgeRangeSet(userId: UUID, min: Option[Int], max: Option[Int]) extends UserEvent
 
+  case class UserPictureSet(userId: UUID, pictureLink: String) extends UserEvent
+
   case class FriendRequestSent(userId: UUID, to: UUID) extends UserEvent
 
   case class FriendRequestReceived(userId: UUID, from: UUID) extends UserEvent

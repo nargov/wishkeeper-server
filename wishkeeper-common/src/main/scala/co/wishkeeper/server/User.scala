@@ -29,6 +29,7 @@ case class User(id: UUID, userProfile: UserProfile = UserProfile(), friends: Fri
     case WishStoreSet(wishId, store) => updateWishProperty(wishId, _.withStore(store))
     case WishOtherInfoSet(wishId, info) => updateWishProperty(wishId, _.withOtherInfo(info))
     case WishImageDeleted(wishId) => updateWishProperty(wishId, _.withoutImageLink)
+    case UserPictureSet(_, link) => this.copy(userProfile = userProfile.copy(picture = Option(link)))
     case _ => this
   }
 

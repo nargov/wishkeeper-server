@@ -78,6 +78,12 @@ class SetFacebookUserInfoTest extends FlatSpec with Matchers {
     )
   }
 
+  it should "create an event for user photo" in {
+    val pictureLink = "http://my.user.photo"
+    SetFacebookUserInfo(picture = Some(pictureLink)).process(User(userId)) should
+      contain theSameElementsAs List(UserPictureSet(userId, pictureLink))
+  }
+
   val userId = UUID.randomUUID()
 
   private def shouldParseSuccessfully(birthday: String) = {
