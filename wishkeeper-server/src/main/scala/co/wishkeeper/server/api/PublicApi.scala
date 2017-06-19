@@ -4,12 +4,15 @@ import java.io.InputStream
 import java.util.UUID
 
 import co.wishkeeper.server.Commands.{ConnectFacebookUser, UserCommand}
-import co.wishkeeper.server.{PotentialFriend, UserProfile}
+import co.wishkeeper.server.projections.PotentialFriend
+import co.wishkeeper.server.{ImageMetadata, UserProfile, UserWishes}
 
 import scala.concurrent.Future
 import scala.util.Try
 
 trait PublicApi {
+  def wishListFor(sessionId: UUID): Option[UserWishes]
+
   def processCommand(command: UserCommand, sessionId: Option[UUID]): Unit
 
   def connectFacebookUser(command: ConnectFacebookUser): Future[Boolean]
@@ -20,5 +23,5 @@ trait PublicApi {
 
   def incomingFriendRequestSenders(sessionId: UUID): Option[List[UUID]]
 
-  def uploadImage(inputStream: InputStream, contentType: String, fileName: String, wishId: UUID, sessionId: UUID): Try[Unit]
+  def uploadImage(inputStream: InputStream, imageMetadata: ImageMetadata, wishId: UUID, sessionId: UUID): Try[Unit]
 }

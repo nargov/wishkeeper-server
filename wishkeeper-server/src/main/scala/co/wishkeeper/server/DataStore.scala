@@ -28,7 +28,7 @@ trait DataStore {
 
   def saveUserSession(userId: UUID, sessionId: UUID, created: DateTime)
 
-  def saveUserEvents(userId: UUID, lastSeqNum: Option[Long], time: DateTime, events: Seq[UserEvent]): Unit
+  def saveUserEvents(userId: UUID, lastSeqNum: Option[Long], time: DateTime, events: Seq[UserEvent]): Boolean
 
   def lastSequenceNum(userId: UUID): Option[Long]
 
@@ -61,7 +61,7 @@ class CassandraDataStore extends DataStore {
   private lazy val selectUsersByFacebookIds = session.prepare(s"select facebookId, userId from $userByFacebookId where facebookId in :idList")
 
 
-  override def saveUserEvents(userId: UUID, lastSeqNum: Option[Long], time: DateTime, events: Seq[UserEvent]): Unit = {
+  override def saveUserEvents(userId: UUID, lastSeqNum: Option[Long], time: DateTime, events: Seq[UserEvent]): Boolean = {
     val batch = new BatchStatement()
 
     val newMax = lastSeqNum.map(_ + events.size).getOrElse(events.size.toLong)
@@ -82,7 +82,7 @@ class CassandraDataStore extends DataStore {
         setTimestamp("time", time.toDate).
         setBytes("event", ByteBuffer.wrap(eventJson.getBytes)))
     }
-    session.execute(batch)
+    session.execute(batch).wasApplied()
   }
 
   override def lastSequenceNum(userId: UUID): Option[Long] = {

@@ -6,6 +6,8 @@ import co.wishkeeper.server.Commands.{ConnectFacebookUser, UserCommand}
 import co.wishkeeper.server.Events._
 import org.joda.time.DateTime
 
+import scala.annotation.tailrec
+
 trait CommandProcessor {
   def process(command: UserCommand, sessionId: Option[UUID] = None): Unit
 
@@ -34,11 +36,20 @@ class UserCommandProcessor(dataStore: DataStore, eventProcessors: List[EventProc
       case _ =>
         val userId = sessionId.flatMap(userIdForSession).getOrElse(throw new SessionNotFoundException(sessionId))
         val user = User.replay(dataStore.userEventsFor(userId))
-        val events: Seq[UserEvent] = command.process(user)
 
-        dataStore.saveUserEvents(userId, dataStore.lastSequenceNum(userId), DateTime.now(), events)
-        events.foreach(event => eventProcessors.foreach(_.process(event)))
+        retry {
+          val events: Seq[UserEvent] = command.process(user)
+          val success = dataStore.saveUserEvents(userId, dataStore.lastSequenceNum(userId), DateTime.now(), events)
+          events.foreach(event => eventProcessors.foreach(_.process(event)))
+          success
+        }
     }
+  }
+
+  @tailrec
+  private def retry(f: => Boolean, retries: Int = 50): Boolean = {
+    val successful = f
+    if (successful || retries == 0) successful else retry(f, retries - 1)
   }
 
   //TODO Move this somewhere else - particular view, probably
@@ -56,15 +67,15 @@ trait IncomingFriendRequestsProjection {
 class DataStoreIncomingFriendRequestsProjection(dataStore: DataStore) extends IncomingFriendRequestsProjection with EventProcessor {
   def awaitingApproval(userId: UUID): List[UUID] = User.replay(dataStore.userEventsFor(userId)).friends.requestReceived
 
-  override def process(event: Event): Unit = { event match {
-    case FriendRequestSent(sender, userId) =>
-      val lastSequenceNum = dataStore.lastSequenceNum(userId)
-      dataStore.saveUserEvents(userId, lastSequenceNum, DateTime.now(), FriendRequestReceived(userId, sender) :: Nil)
-    case _ =>
-  }}
+  override def process(event: Event): Unit = {
+    event match {
+      case FriendRequestSent(sender, userId) =>
+        val lastSequenceNum = dataStore.lastSequenceNum(userId)
+        dataStore.saveUserEvents(userId, lastSequenceNum, DateTime.now(), FriendRequestReceived(userId, sender) :: Nil)
+      case _ =>
+    }
+  }
 }
 
 class SessionNotFoundException(sessionId: Option[UUID]) extends RuntimeException(
   sessionId.map(id => s"Session ${id.toString} not found.").getOrElse("Session not found"))
-
-case class PotentialFriend(userId: UUID, name: String, image: String, requestSent: Boolean = false)

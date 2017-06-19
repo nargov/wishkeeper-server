@@ -3,7 +3,7 @@ package co.wishkeeper.server
 import java.util.UUID
 
 import co.wishkeeper.server.Commands.{ConnectFacebookUser, SetFacebookUserInfo}
-import co.wishkeeper.server.Events.{Event, UserConnected, UserFacebookIdSet}
+import co.wishkeeper.server.Events.{Event, UserConnected, UserEvent, UserFacebookIdSet}
 import com.wixpress.common.specs2.JMock
 import org.joda.time.DateTime
 import org.specs2.matcher.{Matcher, MatcherMacros}
@@ -96,6 +96,18 @@ class UserCommandProcessorTest extends Specification with JMock with MatcherMacr
     }
 
     commandProcessor.process(ConnectFacebookUser(facebookId, authToken, sessionId))
+  }
+
+  "retry saving user events on concurrent modification error" in new Context {
+    checking {
+      allowing(dataStore).userBySession(sessionId).willReturn(Some(userId))
+      allowing(dataStore).userEventsFor(userId).willReturn(UserConnected(userId, DateTime.now().minusDays(1), UUID.randomUUID()) :: Nil)
+      allowing(dataStore).lastSequenceNum(userId).willReturn(Some(3L))
+      exactly(2).of(dataStore).saveUserEvents(having(===(userId)), having(beSome(3L)), having(any[DateTime]), having(contain(any[UserEvent]))).
+        will(returnValue(false), returnValue(true))
+    }
+
+    commandProcessor.process(SetFacebookUserInfo(name = Option("name")), Some(sessionId))
   }
 
   def aUserConnectedEventFor(userId: UUID): Matcher[UserConnected] = ===(userId) ^^ {(_:UserConnected).userId}

@@ -45,6 +45,13 @@ class CassandraDataStoreIT extends FlatSpec with Matchers with BeforeAndAfterAll
     eventStore.userIdsByFacebookIds(List(facebookId1, facebookId2)) shouldBe Map(facebookId1 -> userId1, facebookId2 -> userId2)
   }
 
+  it should "return false on concurrent modification" in {
+    val maybeLastSeqNum = eventStore.lastSequenceNum(userId)
+    val events = List(UserConnected(userId, sessionId = randomUUID()))
+    eventStore.saveUserEvents(userId, maybeLastSeqNum, DateTime.now(), events) shouldBe true
+    eventStore.saveUserEvents(userId, maybeLastSeqNum, DateTime.now(), events) shouldBe false
+  }
+
   val dataStoreTestHelper = DataStoreTestHelper()
 
   override protected def beforeAll(): Unit = {

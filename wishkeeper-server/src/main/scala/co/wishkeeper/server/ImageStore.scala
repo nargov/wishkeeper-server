@@ -46,3 +46,5 @@ case class ImageData(content: InputStream, contentType: String) {
 object ImageData {
   val defaultContentType = "application/octet-stream"
 }
+
+case class ImageMetadata(contentType: String, fileName: String, width: Int, height: Int)

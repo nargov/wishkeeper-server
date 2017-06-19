@@ -49,7 +49,7 @@ class WishkeeperServer() extends PublicApi with ManagementApi {
   override def connectFacebookUser(command: ConnectFacebookUser): Future[Boolean] = {
     val eventualIsValid = facebookConnector.isValid(command.authToken)
     eventualIsValid.map { isValid =>
-      if(isValid) commandProcessor.process(command)
+      if (isValid) commandProcessor.process(command)
       isValid
     }
   }
@@ -70,10 +70,15 @@ class WishkeeperServer() extends PublicApi with ManagementApi {
     dataStore.userBySession(sessionId).map(incomingFriendRequestsProjection.awaitingApproval)
   }
 
-  override def uploadImage(inputStream: InputStream, contentType: String, fileName: String, wishId: UUID, sessionId: UUID): Try[Unit] = {
+  override def uploadImage(inputStream: InputStream, imageMetadata: ImageMetadata, wishId: UUID, sessionId: UUID): Try[Unit] = {
     Try {
-      imageStore.save(ImageData(inputStream, contentType), fileName)
-      processCommand(SetWishDetails(Wish(wishId, imageLink = Option(s"$mediaServerBase/$fileName"))), Option(sessionId))
+      imageStore.save(ImageData(inputStream, imageMetadata.contentType), imageMetadata.fileName)
+      val url = s"$mediaServerBase/${imageMetadata.fileName}"
+      processCommand(SetWishDetails(Wish(
+        wishId,
+        imageLink = Option(url),
+        image = Option(ImageLink(url, imageMetadata.width, imageMetadata.height, imageMetadata.contentType)))
+      ), Option(sessionId))
     }
   }
 
@@ -82,6 +87,12 @@ class WishkeeperServer() extends PublicApi with ManagementApi {
   override def profileFor(userId: UUID): UserProfile = userProfileProjection.get(userId)
 
   override def wishesFor(userId: UUID): List[Wish] = User.replay(dataStore.userEventsFor(userId)).wishes.values.toList
+
+  override def wishListFor(userId: UUID): Option[UserWishes] = {
+    dataStore.userBySession(userId).map { userId =>
+      UserWishes(User.replay(dataStore.userEventsFor(userId)).wishes.values.toList)
+    }
+  }
 }
 
 object Server {

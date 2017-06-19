@@ -67,7 +67,8 @@ object Commands {
       wish.store.map(WishStoreSet(wish.id, _)),
       wish.otherInfo.map(WishOtherInfoSet(wish.id, _)),
       wish.price.map(WishPriceSet(wish.id, _)),
-      wish.currency.map(WishCurrencySet(wish.id, _))
+      wish.currency.map(WishCurrencySet(wish.id, _)),
+      wish.image.map(WishImageSet(wish.id, _))
     ).flatten
   }
 
@@ -75,7 +76,7 @@ object Commands {
     override def process(user: User): List[UserEvent] = List(WishImageDeleted(wishId))
   }
 
-  case class CreateNewWish(wishId: UUID) extends UserCommand {
-    override def process(user: User): List[UserEvent] = List(WishCreated(wishId, user.id))
+  case class CreateNewWish(wishId: UUID, creationTime: DateTime = DateTime.now()) extends UserCommand {
+    override def process(user: User): List[UserEvent] = List(WishCreated(wishId, user.id, creationTime))
   }
 }

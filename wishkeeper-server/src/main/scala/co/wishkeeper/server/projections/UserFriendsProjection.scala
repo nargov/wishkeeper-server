@@ -1,6 +1,8 @@
 package co.wishkeeper.server.projections
 
-import co.wishkeeper.server.{FacebookConnector, PotentialFriend}
+import java.util.UUID
+
+import co.wishkeeper.server.FacebookConnector
 
 import scala.concurrent.{ExecutionContext, Future}
 
@@ -21,3 +23,5 @@ class DelegatingUserFriendsProjection(facebookConnector: FacebookConnector, user
     }
   }
 }
+
+case class PotentialFriend(userId: UUID, name: String, image: String, requestSent: Boolean = false)

@@ -23,12 +23,14 @@ case class User(id: UUID, userProfile: UserProfile = UserProfile(), friends: Fri
       }))
     case FriendRequestSent(_, friendId) => this.copy(friends = this.friends.copy(requestSent = this.friends.requestSent :+ friendId))
     case FriendRequestReceived(_, friendId) => this.copy(friends = this.friends.copy(requestReceived = this.friends.requestReceived :+ friendId))
+    case WishCreated(wishId, creator, creationTime) => updateWishProperty(wishId, _.withCreationTime(creationTime).withCreator(creator))
     case WishNameSet(wishId, name) => updateWishProperty(wishId, _.withName(name))
     case WishLinkSet(wishId, link) => updateWishProperty(wishId, _.withLink(link))
     case WishImageLinkSet(wishId, link) => updateWishProperty(wishId, _.withImageLink(link))
     case WishStoreSet(wishId, store) => updateWishProperty(wishId, _.withStore(store))
     case WishOtherInfoSet(wishId, info) => updateWishProperty(wishId, _.withOtherInfo(info))
     case WishImageDeleted(wishId) => updateWishProperty(wishId, _.withoutImageLink)
+    case WishImageSet(wishId, imageLink) => updateWishProperty(wishId, _.withImage(imageLink))
     case UserPictureSet(_, link) => this.copy(userProfile = userProfile.copy(picture = Option(link)))
     case _ => this
   }

@@ -2,15 +2,20 @@ package co.wishkeeper.server
 
 import java.util.UUID
 
+import org.joda.time.DateTime
+
 case class Wish(id: UUID,
                 name: Option[String] = None,
                 link: Option[String] = None,
+                @deprecated("use image instead, it has metadata as well")
                 imageLink: Option[String] = None,
                 store: Option[String] = None,
                 otherInfo: Option[String] = None,
                 price: Option[String] = None,
-                currency: Option[String] = None
-               ) {
+                currency: Option[String] = None,
+                creationTime: DateTime = DateTime.now(),
+                creator: Option[UUID] = None,
+                image: Option[ImageLink] = None) {
 
 
   def withName(name: String): Wish = this.copy(name = Option(name))
@@ -20,5 +25,12 @@ case class Wish(id: UUID,
   def withOtherInfo(info: String): Wish = this.copy(otherInfo = Option(info))
   def withPrice(price: String): Wish = this.copy(price = Option(price))
   def withCurrency(currency: String): Wish = this.copy(currency = Option(currency))
-  def withoutImageLink = this.copy(imageLink = None)
+  def withoutImageLink: Wish = this.copy(imageLink = None)
+  def withCreationTime(time: DateTime): Wish = this.copy(creationTime = time)
+  def withCreator(creator: UUID): Wish = this.copy(creator = Option(creator))
+  def withImage(imageLink: ImageLink): Wish = this.copy(image = Option(imageLink))
 }
+
+case class UserWishes(wishes: List[Wish])
+
+case class ImageLink(url: String, width: Int, height: Int, contentType: String)

@@ -3,7 +3,6 @@ package co.wishkeeper.server
 import java.util.UUID
 
 import akka.actor.ActorSystem
-import akka.http.javadsl.server.RejectionHandler
 import akka.http.scaladsl.Http.ServerBinding
 import akka.http.scaladsl.model.{HttpRequest, StatusCodes}
 import akka.http.scaladsl.server.Directives.{as, complete, entity, get, headerValueByName, path, pathPrefix, post, _}
@@ -15,6 +14,7 @@ import akka.stream.scaladsl.StreamConverters
 import akka.util.Timeout
 import co.wishkeeper.json._
 import co.wishkeeper.server.Commands._
+import co.wishkeeper.server.WebApi.imageDimensionsHeader
 import co.wishkeeper.server.api.{ManagementApi, PublicApi}
 import de.heikoseeberger.akkahttpcirce.CirceSupport._
 import io.circe.generic.extras.Configuration
@@ -92,17 +92,29 @@ class WebApi(publicApi: PublicApi, managementApi: ManagementApi)(implicit system
                     publicApi.processCommand(setWishDetails, sessionUUID)
                     complete(StatusCodes.OK)
                   } ~
-                  entity(as[CreateNewWish]) { createNewWish =>
-                    publicApi.processCommand(createNewWish, sessionUUID)
-                    complete(StatusCodes.OK)
-                  }
+                    entity(as[CreateNewWish]) { createNewWish =>
+                      publicApi.processCommand(createNewWish, sessionUUID)
+                      complete(StatusCodes.OK)
+                    }
                 } ~
+                  get {
+                    sessionUUID.flatMap(publicApi.wishListFor).map(complete(_)).get
+                  } ~
                   path(JavaUUID / "image") { wishId =>
                     post {
-                      fileUpload("file") { case (metadata, byteSource) =>
-                        val inputStream = byteSource.runWith(StreamConverters.asInputStream(4.seconds))
-                        publicApi.uploadImage(inputStream, metadata.contentType.value, metadata.fileName, wishId, UUID.fromString(sessionId)).
-                          map(_ => complete(StatusCodes.Created)).get //TODO Handle upload failure
+                      headerValueByName(imageDimensionsHeader) { imageDimensionsHeader =>
+                        val imageWidth :: imageHeight :: Nil = imageDimensionsHeader.split(",").toList
+                        fileUpload("file") { case (metadata, byteSource) =>
+                          val inputStream = byteSource.runWith(StreamConverters.asInputStream())
+                          publicApi.uploadImage(inputStream,
+                            ImageMetadata(
+                              metadata.contentType.value,
+                              metadata.fileName,
+                              imageWidth.toInt,
+                              imageHeight.toInt),
+                            wishId, UUID.fromString(sessionId)).
+                            map(_ => complete(StatusCodes.Created)).get //TODO Handle upload failure
+                        }
                       }
                     } ~
                       delete {
@@ -157,4 +169,5 @@ object WebApi {
 
   val facebookAccessTokenHeader = "fbat"
   val sessionIdHeader = "wsid"
+  val imageDimensionsHeader = "image-dim"
 }

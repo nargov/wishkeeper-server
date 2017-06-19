@@ -6,11 +6,11 @@ import java.util.UUID.randomUUID
 import akka.http.scaladsl.model.ContentTypes.`application/json`
 import akka.http.scaladsl.model.StatusCodes
 import akka.http.scaladsl.model.headers.RawHeader
-import akka.http.scaladsl.server.Route
 import akka.http.scaladsl.testkit.Specs2RouteTest
+import co.wishkeeper.json._
 import co.wishkeeper.server.Commands.{ConnectFacebookUser, CreateNewWish, SendFriendRequest}
 import co.wishkeeper.server.api.{ManagementApi, PublicApi}
-import co.wishkeeper.server.projections.{UserFriendsProjection, UserProfileProjection}
+import co.wishkeeper.server.projections.PotentialFriend
 import com.wixpress.common.specs2.JMock
 import de.heikoseeberger.akkahttpcirce.CirceSupport._
 import io.circe.generic.auto._
@@ -94,11 +94,11 @@ class RouteTest extends Specification with Specs2RouteTest with JMock {
     "Validate facebook token" in new NotLoggedInContext {
 
       checking {
-        oneOf(publicApi).connectFacebookUser(connectFacebookUser)
+        oneOf(publicApi).connectFacebookUser(connectFacebookUser).willReturn(Future.successful(true))
       }
 
       Post("/users/connect/facebook").withEntity(`application/json`, connectFacebookUser.asJson.noSpaces) ~> webApi.userRoute ~> check {
-        ok
+        status must beEqualTo(StatusCodes.OK)
       }
     }
 
@@ -142,6 +142,19 @@ class RouteTest extends Specification with Specs2RouteTest with JMock {
         withHeaders(sessionIdHeader).
         withEntity(`application/json`, createNewWish.asJson.noSpaces) ~> webApi.userRoute ~> check {
         handled must beTrue
+      }
+    }
+
+
+    "Return wish list" in new LoggedInUserContext {
+      val wishes = UserWishes(List(Wish(randomUUID())))
+
+      checking {
+        allowing(publicApi).wishListFor(sessionId).willReturn(Some(wishes))
+      }
+
+      Get("/users/wishes").withHeaders(sessionIdHeader) ~> webApi.userRoute ~> check {
+        responseAs[UserWishes] must beEqualTo(wishes)
       }
     }
   }

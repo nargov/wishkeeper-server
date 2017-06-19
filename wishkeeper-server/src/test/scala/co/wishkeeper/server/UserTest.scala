@@ -6,9 +6,10 @@ import java.util.UUID.randomUUID
 import co.wishkeeper.server.Events._
 import com.wixpress.common.specs2.JMock
 import org.joda.time.DateTime
-import org.specs2.matcher.MatcherMacros
+import org.specs2.matcher.{Matcher, MatcherMacros}
 import org.specs2.mutable.Specification
 import org.specs2.specification.Scope
+import WishMatchers._
 
 import scala.language.experimental.macros
 
@@ -16,6 +17,11 @@ class UserTest extends Specification with MatcherMacros with JMock {
 
   trait Context extends Scope {
     val user = User.createNew()
+    val wish = Wish(randomUUID())
+
+    def appliedEventCreatesExpectedWish(event: UserEvent, expectedWish: Wish): Any = {
+      user.applyEvent(event).wishes(expectedWish.id) must beEqualToIgnoringDates(expectedWish)
+    }
   }
 
   "create a new user" in new Context {
@@ -100,42 +106,51 @@ class UserTest extends Specification with MatcherMacros with JMock {
 
   "apply WishNameSet" in new Context {
     private val name = "name"
-    val expectedWish = Wish(randomUUID(), name = Option(name))
-    user.applyEvent(WishNameSet(expectedWish.id, name)).wishes must havePair(expectedWish.id -> expectedWish)
+    appliedEventCreatesExpectedWish(WishNameSet(wish.id, name), wish.withName(name))
+
   }
 
   "apply WishLinkSet" in new Context {
     private val link = "link"
-    val expectedWish = Wish(randomUUID(), link = Option(link))
-    user.applyEvent(WishLinkSet(expectedWish.id, link)).wishes must havePair(expectedWish.id -> expectedWish)
+    appliedEventCreatesExpectedWish(WishLinkSet(wish.id, link), wish.withLink(link))
   }
 
   "apply WishImageLinkSet" in new Context {
     private val imageLink = "image"
-    val expectedWish = Wish(randomUUID(), imageLink = Option(imageLink))
-    user.applyEvent(WishImageLinkSet(expectedWish.id, imageLink)).wishes must havePair(expectedWish.id -> expectedWish)
+    appliedEventCreatesExpectedWish(WishImageLinkSet(wish.id, imageLink), wish.withImageLink(imageLink))
   }
 
   "apply WishStoreSet" in new Context {
     private val store = "store"
-    val expectedWish = Wish(randomUUID(), store = Option(store))
-    user.applyEvent(WishStoreSet(expectedWish.id, store)).wishes must havePair(expectedWish.id -> expectedWish)
+    appliedEventCreatesExpectedWish(WishStoreSet(wish.id, store), wish.withStore(store))
   }
 
   "apply WishOtherInfoSet" in new Context {
     private val otherInfo = "other info"
-    val expectedWish = Wish(randomUUID(), otherInfo = Option(otherInfo))
-    user.applyEvent(WishOtherInfoSet(expectedWish.id, otherInfo)).wishes must havePair(expectedWish.id -> expectedWish)
+    appliedEventCreatesExpectedWish(WishOtherInfoSet(wish.id, otherInfo), wish.withOtherInfo(otherInfo))
   }
 
   "apply WishImageDeleted" in new Context {
-    private val imageLink = "image"
-    val wish = Wish(randomUUID(), imageLink = Option(imageLink))
-    user.applyEvent(WishImageLinkSet(wish.id, imageLink)).applyEvent(WishImageDeleted(wish.id)).wishes(wish.id).imageLink must beNone
+    user.applyEvent(WishImageLinkSet(wish.id, "image-link")).applyEvent(WishImageDeleted(wish.id)).wishes(wish.id).imageLink must beNone
   }
 
   "apply UserPictureSet" in new Context {
     private val pic = "picture-link"
     user.applyEvent(UserPictureSet(user.id, pic)).userProfile.picture must beSome(pic)
   }
+
+  "apply WishCreated" in new Context {
+    private val wishId = randomUUID()
+    val creationTime = DateTime.now()
+    private val wishCreated = WishCreated(wishId, user.id, creationTime)
+    user.applyEvent(wishCreated).wishes(wishId) must haveCreationTime(creationTime)
+  }
+
+  "apply WishImageSet" in new Context {
+    private val wishId = randomUUID()
+    private val imageLink = ImageLink("url", 10, 20, "image/jpeg")
+    user.applyEvent(WishImageSet(wishId, imageLink)).wishes(wishId).image must beSome(imageLink)
+  }
+
+  def haveCreationTime(time: DateTime): Matcher[Wish] = ===(time) ^^ {(_:Wish).creationTime}
 }

@@ -4,17 +4,22 @@ import java.util.UUID
 import java.util.UUID.randomUUID
 
 import co.wishkeeper.DataStoreTestHelper
+import co.wishkeeper.json._
 import co.wishkeeper.server.Commands.{ConnectFacebookUser, SendFriendRequest, SetWishDetails}
 import co.wishkeeper.server.HttpTestKit._
+import co.wishkeeper.server.projections.PotentialFriend
 import io.circe.generic.auto._
+import org.joda.time.DateTime
 import org.specs2.concurrent.ExecutionEnv
+import org.specs2.matcher.{AdaptableMatcher, MustThrownMatchers}
 import org.specs2.mutable.Specification
 import org.specs2.specification.BeforeAfterAll
 
 import scala.concurrent.Future
 import scala.concurrent.duration._
+import scala.language.postfixOps
 
-class WishkeeperServerIT(implicit ee: ExecutionEnv) extends Specification with BeforeAfterAll with ResponseMatchers {
+class WishkeeperServerIT(implicit ee: ExecutionEnv) extends Specification with BeforeAfterAll with ResponseMatchers with WishMatchers {
   sequential //TODO remove this when thread safe - see CommandProcessor FIXME for more details.
 
   val dataStoreTestHelper = DataStoreTestHelper()
@@ -59,7 +64,7 @@ class WishkeeperServerIT(implicit ee: ExecutionEnv) extends Specification with B
 
     val response = Get(s"$usersManagementEndpoint/$userId/wishes")
     response must beOk
-    response.to[List[Wish]] must contain(exactly(wish))
+    response.to[List[Wish]] must contain(beEqualToIgnoringDates(wish))
   }
 
   "Upload a wish image" in {
@@ -71,9 +76,12 @@ class WishkeeperServerIT(implicit ee: ExecutionEnv) extends Specification with B
 
     Post(s"$usersEndpoint/connect/facebook", ConnectFacebookUser(facebookUser.id, facebookUser.access_token, sessionId))
 
-    ImagePost(s"$usersEndpoint/wishes/$wishId/image", testImage, imageId, Map(WebApi.sessionIdHeader -> sessionId.toString)) must beSuccessful
+    ImagePost(s"$usersEndpoint/wishes/$wishId/image", testImage, imageId, Map(
+      WebApi.sessionIdHeader -> sessionId.toString,
+      WebApi.imageDimensionsHeader -> s"${testImage.width},${testImage.height}"
+    )) must beSuccessful
 
-    val imageResponse = Get(s"http://wish.media.wishkeeper.co/$imageId")
+    val imageResponse = Get(s"http://wish.media.wishkeeper.co/$imageId") //TODO replace with fake cloud storage
     imageResponse.contentType must beEqualTo(testImage.contentType)
     imageResponse.bytes must containTheSameElementsAs(testImage.fileBytes)
   }
@@ -95,5 +103,8 @@ class WishkeeperServerIT(implicit ee: ExecutionEnv) extends Specification with B
 }
 
 
-
+trait WishMatchers extends MustThrownMatchers {
+  def beEqualToIgnoringDates: (Wish) => AdaptableMatcher[Wish] = ===(_:Wish) ^^^ ((_:Wish).copy(creationTime = new DateTime(0)))
+}
+object WishMatchers extends WishMatchers
 

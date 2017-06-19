@@ -71,4 +71,9 @@ class SetWishDetailsTest extends Specification {
     val currency = "USD"
     SetWishDetails(Wish(wishId).withCurrency(currency)).process(user) must beEqualTo(List(WishCurrencySet(wishId, currency)))
   }
+
+  "should create event for image" in {
+    val imageLink = ImageLink("http://www.myimage.com", 10, 20, "image/jpeg")
+    SetWishDetails(Wish(wishId).withImage(imageLink)).process(user) must beEqualTo(List(WishImageSet(wishId, imageLink)))
+  }
 }
