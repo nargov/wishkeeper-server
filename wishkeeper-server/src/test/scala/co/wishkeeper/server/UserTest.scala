@@ -140,16 +140,24 @@ class UserTest extends Specification with MatcherMacros with JMock {
   }
 
   "apply WishCreated" in new Context {
-    private val wishId = randomUUID()
     val creationTime = DateTime.now()
-    private val wishCreated = WishCreated(wishId, user.id, creationTime)
-    user.applyEvent(wishCreated).wishes(wishId) must haveCreationTime(creationTime)
+    private val wishCreated = WishCreated(wish.id, user.id, creationTime)
+    user.applyEvent(wishCreated).wishes(wish.id) must haveCreationTime(creationTime)
   }
 
   "apply WishImageSet" in new Context {
-    private val wishId = randomUUID()
     private val imageLink = ImageLink("url", 10, 20, "image/jpeg")
-    user.applyEvent(WishImageSet(wishId, imageLink)).wishes(wishId).image must beSome(imageLink)
+    appliedEventCreatesExpectedWish(WishImageSet(wish.id, imageLink), wish.withImage(imageLink))
+  }
+
+  "apply WishPriceSet" in new Context {
+    val price = "12.34"
+    appliedEventCreatesExpectedWish(WishPriceSet(wish.id, price), wish.withPrice(price))
+  }
+
+  "apply WishCurrencySet" in new Context {
+    val currency = "GBP"
+    appliedEventCreatesExpectedWish(WishCurrencySet(wish.id, currency), wish.withCurrency(currency))
   }
 
   def haveCreationTime(time: DateTime): Matcher[Wish] = ===(time) ^^ {(_:Wish).creationTime}

@@ -90,7 +90,8 @@ class WishkeeperServer() extends PublicApi with ManagementApi {
 
   override def wishListFor(userId: UUID): Option[UserWishes] = {
     dataStore.userBySession(userId).map { userId =>
-      UserWishes(User.replay(dataStore.userEventsFor(userId)).wishes.values.toList)
+      val wishList = User.replay(dataStore.userEventsFor(userId)).wishes.values.toList
+      UserWishes(wishList.sortBy(_.creationTime.getMillis).reverse)
     }
   }
 }
