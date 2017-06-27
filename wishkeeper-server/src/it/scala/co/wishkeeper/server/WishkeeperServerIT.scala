@@ -57,7 +57,7 @@ class WishkeeperServerIT(implicit ee: ExecutionEnv) extends Specification with B
 
     Post(s"$usersEndpoint/connect/facebook", ConnectFacebookUser(facebookUser.id, facebookUser.access_token, sessionId))
 
-    val wish = Wish(randomUUID()).withName("Expected Name").withImageLink("expected image link")
+    val wish = Wish(randomUUID()).withName("Expected Name")
     Post(s"$usersEndpoint/wishes", SetWishDetails(wish), Map(WebApi.sessionIdHeader -> sessionId.toString)) must beOk
 
     val userId = Get(s"$usersManagementEndpoint/facebook/${facebookUser.id}").to[UUID]
