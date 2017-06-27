@@ -70,8 +70,8 @@ class WebApi(publicApi: PublicApi, managementApi: ManagementApi)(implicit system
                 (path("facebook") & get) {
                   headerValueByName(WebApi.facebookAccessTokenHeader) { accessToken =>
                     publicApi.potentialFriendsFor(accessToken, sessionUUID.get).
-                      map(onSuccess(_) { listOfPotentialFriends =>
-                        complete(listOfPotentialFriends)
+                      map(onSuccess(_) {
+                        complete(_)
                       }).get //TODO test for rejection if user not found
                   }
                 } ~
@@ -91,11 +91,7 @@ class WebApi(publicApi: PublicApi, managementApi: ManagementApi)(implicit system
                   entity(as[SetWishDetails]) { setWishDetails =>
                     publicApi.processCommand(setWishDetails, sessionUUID)
                     complete(StatusCodes.OK)
-                  } ~
-                    entity(as[CreateNewWish]) { createNewWish =>
-                      publicApi.processCommand(createNewWish, sessionUUID)
-                      complete(StatusCodes.OK)
-                    }
+                  }
                 } ~
                   get {
                     sessionUUID.flatMap(publicApi.wishListFor).map(complete(_)).get
@@ -116,11 +112,7 @@ class WebApi(publicApi: PublicApi, managementApi: ManagementApi)(implicit system
                             map(_ => complete(StatusCodes.Created)).get //TODO Handle upload failure
                         }
                       }
-                    } ~
-                      delete {
-                        publicApi.processCommand(DeleteWishImage(wishId), sessionUUID)
-                        complete(StatusCodes.OK)
-                      }
+                    }
                   }
               }
           }

@@ -60,23 +60,26 @@ object Commands {
   }
 
   case class SetWishDetails(wish: Wish) extends UserCommand {
-    override def process(user: User): List[UserEvent] = List(
-      wish.name.map(WishNameSet(wish.id, _)),
-      wish.link.map(WishLinkSet(wish.id, _)),
-      wish.imageLink.map(WishImageLinkSet(wish.id, _)),
-      wish.store.map(WishStoreSet(wish.id, _)),
-      wish.otherInfo.map(WishOtherInfoSet(wish.id, _)),
-      wish.price.map(WishPriceSet(wish.id, _)),
-      wish.currency.map(WishCurrencySet(wish.id, _)),
-      wish.image.map(WishImageSet(wish.id, _))
-    ).flatten
+    override def process(user: User): List[UserEvent] =
+      creationEventIfNotExists(user) ++ List(
+        wish.name.map(WishNameSet(wish.id, _)),
+        wish.link.map(WishLinkSet(wish.id, _)),
+        wish.store.map(WishStoreSet(wish.id, _)),
+        wish.otherInfo.map(WishOtherInfoSet(wish.id, _)),
+        wish.price.map(WishPriceSet(wish.id, _)),
+        wish.currency.map(WishCurrencySet(wish.id, _)),
+        wish.image.map(WishImageSet(wish.id, _))
+      ).flatten
+
+    private def creationEventIfNotExists(user: User) = {
+      if (!user.wishes.contains(wish.id))
+        List(WishCreated(wish.id, user.id, DateTime.now()))
+      else
+        Nil
+    }
   }
 
   case class DeleteWishImage(wishId: UUID) extends UserCommand {
     override def process(user: User): List[UserEvent] = List(WishImageDeleted(wishId))
-  }
-
-  case class CreateNewWish(wishId: UUID, creationTime: DateTime = DateTime.now()) extends UserCommand {
-    override def process(user: User): List[UserEvent] = List(WishCreated(wishId, user.id, creationTime))
   }
 }

@@ -115,11 +115,6 @@ class UserTest extends Specification with MatcherMacros with JMock {
     appliedEventCreatesExpectedWish(WishLinkSet(wish.id, link), wish.withLink(link))
   }
 
-  "apply WishImageLinkSet" in new Context {
-    private val imageLink = "image"
-    appliedEventCreatesExpectedWish(WishImageLinkSet(wish.id, imageLink), wish.withImageLink(imageLink))
-  }
-
   "apply WishStoreSet" in new Context {
     private val store = "store"
     appliedEventCreatesExpectedWish(WishStoreSet(wish.id, store), wish.withStore(store))
@@ -131,7 +126,7 @@ class UserTest extends Specification with MatcherMacros with JMock {
   }
 
   "apply WishImageDeleted" in new Context {
-    user.applyEvent(WishImageLinkSet(wish.id, "image-link")).applyEvent(WishImageDeleted(wish.id)).wishes(wish.id).imageLink must beNone
+    user.applyEvent(WishImageSet(wish.id, ImageLink("", 0, 0, ""))).applyEvent(WishImageDeleted(wish.id)).wishes(wish.id).image must beNone
   }
 
   "apply UserPictureSet" in new Context {

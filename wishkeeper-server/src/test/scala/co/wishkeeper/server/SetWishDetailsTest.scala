@@ -4,6 +4,8 @@ import java.util.UUID
 
 import co.wishkeeper.server.Commands.SetWishDetails
 import co.wishkeeper.server.Events._
+import org.joda.time.DateTime
+import org.specs2.matcher.Matcher
 import org.specs2.mutable.Specification
 
 class SetWishDetailsTest extends Specification {
@@ -13,33 +15,27 @@ class SetWishDetailsTest extends Specification {
 
   "should create event for name" in {
     val name = "name"
-    SetWishDetails(Wish(wishId).withName(name)).process(user) must beEqualTo(List(WishNameSet(wishId, name)))
+    SetWishDetails(Wish(wishId).withName(name)).process(user) must contain(WishNameSet(wishId, name))
   }
 
   "should create event for link" in {
     val link = "link"
-    SetWishDetails(Wish(wishId).withLink(link)).process(user) must beEqualTo(List(WishLinkSet(wishId, link)))
-  }
-
-  "should create event for image link" in {
-    val link = "link"
-    SetWishDetails(Wish(wishId).withImageLink(link)).process(user) must beEqualTo(List(WishImageLinkSet(wishId, link)))
+    SetWishDetails(Wish(wishId).withLink(link)).process(user) must contain(WishLinkSet(wishId, link))
   }
 
   "should create event for store" in {
     val store = "store"
-    SetWishDetails(Wish(wishId).withStore(store)).process(user) must beEqualTo(List(WishStoreSet(wishId, store)))
+    SetWishDetails(Wish(wishId).withStore(store)).process(user) must contain(WishStoreSet(wishId, store))
   }
 
   "should create event for other info" in {
     val otherInfo = "other info"
-    SetWishDetails(Wish(wishId).withOtherInfo(otherInfo)).process(user) must beEqualTo(List(WishOtherInfoSet(wishId, otherInfo)))
+    SetWishDetails(Wish(wishId).withOtherInfo(otherInfo)).process(user) must contain(WishOtherInfoSet(wishId, otherInfo))
   }
 
   "should create events for multiple properties" in {
     val name = "name"
     val link = "link"
-    val imageLink = "image link"
     val store = "store"
     val otherInfo = "other info"
 
@@ -47,14 +43,12 @@ class SetWishDetailsTest extends Specification {
       Wish(wishId).
         withName(name).
         withLink(link).
-        withImageLink(imageLink).
         withStore(store).
         withOtherInfo(otherInfo))
 
     val expectedEvents: List[UserEvent] = List(
       WishNameSet(wishId, name),
       WishLinkSet(wishId, link),
-      WishImageLinkSet(wishId, imageLink),
       WishStoreSet(wishId, store),
       WishOtherInfoSet(wishId, otherInfo)
     )
@@ -64,16 +58,31 @@ class SetWishDetailsTest extends Specification {
 
   "should create event for price" in {
     val price = "5.00"
-    SetWishDetails(Wish(wishId).withPrice(price)).process(user) must beEqualTo(List(WishPriceSet(wishId, price)))
+    SetWishDetails(Wish(wishId).withPrice(price)).process(user) must contain(WishPriceSet(wishId, price))
   }
 
   "should create event for currency" in {
     val currency = "USD"
-    SetWishDetails(Wish(wishId).withCurrency(currency)).process(user) must beEqualTo(List(WishCurrencySet(wishId, currency)))
+    SetWishDetails(Wish(wishId).withCurrency(currency)).process(user) must contain(WishCurrencySet(wishId, currency))
   }
 
   "should create event for image" in {
     val imageLink = ImageLink("http://www.myimage.com", 10, 20, "image/jpeg")
-    SetWishDetails(Wish(wishId).withImage(imageLink)).process(user) must beEqualTo(List(WishImageSet(wishId, imageLink)))
+    SetWishDetails(Wish(wishId).withImage(imageLink)).process(user) must contain(WishImageSet(wishId, imageLink))
+  }
+
+  "should create a wish creation event if the wish is new" in {
+    SetWishDetails(Wish(wishId)).process(user) must containWishCreatedEvent(wishId, user.id)
+  }
+
+  "should not create a wish creation event if the wish already exists" in {
+    SetWishDetails(Wish(wishId)).process(user.applyEvent(WishCreated(wishId, user.id, DateTime.now()))) must beEmpty
+  }
+
+  def containWishCreatedEvent(wishId: UUID, createdBy: UUID): Matcher[List[UserEvent]] = { eventList: List[UserEvent] =>
+    (eventList.exists(_ match {
+      case WishCreated(wish, userId, _) if wish == wishId && userId == createdBy => true
+      case _ => false
+    }), s"$eventList does not contain WishCreated($wishId, $createdBy, any[DateTime])")
   }
 }

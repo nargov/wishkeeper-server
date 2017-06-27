@@ -8,7 +8,7 @@ import akka.http.scaladsl.model.StatusCodes
 import akka.http.scaladsl.model.headers.RawHeader
 import akka.http.scaladsl.testkit.Specs2RouteTest
 import co.wishkeeper.json._
-import co.wishkeeper.server.Commands.{ConnectFacebookUser, CreateNewWish, SendFriendRequest}
+import co.wishkeeper.server.Commands.{ConnectFacebookUser, SendFriendRequest}
 import co.wishkeeper.server.api.{ManagementApi, PublicApi}
 import co.wishkeeper.server.projections.PotentialFriend
 import com.wixpress.common.specs2.JMock
@@ -130,21 +130,6 @@ class RouteTest extends Specification with Specs2RouteTest with JMock {
         responseAs[UserProfile] must beEqualTo(expectedProfile)
       }
     }
-
-    "Create new wish" in new LoggedInUserContext {
-      val createNewWish = CreateNewWish(randomUUID())
-
-      checking {
-        oneOf(publicApi).processCommand(createNewWish, Option(sessionId))
-      }
-
-      Post(s"/users/wishes").
-        withHeaders(sessionIdHeader).
-        withEntity(`application/json`, createNewWish.asJson.noSpaces) ~> webApi.userRoute ~> check {
-        handled must beTrue
-      }
-    }
-
 
     "Return wish list" in new LoggedInUserContext {
       val wishes = UserWishes(List(Wish(randomUUID())))
