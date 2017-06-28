@@ -74,8 +74,10 @@ class WishkeeperServer() extends PublicApi with ManagementApi {
     Try {
       imageStore.save(ImageData(inputStream, imageMetadata.contentType), imageMetadata.fileName)
       val url = s"$mediaServerBase/${imageMetadata.fileName}"
-      processCommand(SetWishDetails(Wish(wishId, image = Option(ImageLink(url, imageMetadata.width, imageMetadata.height, imageMetadata.contentType)))
-      ), Option(sessionId))
+      processCommand(
+        SetWishDetails(Wish(wishId, image = Option(ImageLink(url, imageMetadata.width, imageMetadata.height, imageMetadata.contentType)))),
+        Option(sessionId)
+      )
     }
   }
 

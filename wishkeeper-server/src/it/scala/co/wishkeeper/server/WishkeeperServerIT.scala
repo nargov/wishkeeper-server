@@ -56,15 +56,14 @@ class WishkeeperServerIT(implicit ee: ExecutionEnv) extends Specification with B
     val sessionId = randomUUID()
 
     Post(s"$usersEndpoint/connect/facebook", ConnectFacebookUser(facebookUser.id, facebookUser.access_token, sessionId))
-
-    val wish = Wish(randomUUID()).withName("Expected Name")
-    Post(s"$usersEndpoint/wishes", SetWishDetails(wish), Map(WebApi.sessionIdHeader -> sessionId.toString)) must beOk
-
     val userId = Get(s"$usersManagementEndpoint/facebook/${facebookUser.id}").to[UUID]
+
+    val wish = Wish(userId).withName("Expected Name")
+    Post(s"$usersEndpoint/wishes", SetWishDetails(wish), Map(WebApi.sessionIdHeader -> sessionId.toString)) must beOk
 
     val response = Get(s"$usersManagementEndpoint/$userId/wishes")
     response must beOk
-    response.to[List[Wish]] must contain(beEqualToIgnoringDates(wish))
+    response.to[List[Wish]] must contain(beEqualToIgnoringDates(wish.withCreator(userId)))
   }
 
   "Upload a wish image" in {

@@ -1,11 +1,12 @@
 package co.wishkeeper.server
 
+import java.nio.file.Paths
 import java.util.concurrent.atomic.AtomicReference
 
-import com.spotify.docker.client.DefaultDockerClient
+import com.spotify.docker.client.{DefaultDockerClient, ProgressHandler}
 import com.spotify.docker.client.DockerClient.ListContainersParam.allContainers
-import com.spotify.docker.client.DockerClient.LogsParam
-import com.spotify.docker.client.messages.{ContainerConfig, HostConfig, PortBinding}
+import com.spotify.docker.client.DockerClient.{ListImagesParam, LogsParam}
+import com.spotify.docker.client.messages.{ContainerConfig, HostConfig, PortBinding, ProgressMessage}
 import org.slf4j.LoggerFactory
 
 import scala.collection.JavaConverters._
@@ -13,27 +14,26 @@ import scala.concurrent.duration._
 
 
 class CassandraDocker {
+  val imageName = "cassandra-test-kit"
   val containerName = "cassandra-test-kit"
   val docker = DefaultDockerClient.fromEnv().build()
-  val cassandraImage = "cassandra:3.9"
   val port = "9042"
 
   private def start() = {
-    docker.pull(cassandraImage)
+    createImageIfNotExists()
 
     val portBindings = Map(port → List(PortBinding.of("0.0.0.0", port)).asJava)
 
     val hostConfig = HostConfig.builder().portBindings(portBindings.asJava).build()
     val containerConfig = ContainerConfig.builder().
       hostConfig(hostConfig).
-      image(cassandraImage).
+      image(imageName).
       exposedPorts(port).
       build()
 
     removeContainerIfAlreadyExists()
 
-    val containerCreation = docker.createContainer(containerConfig, containerName)
-    val id = containerCreation.id
+    val id = docker.createContainer(containerConfig, containerName).id
 
     docker.startContainer(id)
 
@@ -42,6 +42,18 @@ class CassandraDocker {
     this
   }
 
+
+  private def createImageIfNotExists() = {
+    if (docker.listImages(ListImagesParam.byName(imageName)).isEmpty) {
+      println(s"Creating $imageName Docker image")
+      val dockerfilePath = Paths.get(getClass.getResource("/CassandraDockerTestKit/testkit-cassandra.yaml").getPath).getParent
+      docker.build(dockerfilePath, imageName, new ProgressHandler {
+        override def progress(message: ProgressMessage): Unit = {
+          println(message.stream())
+        }
+      })
+    }
+  }
 
   private def waitForUpMessage(containerId: String, retries: Int = 240, backoff: Duration = 250.millis) = {
     (1 to retries).find(_ ⇒ {
@@ -71,7 +83,7 @@ object CassandraDocker {
     if (instance.compareAndSet(None, Some(new CassandraDocker().start()))) {
       log.info("Starting Cassandra Docker container.")
     }
-    else{
+    else {
       log.info("Cassandra Docker already started")
     }
   }
