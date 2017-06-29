@@ -25,7 +25,7 @@ object HttpTestKit {
   private val threadPool = Executors.newCachedThreadPool()
   implicit val executionContext = ExecutionContext.fromExecutor(threadPool)
 
-  implicit val defaultTimeout = Timeout(4.seconds)
+  implicit val defaultTimeout = Timeout(10.seconds)
 
   class Get private(uri: String, headers: Map[String, String])(implicit timeout: Timeout) {
     private val response = Http().singleRequest(httpRequest(uri, headers)).map(Response(_, timeout))
@@ -113,7 +113,7 @@ trait ResponseMatchers extends MustThrownMatchers {
     (_: HttpTestKit.Response).status
   }
 
-  def beSuccessful: Matcher[HttpTestKit.Response] = between(200, 300) ^^ {
+  def beSuccessful: Matcher[HttpTestKit.Response] = between(200, 299) ^^ {
     (_: HttpTestKit.Response).status.intValue()
   }
 }

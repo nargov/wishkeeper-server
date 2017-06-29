@@ -4,8 +4,9 @@ import java.io.InputStream
 import java.util.UUID
 
 import co.wishkeeper.server.Commands.{ConnectFacebookUser, UserCommand}
+import co.wishkeeper.server.image.ImageMetadata
 import co.wishkeeper.server.projections.PotentialFriend
-import co.wishkeeper.server.{ImageMetadata, UserProfile, UserWishes}
+import co.wishkeeper.server.{UserProfile, UserWishes}
 
 import scala.concurrent.Future
 import scala.util.Try

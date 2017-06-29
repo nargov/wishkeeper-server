@@ -69,7 +69,7 @@ class WishkeeperServerIT(implicit ee: ExecutionEnv) extends Specification with B
   "Upload a wish image" in {
     val facebookUser = testUsers.head
     val sessionId = randomUUID()
-    val testImage = new TestImage
+    val testImage = TestImage.large()
     val wishId = randomUUID()
     val imageId = new UUID(0, 0)
 
@@ -80,9 +80,12 @@ class WishkeeperServerIT(implicit ee: ExecutionEnv) extends Specification with B
       WebApi.imageDimensionsHeader -> s"${testImage.width},${testImage.height}"
     )) must beSuccessful
 
-    val imageResponse = Get(s"http://wish.media.wishkeeper.co/$imageId") //TODO replace with fake cloud storage
+    val imageResponse = Get(s"http://wish.media.wishkeeper.co/$imageId.full") //TODO replace with fake cloud storage
+    imageResponse must beSuccessful
     imageResponse.contentType must beEqualTo(testImage.contentType)
-    imageResponse.bytes must containTheSameElementsAs(testImage.fileBytes)
+
+    Get(s"http://wish.media.wishkeeper.co/$imageId.fhd") must beSuccessful
+    Get(s"http://wish.media.wishkeeper.co/$imageId.hfhd") must beSuccessful
   }
 
   override def beforeAll(): Unit = {

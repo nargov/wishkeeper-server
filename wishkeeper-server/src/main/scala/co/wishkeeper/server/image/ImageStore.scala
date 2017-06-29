@@ -1,9 +1,9 @@
-package co.wishkeeper.server
+package co.wishkeeper.server.image
 
 import java.io.InputStream
 import java.nio.channels.Channels
 
-import co.wishkeeper.server.GoogleCloudStorageImageStore.bucketName
+import co.wishkeeper.server.image.GoogleCloudStorageImageStore.bucketName
 import com.google.cloud.storage.Bucket.BlobWriteOption
 import com.google.cloud.storage.Storage.{BlobField, BlobGetOption}
 import com.google.cloud.storage.{BlobId, Storage, StorageOptions}

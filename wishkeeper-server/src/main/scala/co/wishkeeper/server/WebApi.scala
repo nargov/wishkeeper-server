@@ -16,6 +16,7 @@ import co.wishkeeper.json._
 import co.wishkeeper.server.Commands._
 import co.wishkeeper.server.WebApi.imageDimensionsHeader
 import co.wishkeeper.server.api.{ManagementApi, PublicApi}
+import co.wishkeeper.server.image.ImageMetadata
 import de.heikoseeberger.akkahttpcirce.CirceSupport._
 import io.circe.generic.extras.Configuration
 import io.circe.generic.extras.auto._

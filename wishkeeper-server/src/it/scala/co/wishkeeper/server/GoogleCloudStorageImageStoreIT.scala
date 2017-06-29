@@ -1,5 +1,6 @@
 package co.wishkeeper.server
 
+import co.wishkeeper.server.image.{GoogleCloudStorageImageStore, ImageData, ImageStore}
 import org.specs2.mutable.Specification
 import org.specs2.specification.{AfterAll, Scope}
 
