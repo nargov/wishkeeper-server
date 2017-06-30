@@ -77,25 +77,32 @@ class WishkeeperServer() extends PublicApi with ManagementApi {
 
   override def uploadImage(inputStream: InputStream, imageMetadata: ImageMetadata, wishId: UUID, sessionId: UUID): Try[Unit] = {
     Try {
-      val tempDir = Files.createDirectories(Paths.get("/tmp/wishkeeper-resize"))
-      val origFile = Paths.get(tempDir.toString, imageMetadata.fileName)
+      val origFile = Paths.get(ImageProcessor.tempDir.toString, imageMetadata.fileName)
       Files.copy(inputStream, origFile)
 
-      List(
-        imageProcessor.compress(origFile, ".full"),
-        imageProcessor.resizeToWidth(origFile, ".fhd", 1080),
-        imageProcessor.resizeToWidth(origFile, ".hfhd", 540)
-      ).foreach { file =>
-        imageStore.save(ImageData(Files.newInputStream(file), jpegContentType), file.getFileName.toString)
+      val sizeExtensions = List(
+        (".full", imageMetadata.width),
+        (".fhd", 1080),
+        (".hfhd", 540)
+      )
+
+      val resizedImages: List[ImageLink] = sizeExtensions.filter { case (_, width) =>
+        width <= imageMetadata.width
+      }.map { case (ext, width) =>
+        val file = if (width == imageMetadata.width)
+          imageProcessor.compress(origFile, ext)
+        else
+          imageProcessor.resizeToWidth(origFile, ext, width)
+        val fileName = file.getFileName.toString
+        val (_, height) = imageProcessor.dimensions(file)
+        imageStore.save(ImageData(Files.newInputStream(file), jpegContentType), fileName)
         Files.deleteIfExists(file)
+        ImageLink(s"$mediaServerBase/$fileName", width, height, jpegContentType)
       }
+
       Files.deleteIfExists(origFile)
 
-      val url = s"$mediaServerBase/${imageMetadata.fileName}"
-      processCommand(
-        SetWishDetails(Wish(wishId, image = Option(ImageLink(url, imageMetadata.width, imageMetadata.height, imageMetadata.contentType)))),
-        Option(sessionId)
-      )
+      processCommand(SetWishDetails(Wish(wishId, image = Option(ImageLinks(resizedImages)))), Option(sessionId))
     }
   }
 

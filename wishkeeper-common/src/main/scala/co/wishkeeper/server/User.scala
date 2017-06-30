@@ -31,7 +31,7 @@ case class User(id: UUID, userProfile: UserProfile = UserProfile(), friends: Fri
     case WishCurrencySet(wishId, currency) => updateWishProperty(wishId, _.withCurrency(currency))
     case WishStoreSet(wishId, store) => updateWishProperty(wishId, _.withStore(store))
     case WishOtherInfoSet(wishId, info) => updateWishProperty(wishId, _.withOtherInfo(info))
-    case WishImageSet(wishId, imageLink) => updateWishProperty(wishId, _.withImage(imageLink))
+    case WishImageSet(wishId, imageLinks) => updateWishProperty(wishId, _.withImage(imageLinks))
     case WishImageDeleted(wishId) => updateWishProperty(wishId, _.withoutImage)
     case _ => this
   }

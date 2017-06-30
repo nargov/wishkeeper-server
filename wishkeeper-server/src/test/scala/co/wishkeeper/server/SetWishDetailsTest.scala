@@ -8,6 +8,8 @@ import org.joda.time.DateTime
 import org.specs2.matcher.Matcher
 import org.specs2.mutable.Specification
 
+import scala.collection.SortedMap
+
 class SetWishDetailsTest extends Specification {
 
   val user = User(UUID.randomUUID())
@@ -68,7 +70,8 @@ class SetWishDetailsTest extends Specification {
 
   "should create event for image" in {
     val imageLink = ImageLink("http://www.myimage.com", 10, 20, "image/jpeg")
-    SetWishDetails(Wish(wishId).withImage(imageLink)).process(user) must contain(WishImageSet(wishId, imageLink))
+    val imageLinks = ImageLinks(imageLink :: Nil)
+    SetWishDetails(Wish(wishId).withImage(imageLinks)).process(user) must contain(WishImageSet(wishId, imageLinks))
   }
 
   "should create a wish creation event if the wish is new" in {

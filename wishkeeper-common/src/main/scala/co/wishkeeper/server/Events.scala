@@ -54,7 +54,7 @@ object Events {
 
   case class WishImageDeleted(wishId: UUID) extends UserEvent
 
-  case class WishImageSet(wishId: UUID, imageLink: ImageLink) extends UserEvent
+  case class WishImageSet(wishId: UUID, imageLinks: ImageLinks) extends UserEvent
 
   case class WishCreated(wishId: UUID, createdBy: UUID, creationTime: DateTime) extends UserEvent
 

@@ -13,8 +13,7 @@ case class Wish(id: UUID,
                 currency: Option[String] = None,
                 creationTime: DateTime = DateTime.now(),
                 creator: Option[UUID] = None,
-                image: Option[ImageLink] = None) {
-
+                image: Option[ImageLinks] = None) {
 
   def withName(name: String): Wish = this.copy(name = Option(name))
   def withLink(link: String): Wish = this.copy(link = Option(link))
@@ -25,9 +24,11 @@ case class Wish(id: UUID,
   def withoutImage: Wish = this.copy(image = None)
   def withCreationTime(time: DateTime): Wish = this.copy(creationTime = time)
   def withCreator(creator: UUID): Wish = this.copy(creator = Option(creator))
-  def withImage(imageLink: ImageLink): Wish = this.copy(image = Option(imageLink))
+  def withImage(imageLinks: ImageLinks): Wish = this.copy(image = Option(imageLinks.copy(links = imageLinks.links.sortBy(_.width))))
 }
 
 case class UserWishes(wishes: List[Wish])
 
 case class ImageLink(url: String, width: Int, height: Int, contentType: String)
+
+case class ImageLinks(links: List[ImageLink])

@@ -126,7 +126,8 @@ class UserTest extends Specification with MatcherMacros with JMock {
   }
 
   "apply WishImageDeleted" in new Context {
-    user.applyEvent(WishImageSet(wish.id, ImageLink("", 0, 0, ""))).applyEvent(WishImageDeleted(wish.id)).wishes(wish.id).image must beNone
+    private val imageLinks = ImageLinks(ImageLink("", 0, 0, "") :: Nil)
+    user.applyEvent(WishImageSet(wish.id, imageLinks)).applyEvent(WishImageDeleted(wish.id)).wishes(wish.id).image must beNone
   }
 
   "apply UserPictureSet" in new Context {
@@ -141,8 +142,8 @@ class UserTest extends Specification with MatcherMacros with JMock {
   }
 
   "apply WishImageSet" in new Context {
-    private val imageLink = ImageLink("url", 10, 20, "image/jpeg")
-    appliedEventCreatesExpectedWish(WishImageSet(wish.id, imageLink), wish.withImage(imageLink))
+    private val imageLinks = ImageLinks(ImageLink("url", 10, 20, "image/jpeg") :: Nil)
+    appliedEventCreatesExpectedWish(WishImageSet(wish.id, imageLinks), wish.withImage(imageLinks))
   }
 
   "apply WishPriceSet" in new Context {
@@ -153,6 +154,15 @@ class UserTest extends Specification with MatcherMacros with JMock {
   "apply WishCurrencySet" in new Context {
     val currency = "GBP"
     appliedEventCreatesExpectedWish(WishCurrencySet(wish.id, currency), wish.withCurrency(currency))
+  }
+
+  "apply wish links ordered by width" in new Context {
+    private val imageLinks = ImageLinks(
+      ImageLink("url", 30, 20, "image/jpeg") ::
+      ImageLink("url", 10, 20, "image/jpeg") ::
+      ImageLink("url", 20, 20, "image/jpeg") ::
+        Nil)
+    user.applyEvent(WishImageSet(wish.id, imageLinks)).wishes(wish.id).image.get.links must beEqualTo(imageLinks.links.sortBy(_.width))
   }
 
   def haveCreationTime(time: DateTime): Matcher[Wish] = ===(time) ^^ {(_:Wish).creationTime}

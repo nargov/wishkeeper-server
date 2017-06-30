@@ -3,6 +3,7 @@ package co.wishkeeper.server
 import java.util.UUID
 import java.util.UUID.randomUUID
 
+import akka.http.scaladsl.model.StatusCode
 import co.wishkeeper.DataStoreTestHelper
 import co.wishkeeper.json._
 import co.wishkeeper.server.Commands.{ConnectFacebookUser, SendFriendRequest, SetWishDetails}
@@ -80,12 +81,13 @@ class WishkeeperServerIT(implicit ee: ExecutionEnv) extends Specification with B
       WebApi.imageDimensionsHeader -> s"${testImage.width},${testImage.height}"
     )) must beSuccessful
 
-    val imageResponse = Get(s"http://wish.media.wishkeeper.co/$imageId.full") //TODO replace with fake cloud storage
-    imageResponse must beSuccessful
-    imageResponse.contentType must beEqualTo(testImage.contentType)
+    val userWishes = Get(s"$usersEndpoint/wishes", Map(WebApi.sessionIdHeader -> sessionId.toString)).to[UserWishes]
 
-    Get(s"http://wish.media.wishkeeper.co/$imageId.fhd") must beSuccessful
-    Get(s"http://wish.media.wishkeeper.co/$imageId.hfhd") must beSuccessful
+    val maybeWish = userWishes.wishes.find(_.id == wishId)
+    val maybeLinks: Option[List[ImageLink]] = maybeWish.flatMap(_.image).map(_.links)
+    maybeLinks.map(_.size) must beSome(3)
+    val maybeResponses = maybeLinks.map(_.map(imageLink => Get(imageLink.url)))
+    maybeResponses must beSome(contain(beSuccessful))
   }
 
   override def beforeAll(): Unit = {
