@@ -83,7 +83,8 @@ class WishkeeperServer() extends PublicApi with ManagementApi {
       val sizeExtensions = List(
         (".full", imageMetadata.width),
         (".fhd", 1080),
-        (".hfhd", 540)
+        (".hfhd", 540),
+        (".qfhd", 270)
       )
 
       val resizedImages: List[ImageLink] = sizeExtensions.filter { case (_, width) =>
