@@ -7,7 +7,7 @@ import java.util.UUID
 import akka.actor.ActorSystem
 import akka.stream.ActorMaterializer
 import co.wishkeeper.json._
-import co.wishkeeper.server.Commands.{ConnectFacebookUser, SetWishDetails, UserCommand}
+import co.wishkeeper.server.Commands.{ConnectFacebookUser, DeleteWish, SetWishDetails, UserCommand}
 import co.wishkeeper.server.Server.mediaServerBase
 import co.wishkeeper.server.api.{ManagementApi, PublicApi}
 import co.wishkeeper.server.image.{GoogleCloudStorageImageStore, ImageData, ImageMetadata}
@@ -113,12 +113,14 @@ class WishkeeperServer() extends PublicApi with ManagementApi {
 
   override def wishesFor(userId: UUID): List[Wish] = User.replay(dataStore.userEventsFor(userId)).wishes.values.toList
 
-  override def wishListFor(userId: UUID): Option[UserWishes] = {
+  override def wishListFor(userId: UUID): Option[UserWishes] = { //TODO missing tests here - need to move this logic so that can unit test
     dataStore.userBySession(userId).map { userId =>
       val wishList = User.replay(dataStore.userEventsFor(userId)).wishes.values.toList
-      UserWishes(wishList.sortBy(_.creationTime.getMillis).reverse)
+      UserWishes(wishList.filter(_.status == WishStatus.Active).sortBy(_.creationTime.getMillis).reverse)
     }
   }
+
+  override def deleteWish(sessionId: UUID, wishId: UUID): Unit = commandProcessor.process(DeleteWish(wishId), Option(sessionId))
 }
 
 object Server {

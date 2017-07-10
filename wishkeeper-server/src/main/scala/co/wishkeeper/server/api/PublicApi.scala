@@ -12,6 +12,8 @@ import scala.concurrent.Future
 import scala.util.Try
 
 trait PublicApi {
+  def deleteWish(sessionId: UUID, wishId: UUID): Unit
+
   def wishListFor(sessionId: UUID): Option[UserWishes]
 
   def processCommand(command: UserCommand, sessionId: Option[UUID]): Unit

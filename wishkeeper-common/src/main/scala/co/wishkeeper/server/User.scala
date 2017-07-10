@@ -33,6 +33,7 @@ case class User(id: UUID, userProfile: UserProfile = UserProfile(), friends: Fri
     case WishOtherInfoSet(wishId, info) => updateWishProperty(wishId, _.withOtherInfo(info))
     case WishImageSet(wishId, imageLinks) => updateWishProperty(wishId, _.withImage(imageLinks))
     case WishImageDeleted(wishId) => updateWishProperty(wishId, _.withoutImage)
+    case WishDeleted(wishId) => updateWishProperty(wishId, _.withStatus(WishStatus.Deleted))
     case _ => this
   }
 

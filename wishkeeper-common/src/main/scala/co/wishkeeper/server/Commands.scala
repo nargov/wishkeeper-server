@@ -82,4 +82,8 @@ object Commands {
   case class DeleteWishImage(wishId: UUID) extends UserCommand {
     override def process(user: User): List[UserEvent] = List(WishImageDeleted(wishId))
   }
+
+  case class DeleteWish(wishId: UUID) extends UserCommand {
+    override def process(user: User): List[UserEvent] = WishDeleted(wishId) :: Nil
+  }
 }

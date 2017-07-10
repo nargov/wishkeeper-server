@@ -165,5 +165,9 @@ class UserTest extends Specification with MatcherMacros with JMock {
     user.applyEvent(WishImageSet(wish.id, imageLinks)).wishes(wish.id).image.get.links must beEqualTo(imageLinks.links.sortBy(_.width))
   }
 
+  "apply wish deleted" in new Context {
+    user.applyEvent(WishCreated(wish.id, randomUUID(), DateTime.now())).applyEvent(WishDeleted(wish.id)).wishes(wish.id).status must beEqualTo(WishStatus.Deleted)
+  }
+
   def haveCreationTime(time: DateTime): Matcher[Wish] = ===(time) ^^ {(_:Wish).creationTime}
 }

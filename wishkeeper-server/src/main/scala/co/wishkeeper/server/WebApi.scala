@@ -97,6 +97,14 @@ class WebApi(publicApi: PublicApi, managementApi: ManagementApi)(implicit system
                   get {
                     sessionUUID.flatMap(publicApi.wishListFor).map(complete(_)).get
                   } ~
+                  delete {
+                    path(JavaUUID) { wishId =>
+                      sessionUUID.map { sessionId =>
+                        publicApi.deleteWish(sessionId, wishId)
+                        complete()
+                      }.get
+                    }
+                  } ~
                   path(JavaUUID / "image") { wishId =>
                     post {
                       headerValueByName(imageDimensionsHeader) { imageDimensionsHeader =>

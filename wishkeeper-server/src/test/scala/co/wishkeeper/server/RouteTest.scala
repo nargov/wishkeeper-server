@@ -142,6 +142,18 @@ class RouteTest extends Specification with Specs2RouteTest with JMock {
         responseAs[UserWishes] must beEqualTo(wishes)
       }
     }
+
+    "Delete Wish" in new LoggedInUserContext {
+      val wishId = randomUUID()
+
+      checking {
+        oneOf(publicApi).deleteWish(sessionId, wishId)
+      }
+
+      Delete(s"/users/wishes/$wishId").withHeaders(sessionIdHeader) ~> webApi.userRoute ~> check {
+        status must beEqualTo(StatusCodes.OK)
+      }
+    }
   }
 
   def aPotentialFriendWith(id: UUID, name: String): Matcher[PotentialFriend] =
