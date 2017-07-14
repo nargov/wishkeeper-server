@@ -105,23 +105,42 @@ class WebApi(publicApi: PublicApi, managementApi: ManagementApi)(implicit system
                       }.get
                     }
                   } ~
-                  path(JavaUUID / "image") { wishId =>
+                  pathPrefix(JavaUUID / "image") { wishId =>
                     post {
                       headerValueByName(imageDimensionsHeader) { imageDimensionsHeader =>
                         val imageWidth :: imageHeight :: Nil = imageDimensionsHeader.split(",").toList
-                        fileUpload("file") { case (metadata, byteSource) =>
-                          val inputStream = byteSource.runWith(StreamConverters.asInputStream())
-                          publicApi.uploadImage(inputStream,
-                            ImageMetadata(
-                              metadata.contentType.value,
-                              metadata.fileName,
-                              imageWidth.toInt,
-                              imageHeight.toInt),
-                            wishId, UUID.fromString(sessionId)).
-                            map(_ => complete(StatusCodes.Created)).get //TODO Handle upload failure
-                        }
+                        pathEnd {
+                          fileUpload("file") { case (metadata, byteSource) =>
+                            val inputStream = byteSource.runWith(StreamConverters.asInputStream())
+                            publicApi.uploadImage(inputStream,
+                              ImageMetadata(
+                                metadata.contentType.value,
+                                metadata.fileName,
+                                imageWidth.toInt,
+                                imageHeight.toInt),
+                              wishId, UUID.fromString(sessionId)).
+                              map(_ => complete(StatusCodes.Created)).get //TODO Handle upload failure
+                          }
+                        } ~
+                          path("url") {
+                            parameters('filename, 'contentType, 'url) { (filename, contentType, url) =>
+                              sessionUUID.map { sessionId =>
+                                publicApi.uploadImage(
+                                  url,
+                                  ImageMetadata(contentType, filename, imageWidth.toInt, imageHeight.toInt),
+                                  wishId,
+                                  sessionId) //TODO handle error
+                                complete(StatusCodes.Created)
+                              }.get
+                            }
+                          }
                       }
-                    }
+                    } ~
+                      delete {
+                        sessionUUID.map { sessionId =>
+                          complete(publicApi.deleteWishImage(sessionId, wishId))
+                        }.get
+                      }
                   }
               }
           }

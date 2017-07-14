@@ -1,18 +1,20 @@
 package co.wishkeeper.server
 
 import java.io.InputStream
-import java.nio.file.{Files, Paths}
+import java.net.URL
+import java.nio.file.{Files, Path, Paths}
 import java.util.UUID
 
 import akka.actor.ActorSystem
 import akka.stream.ActorMaterializer
 import co.wishkeeper.json._
-import co.wishkeeper.server.Commands.{ConnectFacebookUser, DeleteWish, SetWishDetails, UserCommand}
+import co.wishkeeper.server.Commands._
 import co.wishkeeper.server.Server.mediaServerBase
 import co.wishkeeper.server.api.{ManagementApi, PublicApi}
 import co.wishkeeper.server.image.{GoogleCloudStorageImageStore, ImageData, ImageMetadata}
 import co.wishkeeper.server.projections._
 import com.typesafe.config.ConfigFactory
+import org.apache.commons.io.FileUtils
 
 import scala.concurrent.{ExecutionContextExecutor, Future}
 import scala.util.Try
@@ -80,31 +82,44 @@ class WishkeeperServer() extends PublicApi with ManagementApi {
       val origFile = Paths.get(ImageProcessor.tempDir.toString, imageMetadata.fileName)
       Files.copy(inputStream, origFile)
 
-      val sizeExtensions = List(
-        (".full", imageMetadata.width),
-        (".fhd", 1080),
-        (".hfhd", 540),
-        (".qfhd", 270)
-      )
-
-      val resizedImages: List[ImageLink] = sizeExtensions.filter { case (_, width) =>
-        width <= imageMetadata.width
-      }.map { case (ext, width) =>
-        val file = if (width == imageMetadata.width)
-          imageProcessor.compress(origFile, ext)
-        else
-          imageProcessor.resizeToWidth(origFile, ext, width)
-        val fileName = file.getFileName.toString
-        val (_, height) = imageProcessor.dimensions(file)
-        imageStore.save(ImageData(Files.newInputStream(file), jpegContentType), fileName)
-        Files.deleteIfExists(file)
-        ImageLink(s"$mediaServerBase/$fileName", width, height, jpegContentType)
-      }
-
-      Files.deleteIfExists(origFile)
-
-      processCommand(SetWishDetails(Wish(wishId, image = Option(ImageLinks(resizedImages)))), Option(sessionId))
+      uploadAndSetImages(imageMetadata, wishId, sessionId, origFile)
     }
+  }
+
+  override def uploadImage(url: String, imageMetadata: ImageMetadata, wishId: UUID, sessionId: UUID): Try[Unit] = {
+    Try {
+      val origFile = Paths.get(ImageProcessor.tempDir.toString, imageMetadata.fileName)
+      FileUtils.copyURLToFile(new URL(url), origFile.toFile)
+
+      uploadAndSetImages(imageMetadata, wishId, sessionId, origFile)
+    }
+  }
+
+  private def uploadAndSetImages(imageMetadata: ImageMetadata, wishId: UUID, sessionId: UUID, origFile: Path) = {
+    val sizeExtensions = List(
+      (".full", imageMetadata.width),
+      (".fhd", 1080),
+      (".hfhd", 540),
+      (".qfhd", 270)
+    )
+
+    val resizedImages: List[ImageLink] = sizeExtensions.filter { case (_, width) =>
+      width <= imageMetadata.width
+    }.map { case (ext, width) =>
+      val file = if (width == imageMetadata.width)
+        imageProcessor.compress(origFile, ext)
+      else
+        imageProcessor.resizeToWidth(origFile, ext, width)
+      val fileName = file.getFileName.toString
+      val (_, height) = imageProcessor.dimensions(file)
+      imageStore.save(ImageData(Files.newInputStream(file), jpegContentType), fileName)
+      Files.deleteIfExists(file)
+      ImageLink(s"$mediaServerBase/$fileName", width, height, jpegContentType)
+    }
+
+    Files.deleteIfExists(origFile)
+
+    processCommand(SetWishDetails(Wish(wishId, image = Option(ImageLinks(resizedImages)))), Option(sessionId))
   }
 
   override def userIdFor(facebookId: String): Option[UUID] = userIdByFacebookIdProjection.get(facebookId)
@@ -121,6 +136,8 @@ class WishkeeperServer() extends PublicApi with ManagementApi {
   }
 
   override def deleteWish(sessionId: UUID, wishId: UUID): Unit = commandProcessor.process(DeleteWish(wishId), Option(sessionId))
+
+  override def deleteWishImage(sessionId: UUID, wishId: UUID): Unit = commandProcessor.process(DeleteWishImage(wishId), Option(sessionId))
 }
 
 object Server {

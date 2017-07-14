@@ -10,6 +10,7 @@ import akka.http.scaladsl.testkit.Specs2RouteTest
 import co.wishkeeper.json._
 import co.wishkeeper.server.Commands.{ConnectFacebookUser, SendFriendRequest}
 import co.wishkeeper.server.api.{ManagementApi, PublicApi}
+import co.wishkeeper.server.image.ImageMetadata
 import co.wishkeeper.server.projections.PotentialFriend
 import com.wixpress.common.specs2.JMock
 import de.heikoseeberger.akkahttpcirce.CirceSupport._
@@ -152,6 +153,22 @@ class RouteTest extends Specification with Specs2RouteTest with JMock {
 
       Delete(s"/users/wishes/$wishId").withHeaders(sessionIdHeader) ~> webApi.userRoute ~> check {
         status must beEqualTo(StatusCodes.OK)
+      }
+    }
+
+    "upload image through url" in new LoggedInUserContext {
+      val wishId = randomUUID()
+      val imageMetadata = ImageMetadata("content-type", "filename", width = 1, height = 1)
+      val url = "http://my.image.url"
+
+      checking {
+        oneOf(publicApi).uploadImage(url, imageMetadata, wishId, sessionId)
+      }
+
+      val imageDimensionsHeader = RawHeader(WebApi.imageDimensionsHeader, s"${imageMetadata.width},${imageMetadata.height}")
+      val params = s"filename=${imageMetadata.fileName}&contentType=${imageMetadata.contentType}&url=$url"
+      Post(s"/users/wishes/$wishId/image/url?$params").withHeaders(sessionIdHeader, imageDimensionsHeader) ~> webApi.userRoute ~> check {
+        status must beEqualTo(StatusCodes.Created)
       }
     }
   }

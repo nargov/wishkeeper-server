@@ -27,4 +27,8 @@ trait PublicApi {
   def incomingFriendRequestSenders(sessionId: UUID): Option[List[UUID]]
 
   def uploadImage(inputStream: InputStream, imageMetadata: ImageMetadata, wishId: UUID, sessionId: UUID): Try[Unit]
+
+  def uploadImage(url: String, imageMetadata: ImageMetadata, wishId: UUID, sessionId: UUID): Try[Unit]
+
+  def deleteWishImage(sessionId: UUID, wishId: UUID): Unit
 }
