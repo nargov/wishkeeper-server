@@ -14,8 +14,10 @@ class DataStoreTestHelper extends Matchers {
   private var cluster: Cluster = _
   private var session: Session = _
 
+  val nodeAddresses = "localhost" :: Nil
+
   def start() = {
-    cluster = Cluster.builder().addContactPoint("localhost").build()
+    cluster = Cluster.builder().addContactPoints(nodeAddresses: _*).build()
     session = cluster.connect()
   }
 

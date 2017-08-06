@@ -18,10 +18,13 @@ import org.apache.commons.io.FileUtils
 
 import scala.concurrent.{ExecutionContextExecutor, Future}
 import scala.util.Try
+import scala.collection.JavaConverters._
 
 
 class WishkeeperServer() extends PublicApi with ManagementApi {
-  private val dataStore = new CassandraDataStore
+  private val config = ConfigFactory.load("wishkeeper")
+  private val dataStoreConfig = DataStoreConfig(config.getStringList("wishkeeper.datastore.urls").asScala.toList)
+  private val dataStore = new CassandraDataStore(dataStoreConfig)
   private val userIdByFacebookIdProjection = new DataStoreUserIdByFacebookIdProjection(dataStore)
   private val incomingFriendRequestsProjection = new DataStoreIncomingFriendRequestsProjection(dataStore)
   private val commandProcessor: CommandProcessor = new UserCommandProcessor(dataStore,
@@ -32,7 +35,6 @@ class WishkeeperServer() extends PublicApi with ManagementApi {
   private implicit val materializer = ActorMaterializer()
   private implicit val executionContext: ExecutionContextExecutor = system.dispatcher
 
-  private val config = ConfigFactory.load("wishkeeper")
   private val facebookConnector: FacebookConnector = new AkkaHttpFacebookConnector(
     config.getString("wishkeeper.facebook.app-id"),
     config.getString("wishkeeper.facebook.app-secret"))

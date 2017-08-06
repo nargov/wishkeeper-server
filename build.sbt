@@ -15,6 +15,7 @@ lazy val commonSettings = Seq(
   scalaVersion := scalaVer,
   libraryDependencies ++= Seq(
     "com.google.guava" % "guava" % "19.0",
+    "com.fasterxml.jackson.core" % "jackson-core" % "2.6.0",
     "joda-time" % "joda-time" % "2.9.7",
     "org.joda" % "joda-convert" % "1.8.1",
     "org.scalactic" %% "scalactic" % "3.0.1",

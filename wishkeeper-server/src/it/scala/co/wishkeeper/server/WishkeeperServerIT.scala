@@ -85,7 +85,7 @@ class WishkeeperServerIT(implicit ee: ExecutionEnv) extends Specification with B
 
     val maybeWish = userWishes.wishes.find(_.id == wishId)
     val maybeLinks: Option[List[ImageLink]] = maybeWish.flatMap(_.image).map(_.links)
-    maybeLinks.map(_.size) must beSome(3)
+    maybeLinks.map(_.size) must beSome(4) //todo get the number of extensions from the production code after refactoring
     val maybeResponses = maybeLinks.map(_.map(imageLink => Get(imageLink.url)))
     maybeResponses must beSome(contain(beSuccessful))
   }

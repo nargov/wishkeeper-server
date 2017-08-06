@@ -39,13 +39,15 @@ trait DataStore {
   def close(): Unit
 }
 
-class CassandraDataStore extends DataStore {
+case class DataStoreConfig(addresses: List[String])
+
+class CassandraDataStore(dataStoreConfig: DataStoreConfig) extends DataStore {
 
   import CassandraDataStore._
 
   private implicit val circeConfig = extras.Configuration.default.withDefaults
 
-  val cluster = Cluster.builder().addContactPoint("localhost").build()
+  val cluster = Cluster.builder().addContactPoints(dataStoreConfig.addresses: _*).build()
   private val clusterSession: AtomicReference[Session] = new AtomicReference(null)
   private def session = clusterSession.get()
 

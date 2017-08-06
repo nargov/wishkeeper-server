@@ -59,7 +59,7 @@ class CassandraDataStoreIT extends FlatSpec with Matchers with BeforeAndAfterAll
     dataStoreTestHelper.start()
     dataStoreTestHelper.createSchema()
 
-    eventStore = new CassandraDataStore
+    eventStore = new CassandraDataStore(DataStoreConfig(dataStoreTestHelper.nodeAddresses))
     eventStore.connect()
   }
 
