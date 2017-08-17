@@ -42,9 +42,7 @@ class AkkaHttpFacebookConnectorTest extends Specification with AfterAll {
   "return the list of many friends" in new Context {
     val testUsers = facebookTestHelper.createTestUsers(30, installApp = true)
     testUsers.size must beEqualTo(30)
-    println("make friends begin: " + DateTime.now().toString)
     facebookTestHelper.makeFriends(testUsers.head, testUsers.tail)
-    println("make friends end: " + DateTime.now().toString)
 
     eventually(5, 0.millis) {
       val friends = facebookAdapter.friendsFor(testUsers.head.id, testUsers.head.access_token)
@@ -57,6 +55,11 @@ class AkkaHttpFacebookConnectorTest extends Specification with AfterAll {
 
     val eventualResult = facebookAdapter.isValid(testUser.access_token)
     eventualResult must beTrue.await(80, 250.millis)
+  }
+
+  "return true if user access token is invalid" in new Context {
+    val result = facebookAdapter.isValid("invalid-token")
+    result must beFalse.await(80, 250.millis)
   }
 
   def beSameFriendsAs(users: List[TestFacebookUser]): Matcher[List[FacebookFriend]] =

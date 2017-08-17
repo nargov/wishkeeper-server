@@ -5,14 +5,21 @@ val specs2Version = "3.9.0"
 
 val scalaVer = "2.11.8"
 
+val artifactsDir = "/home/nimrod/dev/wishkeeper-artifacts"
+
 lazy val integrationSettings = inConfig(IntegrationTest)(Defaults.itSettings) ++ Seq(
   fork in IntegrationTest := false,
   parallelExecution in IntegrationTest := false
 )
 
 lazy val commonSettings = Seq(
+  version := "1.0.0",
   organization := "co.wishkeeper",
   scalaVersion := scalaVer,
+
+  resolvers +=
+    "Artifactory" at "http://ci-artifacts.wishkeeper.co:8081/artifactory/sbt-release/",
+
   libraryDependencies ++= Seq(
     "com.google.guava" % "guava" % "19.0",
     "com.fasterxml.jackson.core" % "jackson-core" % "2.6.0",
@@ -40,11 +47,16 @@ lazy val commonSettings = Seq(
     "ch.qos.logback" % "logback-core",
     "ch.qos.logback" % "logback-classic"
   ).map(_ % logbackVersion),
-  scalacOptions in Test ++= Seq("-Yrangepos")
+  scalacOptions in Test ++= Seq("-Yrangepos"),
+
+  publishTo := Some("Artifactory Realm" at "http://ci-artifacts.wishkeeper.co:8081/artifactory/sbt-release")
+
 ) ++ integrationSettings
 
 lazy val wishkeeper = (project in file(".")).aggregate(server, testUtils, common).settings(
-  scalaVersion := scalaVer
+  scalaVersion := scalaVer,
+  publish := {},
+  publishLocal := {}
 )
 
 lazy val common = (project in file("wishkeeper-common")).
@@ -52,8 +64,7 @@ lazy val common = (project in file("wishkeeper-common")).
   settings(
     commonSettings,
     integrationSettings,
-    name := "wishkeeper-common",
-    version := "1.0"
+    name := "wishkeeper-common"
   )
 
 lazy val server = (project in file("wishkeeper-server")).
@@ -62,7 +73,6 @@ lazy val server = (project in file("wishkeeper-server")).
     commonSettings,
     integrationSettings,
     name := "wishkeeper-server",
-    version := "1.0",
     resolvers += Resolver.bintrayRepo("hseeberger", "maven"),
     libraryDependencies ++= Seq(
       "com.typesafe.akka" %% "akka-http" % "10.0.5",
@@ -80,7 +90,9 @@ lazy val server = (project in file("wishkeeper-server")).
       "com.sksamuel.scrimage" %% "scrimage-core" % "2.1.7"
         exclude("commons-io", "commons-io"),
       "io.appium" % "java-client" % "5.0.0-BETA6" % "it" exclude("com.codeborne", "phantomjsdriver")
-    )
+    ),
+    packAutoSettings,
+    addArtifact(Artifact("wishkeeper-server", "Bundled Archive", "tar.gz"), packArchiveTgz).settings
   ).
   dependsOn(common, testUtils % "it->compile")
 
