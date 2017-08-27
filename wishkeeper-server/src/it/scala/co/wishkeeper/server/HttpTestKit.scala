@@ -4,7 +4,6 @@ import java.util.UUID
 import java.util.concurrent.Executors
 
 import akka.actor.ActorSystem
-import akka.http.javadsl.model.BodyPartEntity
 import akka.http.scaladsl.Http
 import akka.http.scaladsl.marshalling.Marshal
 import akka.http.scaladsl.model.Multipart.FormData.BodyPart

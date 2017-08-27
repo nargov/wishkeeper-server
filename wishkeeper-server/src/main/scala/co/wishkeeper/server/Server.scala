@@ -6,7 +6,6 @@ import akka.actor.ActorSystem
 import akka.stream.ActorMaterializer
 import co.wishkeeper.json._
 import co.wishkeeper.server.api.{DelegatingPublicApi, ManagementApi}
-import co.wishkeeper.server.image.GoogleCloudStorageImageStore
 import co.wishkeeper.server.projections._
 import com.typesafe.config.ConfigFactory
 
@@ -32,10 +31,8 @@ class WishkeeperServer() extends ManagementApi {
     config.getString("wishkeeper.facebook.app-id"),
     config.getString("wishkeeper.facebook.app-secret"))
   private val userFriendsProjection: UserFriendsProjection = new DelegatingUserFriendsProjection(facebookConnector, userIdByFacebookIdProjection)
-  private val imageStore = new GoogleCloudStorageImageStore
-  private val imageProcessor: ImageProcessor = new ScrimageImageProcessor
-  private val publicApi = new DelegatingPublicApi(commandProcessor, imageProcessor, imageStore, dataStore,
-    facebookConnector, incomingFriendRequestsProjection, userProfileProjection, userFriendsProjection)
+  private val publicApi = new DelegatingPublicApi(commandProcessor, dataStore, facebookConnector,
+    incomingFriendRequestsProjection, userProfileProjection, userFriendsProjection)
   private val webApi = new WebApi(publicApi, this)
 
   def start(): Unit = {

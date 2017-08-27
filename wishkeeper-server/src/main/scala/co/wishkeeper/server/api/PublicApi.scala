@@ -2,16 +2,15 @@ package co.wishkeeper.server.api
 
 import java.io.InputStream
 import java.net.URL
-import java.nio.file.{Files, Path, Paths}
+import java.nio.file.{Files, Paths}
 import java.util.UUID
 
 import akka.actor.ActorSystem
 import akka.stream.ActorMaterializer
 import co.wishkeeper.server.Commands._
-import co.wishkeeper.server.Server.mediaServerBase
-import co.wishkeeper.server.image.{ImageData, ImageMetadata, ImageStore}
-import co.wishkeeper.server.projections.{PotentialFriend, UserFriendsProjection, UserProfileProjection}
 import co.wishkeeper.server._
+import co.wishkeeper.server.image._
+import co.wishkeeper.server.projections.{PotentialFriend, UserFriendsProjection, UserProfileProjection}
 import org.apache.commons.io.FileUtils
 
 import scala.concurrent.{ExecutionContext, Future}
@@ -40,61 +39,41 @@ trait PublicApi {
 }
 
 class DelegatingPublicApi(commandProcessor: CommandProcessor,
-                          imageProcessor: ImageProcessor,
-                          imageStore: ImageStore,
                           dataStore: DataStore,
                           facebookConnector: FacebookConnector,
                           incomingFriendRequestsProjection: IncomingFriendRequestsProjection,
                           userProfileProjection: UserProfileProjection,
                           userFriendsProjection: UserFriendsProjection)
                          (implicit actorSystem: ActorSystem, ec: ExecutionContext, am: ActorMaterializer) extends PublicApi {
+
+  private val wishImages = new WishImages(new GoogleCloudStorageImageStore, new ScrimageImageProcessor)
+
   override def deleteWish(sessionId: UUID, wishId: UUID): Unit = commandProcessor.process(DeleteWish(wishId), Option(sessionId))
 
   override def deleteWishImage(sessionId: UUID, wishId: UUID): Unit = commandProcessor.process(DeleteWishImage(wishId), Option(sessionId))
 
+  private def uploadedFilePath(imageMetadata: ImageMetadata) = Paths.get(ImageProcessor.tempDir.toString, imageMetadata.fileName)
+
   override def uploadImage(inputStream: InputStream, imageMetadata: ImageMetadata, wishId: UUID, sessionId: UUID): Try[Unit] = {
     Try {
-      val origFile = Paths.get(ImageProcessor.tempDir.toString, imageMetadata.fileName)
-      Files.copy(inputStream, origFile)
+      val origFile = uploadedFilePath(imageMetadata)
+      Files.copy(inputStream, origFile) //todo move to adapter
 
-      uploadAndSetImages(imageMetadata, wishId, sessionId, origFile)
+      val imageLinks = wishImages.uploadImageAndResizedCopies(imageMetadata, wishId, sessionId, origFile)
+      val setWishDetailsEvent = SetWishDetails(Wish(wishId, image = Option(imageLinks)))
+      commandProcessor.process(setWishDetailsEvent, Option(sessionId))
     }
   }
 
   override def uploadImage(url: String, imageMetadata: ImageMetadata, wishId: UUID, sessionId: UUID): Try[Unit] = {
     Try {
-      val origFile = Paths.get(ImageProcessor.tempDir.toString, imageMetadata.fileName)
-      FileUtils.copyURLToFile(new URL(url), origFile.toFile)
+      val origFile = uploadedFilePath(imageMetadata)
+          FileUtils.copyURLToFile(new URL(url), origFile.toFile) //todo move to adapter
 
-      uploadAndSetImages(imageMetadata, wishId, sessionId, origFile)
+      val imageLinks = wishImages.uploadImageAndResizedCopies(imageMetadata, wishId, sessionId, origFile)
+      val setWishDetailsEvent = SetWishDetails(Wish(wishId, image = Option(imageLinks)))
+      commandProcessor.process(setWishDetailsEvent, Option(sessionId))
     }
-  }
-
-  private def uploadAndSetImages(imageMetadata: ImageMetadata, wishId: UUID, sessionId: UUID, origFile: Path) = {
-    val sizeExtensions = List(
-      (".full", imageMetadata.width),
-      (".fhd", 1080),
-      (".hfhd", 540),
-      (".qfhd", 270)
-    )
-
-    val resizedImages: List[ImageLink] = sizeExtensions.filter { case (_, width) =>
-      width <= imageMetadata.width
-    }.map { case (ext, width) =>
-      val file = if (width == imageMetadata.width)
-        imageProcessor.compress(origFile, ext)
-      else
-        imageProcessor.resizeToWidth(origFile, ext, width)
-      val fileName = file.getFileName.toString
-      val (_, height) = imageProcessor.dimensions(file)
-      imageStore.save(ImageData(Files.newInputStream(file), ContentTypes.jpeg), fileName)
-      Files.deleteIfExists(file)
-      ImageLink(s"$mediaServerBase/$fileName", width, height, ContentTypes.jpeg)
-    }
-
-    Files.deleteIfExists(origFile)
-
-    processCommand(SetWishDetails(Wish(wishId, image = Option(ImageLinks(resizedImages)))), Option(sessionId))
   }
 
   override def wishListFor(userId: UUID): Option[UserWishes] = { //TODO missing tests here - need to move this logic so that can unit test
@@ -130,6 +109,3 @@ class DelegatingPublicApi(commandProcessor: CommandProcessor,
 
 }
 
-object ContentTypes {
-  val jpeg = "image/jpeg"
-}

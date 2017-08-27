@@ -8,6 +8,8 @@
         </encoder>
     </appender>
 
+    <logger name="co.wishkeeper" level="debug"/>
+
     <root level="info">
         <appender-ref ref="STDOUT" />
     </root>
