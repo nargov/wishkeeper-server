@@ -59,7 +59,7 @@ class DelegatingPublicApi(commandProcessor: CommandProcessor,
       val origFile = uploadedFilePath(imageMetadata)
       Files.copy(inputStream, origFile) //todo move to adapter
 
-      val imageLinks = wishImages.uploadImageAndResizedCopies(imageMetadata, wishId, sessionId, origFile)
+      val imageLinks = wishImages.uploadImageAndResizedCopies(imageMetadata, origFile)
       val setWishDetailsEvent = SetWishDetails(Wish(wishId, image = Option(imageLinks)))
       commandProcessor.process(setWishDetailsEvent, Option(sessionId))
     }
@@ -70,14 +70,14 @@ class DelegatingPublicApi(commandProcessor: CommandProcessor,
       val origFile = uploadedFilePath(imageMetadata)
           FileUtils.copyURLToFile(new URL(url), origFile.toFile) //todo move to adapter
 
-      val imageLinks = wishImages.uploadImageAndResizedCopies(imageMetadata, wishId, sessionId, origFile)
+      val imageLinks = wishImages.uploadImageAndResizedCopies(imageMetadata, origFile)
       val setWishDetailsEvent = SetWishDetails(Wish(wishId, image = Option(imageLinks)))
       commandProcessor.process(setWishDetailsEvent, Option(sessionId))
     }
   }
 
-  override def wishListFor(userId: UUID): Option[UserWishes] = { //TODO missing tests here - need to move this logic so that can unit test
-    dataStore.userBySession(userId).map { userId =>
+  override def wishListFor(sessionId: UUID): Option[UserWishes] = { //TODO missing tests here
+    dataStore.userBySession(sessionId).map { userId =>
       val wishList = User.replay(dataStore.userEventsFor(userId)).wishes.values.toList
       UserWishes(wishList.filter(_.status == WishStatus.Active).sortBy(_.creationTime.getMillis).reverse)
     }

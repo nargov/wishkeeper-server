@@ -1,7 +1,6 @@
 package co.wishkeeper.server.image
 
 import java.nio.file.{Files, Path}
-import java.util.UUID
 import java.util.concurrent.atomic.AtomicInteger
 import java.util.concurrent.{Executors, ThreadFactory}
 
@@ -16,12 +15,12 @@ import scala.concurrent.{Await, ExecutionContext, Future}
 class WishImages(imageStore: ImageStore, imageProcessor: ImageProcessor, maxUploadThreads: Int = 20)
                 (implicit actorSystem: ActorSystem, am: ActorMaterializer) {
 
-  implicit val ec = ExecutionContext.fromExecutorService(Executors.newFixedThreadPool(maxUploadThreads, new ThreadFactory {
+  private implicit val ec = ExecutionContext.fromExecutorService(Executors.newFixedThreadPool(maxUploadThreads, new ThreadFactory {
     private val threadIdCounter = new AtomicInteger(0)
     override def newThread(r: Runnable): Thread = new Thread(r, s"wish-images-${threadIdCounter.getAndIncrement()}")
   }))
 
-  def uploadImageAndResizedCopies(imageMetadata: ImageMetadata, wishId: UUID, sessionId: UUID, origFile: Path, timeout: Duration = 30.seconds): ImageLinks = {
+  def uploadImageAndResizedCopies(imageMetadata: ImageMetadata, origFile: Path, timeout: Duration = 30.seconds): ImageLinks = {
     val sizesAndExtensions = (".full", imageMetadata.width) :: WishImages.sizeExtensions
 
     val eventualLinks: List[Future[ImageLink]] = sizesAndExtensions.filter {
@@ -40,7 +39,7 @@ class WishImages(imageStore: ImageStore, imageProcessor: ImageProcessor, maxUplo
       }
     }
 
-    val imageLinks: List[ImageLink] = Await.result(Future.sequence(eventualLinks), 30.seconds)
+    val imageLinks: List[ImageLink] = Await.result(Future.sequence(eventualLinks), timeout)
 
     Files.deleteIfExists(origFile)
 

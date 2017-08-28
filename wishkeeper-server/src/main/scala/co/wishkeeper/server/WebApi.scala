@@ -107,33 +107,37 @@ class WebApi(publicApi: PublicApi, managementApi: ManagementApi)(implicit system
                   } ~
                   pathPrefix(JavaUUID / "image") { wishId =>
                     post {
-                      headerValueByName(imageDimensionsHeader) { imageDimensionsHeader =>
-                        val imageWidth :: imageHeight :: Nil = imageDimensionsHeader.split(",").toList
-                        pathEnd {
-                          fileUpload("file") { case (metadata, byteSource) =>
-                            val inputStream = byteSource.runWith(StreamConverters.asInputStream())
-                            publicApi.uploadImage(inputStream,
-                              ImageMetadata(
-                                metadata.contentType.value,
-                                metadata.fileName,
-                                imageWidth.toInt,
-                                imageHeight.toInt),
-                              wishId, UUID.fromString(sessionId)).
-                              map(_ => complete(StatusCodes.Created)).get //TODO Handle upload failure
-                          }
-                        } ~
-                          path("url") {
-                            parameters('filename, 'contentType, 'url) { (filename, contentType, url) =>
-                              sessionUUID.map { sessionId =>
-                                publicApi.uploadImage(
-                                  url,
-                                  ImageMetadata(contentType, filename, imageWidth.toInt, imageHeight.toInt),
-                                  wishId,
-                                  sessionId) //TODO handle error
-                                complete(StatusCodes.Created)
-                              }.get
+                      withRequestTimeout(2.minutes) {
+                        headerValueByName(imageDimensionsHeader) { imageDimensionsHeader =>
+                          val imageWidth :: imageHeight :: Nil = imageDimensionsHeader.split(",").toList
+                          pathEnd {
+                            fileUpload("file") { case (metadata, byteSource) =>
+
+                              val inputStream = byteSource.runWith(StreamConverters.asInputStream())
+                              publicApi.uploadImage(inputStream,
+                                ImageMetadata(
+                                  metadata.contentType.value,
+                                  metadata.fileName,
+                                  imageWidth.toInt,
+                                  imageHeight.toInt),
+                                wishId, UUID.fromString(sessionId)).
+                                map(_ => complete(StatusCodes.Created)).get //TODO Handle upload failure
+
                             }
-                          }
+                          } ~
+                            path("url") {
+                              parameters('filename, 'contentType, 'url) { (filename, contentType, url) =>
+                                sessionUUID.map { sessionId =>
+                                  publicApi.uploadImage(
+                                    url,
+                                    ImageMetadata(contentType, filename, imageWidth.toInt, imageHeight.toInt),
+                                    wishId,
+                                    sessionId) //TODO handle error
+                                  complete(StatusCodes.Created)
+                                }.get
+                              }
+                            }
+                        }
                       }
                     } ~
                       delete {
