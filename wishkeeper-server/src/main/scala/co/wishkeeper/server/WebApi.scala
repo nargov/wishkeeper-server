@@ -23,8 +23,10 @@ import io.circe.generic.extras.auto._
 
 import scala.concurrent.duration._
 import scala.concurrent.{ExecutionContextExecutor, Future}
+import scala.util.{Success, Failure}
 
-class WebApi(publicApi: PublicApi, managementApi: ManagementApi)(implicit system: ActorSystem, mat: ActorMaterializer, ec: ExecutionContextExecutor) {
+class WebApi(publicApi: PublicApi, managementApi: ManagementApi)
+            (implicit system: ActorSystem, mat: ActorMaterializer, ec: ExecutionContextExecutor) {
 
   private implicit val timeout: Timeout = 4.seconds
 
@@ -128,12 +130,15 @@ class WebApi(publicApi: PublicApi, managementApi: ManagementApi)(implicit system
                             path("url") {
                               parameters('filename, 'contentType, 'url) { (filename, contentType, url) =>
                                 sessionUUID.map { sessionId =>
-                                  publicApi.uploadImage(
+                                  val uploadResult = publicApi.uploadImage(
                                     url,
                                     ImageMetadata(contentType, filename, imageWidth.toInt, imageHeight.toInt),
                                     wishId,
                                     sessionId) //TODO handle error
-                                  complete(StatusCodes.Created)
+                                  uploadResult match {
+                                    case Success(_) => complete(StatusCodes.Created)
+                                    case Failure(e) => throw e
+                                  }
                                 }.get
                               }
                             }

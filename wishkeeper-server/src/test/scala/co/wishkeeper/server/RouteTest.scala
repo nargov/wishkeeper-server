@@ -21,6 +21,7 @@ import org.specs2.mutable.Specification
 import org.specs2.specification.Scope
 
 import scala.concurrent.Future
+import scala.util.{Failure, Success}
 
 
 class RouteTest extends Specification with Specs2RouteTest with JMock {
@@ -162,7 +163,7 @@ class RouteTest extends Specification with Specs2RouteTest with JMock {
       val url = "http://my.image.url"
 
       checking {
-        oneOf(publicApi).uploadImage(url, imageMetadata, wishId, sessionId)
+        oneOf(publicApi).uploadImage(url, imageMetadata, wishId, sessionId).willReturn(Success(()))
       }
 
       val imageDimensionsHeader = RawHeader(WebApi.imageDimensionsHeader, s"${imageMetadata.width},${imageMetadata.height}")
@@ -170,6 +171,23 @@ class RouteTest extends Specification with Specs2RouteTest with JMock {
       Post(s"/users/wishes/$wishId/image/url?$params").withHeaders(sessionIdHeader, imageDimensionsHeader) ~> webApi.userRoute ~> check {
         status must beEqualTo(StatusCodes.Created)
       }
+    }
+
+    "print error on upload failure" in new LoggedInUserContext {
+      val wishId = randomUUID()
+      val imageMetadata = ImageMetadata("content-type", "filename", width = 1, height = 1)
+      val url = "http://my.image.url"
+
+      checking {
+        oneOf(publicApi).uploadImage(url, imageMetadata, wishId, sessionId).willReturn(Failure(new RuntimeException("Shit happened")))
+      }
+
+      val imageDimensionsHeader = RawHeader(WebApi.imageDimensionsHeader, s"${imageMetadata.width},${imageMetadata.height}")
+      val params = s"filename=${imageMetadata.fileName}&contentType=${imageMetadata.contentType}&url=$url"
+      Post(s"/users/wishes/$wishId/image/url?$params").withHeaders(sessionIdHeader, imageDimensionsHeader) ~> webApi.userRoute ~> check {
+        status must beEqualTo(StatusCodes.InternalServerError)
+      }
+
     }
   }
 
