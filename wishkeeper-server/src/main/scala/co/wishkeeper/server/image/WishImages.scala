@@ -8,6 +8,7 @@ import akka.actor.ActorSystem
 import akka.stream.ActorMaterializer
 import co.wishkeeper.server.Server.mediaServerBase
 import co.wishkeeper.server.{ImageLink, ImageLinks, ImageProcessor}
+import org.slf4j.LoggerFactory
 
 import scala.concurrent.duration._
 import scala.concurrent.{Await, ExecutionContext, Future}
@@ -19,6 +20,8 @@ class WishImages(imageStore: ImageStore, imageProcessor: ImageProcessor, maxUplo
     private val threadIdCounter = new AtomicInteger(0)
     override def newThread(r: Runnable): Thread = new Thread(r, s"wish-images-${threadIdCounter.getAndIncrement()}")
   }))
+
+  private val log = LoggerFactory.getLogger(getClass)
 
   def uploadImageAndResizedCopies(imageMetadata: ImageMetadata, origFile: Path, timeout: Duration = 30.seconds): ImageLinks = {
     val sizesAndExtensions = (".full", imageMetadata.width) :: WishImages.sizeExtensions
@@ -33,7 +36,9 @@ class WishImages(imageStore: ImageStore, imageProcessor: ImageProcessor, maxUplo
           imageProcessor.resizeToWidth(origFile, ext, width)
         val fileName = file.getFileName.toString
         val (_, height) = imageProcessor.dimensions(file)
+        log.debug(s"Uploading $fileName to cloud Storage")
         imageStore.save(ImageData(Files.newInputStream(file), ContentTypes.jpeg), fileName)
+        log.debug(s"Done uploading $fileName to cloud Storage")
         Files.deleteIfExists(file)
         ImageLink(s"$mediaServerBase/$fileName", width, height, ContentTypes.jpeg)
       }

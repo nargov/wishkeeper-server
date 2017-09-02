@@ -12,6 +12,7 @@ import co.wishkeeper.server._
 import co.wishkeeper.server.image._
 import co.wishkeeper.server.projections.{PotentialFriend, UserFriendsProjection, UserProfileProjection}
 import org.apache.commons.io.FileUtils
+import org.slf4j.LoggerFactory
 
 import scala.concurrent.{ExecutionContext, Future}
 import scala.util.Try
@@ -68,7 +69,8 @@ class DelegatingPublicApi(commandProcessor: CommandProcessor,
   override def uploadImage(url: String, imageMetadata: ImageMetadata, wishId: UUID, sessionId: UUID): Try[Unit] = {
     Try {
       val origFile = uploadedFilePath(imageMetadata)
-          FileUtils.copyURLToFile(new URL(url), origFile.toFile) //todo move to adapter
+      FileUtils.copyURLToFile(new URL(url), origFile.toFile) //todo move to adapter
+      LoggerFactory.getLogger(getClass).debug(s"Downloaded file from $url to ${origFile.toAbsolutePath.toString}")
 
       val imageLinks = wishImages.uploadImageAndResizedCopies(imageMetadata, origFile)
       val setWishDetailsEvent = SetWishDetails(Wish(wishId, image = Option(imageLinks)))

@@ -13,7 +13,7 @@ lazy val integrationSettings = inConfig(IntegrationTest)(Defaults.itSettings) ++
 )
 
 lazy val commonSettings = Seq(
-  version := "1.0.2",
+  version := "1.0.3",
   organization := "co.wishkeeper",
   scalaVersion := scalaVer,
 
