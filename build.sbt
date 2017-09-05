@@ -95,7 +95,7 @@ lazy val server = (project in file("wishkeeper-server")).
     packAutoSettings,
     addArtifact(Artifact("wishkeeper-server", "Bundled Archive", "tar.gz"), packArchiveTgz).settings
   ).
-  dependsOn(common, testUtils % "it->compile")
+  dependsOn(common % "compile;test->test;it->test", testUtils % "it->compile")
 
 lazy val testUtils = (project in file("test-utils")).
   configs(IntegrationTest).

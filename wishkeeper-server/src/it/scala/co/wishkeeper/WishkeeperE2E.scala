@@ -36,7 +36,7 @@ class WishkeeperE2E extends AsyncFlatSpec with Matchers with BeforeAndAfterAll w
   implicit val circeConfig = Configuration.default.withDefaults
 
   val appiumService = AppiumDriverLocalService.buildService(new AppiumServiceBuilder().withArgument(GeneralServerFlag.LOG_LEVEL, "warn"))
-  val apkFile = new File("/home/nimrod/dev/wishkeeper-mobile/android/app/build/outputs/apk/app-release.apk")
+  val apkFile = new File("/home/nimrod/dev/wishkeeper-mobile/android/app/build/outputs/apk/wishkeeper-e2e.apk")
   val capabilities = new DesiredCapabilities(
     Map(
       DEVICE_NAME → "Android Emulator",

@@ -9,6 +9,7 @@ import co.wishkeeper.json._
 import co.wishkeeper.server.Commands.{ConnectFacebookUser, SendFriendRequest, SetWishDetails}
 import co.wishkeeper.server.HttpTestKit._
 import co.wishkeeper.server.projections.PotentialFriend
+import co.wishkeeper.test.utils.WishMatchers
 import io.circe.generic.auto._
 import org.joda.time.DateTime
 import org.specs2.concurrent.ExecutionEnv
@@ -105,10 +106,3 @@ class WishkeeperServerIT(implicit ee: ExecutionEnv) extends Specification with B
     dataStoreTestHelper.stop()
   }
 }
-
-
-trait WishMatchers extends MustThrownMatchers {
-  def beEqualToIgnoringDates: (Wish) => AdaptableMatcher[Wish] = ===(_:Wish) ^^^ ((_:Wish).copy(creationTime = new DateTime(0)))
-}
-object WishMatchers extends WishMatchers
-

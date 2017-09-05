@@ -4,12 +4,12 @@ import java.util.UUID
 import java.util.UUID.randomUUID
 
 import co.wishkeeper.server.Events._
+import co.wishkeeper.test.utils.WishMatchers._
 import com.wixpress.common.specs2.JMock
 import org.joda.time.DateTime
 import org.specs2.matcher.{Matcher, MatcherMacros}
 import org.specs2.mutable.Specification
 import org.specs2.specification.Scope
-import WishMatchers._
 
 import scala.language.experimental.macros
 
