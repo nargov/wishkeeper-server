@@ -6,7 +6,6 @@ import java.util.concurrent.{Executors, ThreadFactory}
 
 import akka.actor.ActorSystem
 import akka.stream.ActorMaterializer
-import co.wishkeeper.server.Server.mediaServerBase
 import co.wishkeeper.server.{ImageLink, ImageLinks, ImageProcessor}
 import org.slf4j.LoggerFactory
 
@@ -40,7 +39,7 @@ class WishImages(imageStore: ImageStore, imageProcessor: ImageProcessor, maxUplo
         imageStore.save(ImageData(Files.newInputStream(file), ContentTypes.jpeg), fileName)
         log.debug(s"Done uploading $fileName to cloud Storage")
         Files.deleteIfExists(file)
-        ImageLink(s"$mediaServerBase/$fileName", width, height, ContentTypes.jpeg)
+        ImageLink(s"${imageStore.imageLinkBase}/$fileName", width, height, ContentTypes.jpeg)
       }
     }
 

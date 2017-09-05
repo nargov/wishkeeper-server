@@ -7,7 +7,7 @@ import org.specs2.specification.{AfterAll, Scope}
 class GoogleCloudStorageImageStoreIT extends Specification with AfterAll {
   sequential
 
-  val imageStore: ImageStore = new GoogleCloudStorageImageStore
+  val imageStore: ImageStore = new GoogleCloudStorageImageStore("wish.media.dev.wishkeeper.co")
   val id = "test-image-file"
 
   "GoogleCloudStorageImageStore" should {

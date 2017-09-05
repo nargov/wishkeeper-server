@@ -3,7 +3,6 @@ package co.wishkeeper.server.image
 import java.io.InputStream
 import java.nio.channels.Channels
 
-import co.wishkeeper.server.image.GoogleCloudStorageImageStore.bucketName
 import com.google.cloud.storage.Bucket.BlobWriteOption
 import com.google.cloud.storage.Storage.{BlobField, BlobGetOption}
 import com.google.cloud.storage.{BlobId, Storage, StorageOptions}
@@ -14,30 +13,30 @@ trait ImageStore {
   def read(id: String): Option[ImageData]
 
   def save(image: ImageData, id: String): Unit
+
+  def imageLinkBase: String
 }
 
-class GoogleCloudStorageImageStore extends ImageStore {
+class GoogleCloudStorageImageStore(bucket: String) extends ImageStore {
   private val storage = StorageOptions.getDefaultInstance.getService
 
   override def save(image: ImageData, id: String): Unit = {
-    val maybeBucket = Option(storage.get(bucketName))
+    val maybeBucket = Option(storage.get(bucket))
     maybeBucket.map { bucket =>
       bucket.create(id, image.content, image.contentType, BlobWriteOption.predefinedAcl(Storage.PredefinedAcl.PUBLIC_READ))
     }
   }
 
   override def read(id: String): Option[ImageData] = {
-    val maybeBlob = Option(storage.get(BlobId.of(bucketName, id), BlobGetOption.fields(BlobField.CONTENT_TYPE)))
+    val maybeBlob = Option(storage.get(BlobId.of(bucket, id), BlobGetOption.fields(BlobField.CONTENT_TYPE)))
     maybeBlob.map { blob =>
       ImageData(Channels.newInputStream(blob.reader()), blob.getContentType)
     }
   }
 
-  override def delete(id: String): Unit = storage.delete(BlobId.of(bucketName, id))
-}
+  override def delete(id: String): Unit = storage.delete(BlobId.of(bucket, id))
 
-object GoogleCloudStorageImageStore {
-  private val bucketName = "wish.media.wishkeeper.co"
+  override def imageLinkBase = s"http://$bucket"
 }
 
 case class ImageData(content: InputStream, contentType: String) {

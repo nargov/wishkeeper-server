@@ -44,10 +44,11 @@ class DelegatingPublicApi(commandProcessor: CommandProcessor,
                           facebookConnector: FacebookConnector,
                           incomingFriendRequestsProjection: IncomingFriendRequestsProjection,
                           userProfileProjection: UserProfileProjection,
-                          userFriendsProjection: UserFriendsProjection)
+                          userFriendsProjection: UserFriendsProjection,
+                          imageStore: ImageStore)
                          (implicit actorSystem: ActorSystem, ec: ExecutionContext, am: ActorMaterializer) extends PublicApi {
 
-  private val wishImages = new WishImages(new GoogleCloudStorageImageStore, new ScrimageImageProcessor)
+  private val wishImages = new WishImages(imageStore, new ScrimageImageProcessor)
 
   override def deleteWish(sessionId: UUID, wishId: UUID): Unit = commandProcessor.process(DeleteWish(wishId), Option(sessionId))
 

@@ -6,6 +6,7 @@ import akka.actor.ActorSystem
 import akka.stream.ActorMaterializer
 import co.wishkeeper.json._
 import co.wishkeeper.server.api.{DelegatingPublicApi, ManagementApi}
+import co.wishkeeper.server.image.{GoogleCloudStorageImageStore, ImageStore}
 import co.wishkeeper.server.projections._
 import com.typesafe.config.ConfigFactory
 
@@ -14,7 +15,7 @@ import scala.concurrent.ExecutionContextExecutor
 
 
 class WishkeeperServer() extends ManagementApi {
-  private val config = ConfigFactory.load("wishkeeper")
+  private val config = ConfigFactory.load()
   private val dataStoreConfig = DataStoreConfig(config.getStringList("wishkeeper.datastore.urls").asScala.toList)
   private val dataStore = new CassandraDataStore(dataStoreConfig)
   private val userIdByFacebookIdProjection = new DataStoreUserIdByFacebookIdProjection(dataStore)
@@ -31,8 +32,9 @@ class WishkeeperServer() extends ManagementApi {
     config.getString("wishkeeper.facebook.app-id"),
     config.getString("wishkeeper.facebook.app-secret"))
   private val userFriendsProjection: UserFriendsProjection = new DelegatingUserFriendsProjection(facebookConnector, userIdByFacebookIdProjection)
+  private val imageStore: ImageStore = new GoogleCloudStorageImageStore(config.getString("wishkeeper.image-store.bucket-name"))
   private val publicApi = new DelegatingPublicApi(commandProcessor, dataStore, facebookConnector,
-    incomingFriendRequestsProjection, userProfileProjection, userFriendsProjection)
+    incomingFriendRequestsProjection, userProfileProjection, userFriendsProjection, imageStore)
   private val webApi = new WebApi(publicApi, this)
 
   def start(): Unit = {
@@ -55,8 +57,6 @@ class WishkeeperServer() extends ManagementApi {
 }
 
 object Server {
-  val mediaServerBase = "http://wish.media.wishkeeper.co"
-
   def main(args: Array[String] = Array.empty): Unit = {
     new WishkeeperServer().start()
   }
