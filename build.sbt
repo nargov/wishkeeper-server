@@ -16,6 +16,7 @@ lazy val commonSettings = Seq(
   version := "1.0.5",
   organization := "co.wishkeeper",
   scalaVersion := scalaVer,
+  scalacOptions ++= Seq("-deprecation", "-feature"),
 
   resolvers +=
     "Artifactory" at "http://ci-artifacts.wishkeeper.co:8081/artifactory/sbt-release/",

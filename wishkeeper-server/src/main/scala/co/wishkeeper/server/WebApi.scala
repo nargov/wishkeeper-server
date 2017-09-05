@@ -103,7 +103,7 @@ class WebApi(publicApi: PublicApi, managementApi: ManagementApi)
                     path(JavaUUID) { wishId =>
                       sessionUUID.map { sessionId =>
                         publicApi.deleteWish(sessionId, wishId)
-                        complete()
+                        complete(StatusCodes.OK)
                       }.get
                     }
                   } ~
