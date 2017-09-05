@@ -69,13 +69,11 @@ class DelegatingPublicApi(commandProcessor: CommandProcessor,
 
   override def uploadImage(url: String, imageMetadata: ImageMetadata, wishId: UUID, sessionId: UUID): Try[Unit] = {
     Try {
-      val origFile = uploadedFilePath(imageMetadata)
-      FileUtils.copyURLToFile(new URL(url), origFile.toFile) //todo move to adapter
-      LoggerFactory.getLogger(getClass).debug(s"Downloaded file from $url to ${origFile.toAbsolutePath.toString}")
-
-      val imageLinks = wishImages.uploadImageAndResizedCopies(imageMetadata, origFile)
-      val setWishDetailsEvent = SetWishDetails(Wish(wishId, image = Option(imageLinks)))
-      commandProcessor.process(setWishDetailsEvent, Option(sessionId))
+      val connection = new URL(url).openConnection()
+      connection.setRequestProperty("User-Agent",
+        "Mozilla/5.0 (Windows NT 6.4; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/41.0.2225.0 Safari/537.36")
+      connection.connect()
+      uploadImage(connection.getInputStream, imageMetadata, wishId, sessionId)
     }
   }
 
