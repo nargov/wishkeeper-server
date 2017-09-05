@@ -52,7 +52,7 @@ class WishkeeperE2E extends AsyncFlatSpec with Matchers with BeforeAndAfterAll w
   override protected def beforeAll(): Unit = {
     appiumService.start()
     driver = new AppiumDriver[MobileElement](capabilities)
-    driver.manage().timeouts().implicitlyWait(10, SECONDS)
+    driver.manage().timeouts().implicitlyWait(20, SECONDS)
 
     CassandraDocker.start()
     dataStoreTestHelper.start()
