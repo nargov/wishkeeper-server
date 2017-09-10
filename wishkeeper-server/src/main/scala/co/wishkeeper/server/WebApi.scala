@@ -151,6 +151,19 @@ class WebApi(publicApi: PublicApi, managementApi: ManagementApi)
                         }.get
                       }
                   }
+              } ~
+              pathPrefix("flags") {
+                post {
+                  path("facebook-friends") {
+                    publicApi.processCommand(SetFlagFacebookFriendsListSeen, sessionUUID)
+                    complete(StatusCodes.OK)
+                  }
+                } ~
+                  get {
+                    sessionUUID.map { sessionId =>
+                      complete(publicApi.userFlagsFor(sessionId))
+                    }.get
+                  }
               }
           }
       } ~

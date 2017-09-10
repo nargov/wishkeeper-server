@@ -8,7 +8,7 @@ import akka.http.scaladsl.model.StatusCodes
 import akka.http.scaladsl.model.headers.RawHeader
 import akka.http.scaladsl.testkit.Specs2RouteTest
 import co.wishkeeper.json._
-import co.wishkeeper.server.Commands.{ConnectFacebookUser, SendFriendRequest}
+import co.wishkeeper.server.Commands.{ConnectFacebookUser, SendFriendRequest, SetFlagFacebookFriendsListSeen}
 import co.wishkeeper.server.api.{ManagementApi, PublicApi}
 import co.wishkeeper.server.image.ImageMetadata
 import co.wishkeeper.server.projections.PotentialFriend
@@ -188,6 +188,26 @@ class RouteTest extends Specification with Specs2RouteTest with JMock {
         status must beEqualTo(StatusCodes.InternalServerError)
       }
 
+    }
+
+    "Set facebook friends list flag" in new LoggedInUserContext {
+      checking {
+        oneOf(publicApi).processCommand(SetFlagFacebookFriendsListSeen, Option(sessionId))
+      }
+
+      Post(s"/users/flags/facebook-friends").withHeaders(sessionIdHeader) ~> webApi.userRoute ~> check {
+        status must beEqualTo(StatusCodes.OK)
+      }
+    }
+
+    "get flags" in new LoggedInUserContext {
+      checking {
+        allowing(publicApi).userFlagsFor(sessionId).willReturn(Flags(seenFacebookFriendsList = true))
+      }
+
+      Get(s"/users/flags").withHeaders(sessionIdHeader) ~> webApi.userRoute ~> check {
+        responseAs[Flags].seenFacebookFriendsList must beTrue
+      }
     }
   }
 

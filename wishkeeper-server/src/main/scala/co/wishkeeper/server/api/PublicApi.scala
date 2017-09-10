@@ -11,13 +11,13 @@ import co.wishkeeper.server.Commands._
 import co.wishkeeper.server._
 import co.wishkeeper.server.image._
 import co.wishkeeper.server.projections.{PotentialFriend, UserFriendsProjection, UserProfileProjection}
-import org.apache.commons.io.FileUtils
-import org.slf4j.LoggerFactory
 
 import scala.concurrent.{ExecutionContext, Future}
 import scala.util.Try
 
 trait PublicApi {
+  def userFlagsFor(sessionId: UUID): Flags
+
   def deleteWish(sessionId: UUID, wishId: UUID): Unit
 
   def wishListFor(sessionId: UUID): Option[UserWishes]
@@ -108,5 +108,9 @@ class DelegatingPublicApi(commandProcessor: CommandProcessor,
     } yield userFriendsProjection.potentialFacebookFriends(facebookId, facebookAccessToken)
   }
 
+  override def userFlagsFor(sessionId: UUID): Flags = {
+    dataStore.userBySession(sessionId).map { userId =>
+      User.replay(dataStore.userEventsFor(userId)).flags
+    }.getOrElse(throw new SessionNotFoundException(Option(sessionId)))
+  }
 }
-

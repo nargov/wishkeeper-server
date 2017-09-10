@@ -4,7 +4,8 @@ import java.util.UUID
 
 import co.wishkeeper.server.Events._
 
-case class User(id: UUID, userProfile: UserProfile = UserProfile(), friends: Friends = Friends(), wishes: Map[UUID, Wish] = Map.empty) {
+case class User(id: UUID, userProfile: UserProfile = UserProfile(), friends: Friends = Friends(), wishes: Map[UUID, Wish] = Map.empty,
+                flags: Flags = Flags()) {
 
   def applyEvent(event: UserEvent): User = event match {
     case UserFirstNameSet(_, value) => this.copy(userProfile = this.userProfile.copy(firstName = Option(value)))
@@ -34,8 +35,11 @@ case class User(id: UUID, userProfile: UserProfile = UserProfile(), friends: Fri
     case WishImageSet(wishId, imageLinks) => updateWishProperty(wishId, _.withImage(imageLinks))
     case WishImageDeleted(wishId) => updateWishProperty(wishId, _.withoutImage)
     case WishDeleted(wishId) => updateWishProperty(wishId, _.withStatus(WishStatus.Deleted))
+    case FacebookFriendsListSeen => this.copy(flags = flags.copy(seenFacebookFriendsList = true))
     case _ => this
   }
+
+  def seenFacebookFriends: Boolean = flags.seenFacebookFriendsList
 
   private def updateWishProperty(wishId: UUID, updater: Wish => Wish) =
     this.copy(wishes = wishes + (wishId -> updater(wishes.getOrElse(wishId, Wish(wishId)))))
@@ -55,3 +59,4 @@ object User {
 }
 
 case class Friends(current: List[UUID] = Nil, requestSent: List[UUID] = Nil, requestReceived: List[UUID] = Nil)
+case class Flags(seenFacebookFriendsList: Boolean = false)

@@ -86,4 +86,8 @@ object Commands {
   case class DeleteWish(wishId: UUID) extends UserCommand {
     override def process(user: User): List[UserEvent] = WishDeleted(wishId) :: Nil
   }
+
+  case object SetFlagFacebookFriendsListSeen extends UserCommand {
+    override def process(user: User): List[UserEvent] = FacebookFriendsListSeen :: Nil
+  }
 }

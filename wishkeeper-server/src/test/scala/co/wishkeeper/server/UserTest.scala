@@ -169,5 +169,13 @@ class UserTest extends Specification with MatcherMacros with JMock {
     user.applyEvent(WishCreated(wish.id, randomUUID(), DateTime.now())).applyEvent(WishDeleted(wish.id)).wishes(wish.id).status must beEqualTo(WishStatus.Deleted)
   }
 
+  "apply facebook friends list seen" in new Context {
+    user.applyEvent(FacebookFriendsListSeen).seenFacebookFriends must beTrue
+  }
+
+  "have default seenFacebookFriends flag set to false" in new Context {
+    user.seenFacebookFriends must beFalse
+  }
+
   def haveCreationTime(time: DateTime): Matcher[Wish] = ===(time) ^^ {(_:Wish).creationTime}
 }

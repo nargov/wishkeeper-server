@@ -59,4 +59,6 @@ object Events {
   case class WishCreated(wishId: UUID, createdBy: UUID, creationTime: DateTime) extends UserEvent
 
   case class WishDeleted(wishId: UUID) extends UserEvent
+
+  case object FacebookFriendsListSeen extends UserEvent
 }
