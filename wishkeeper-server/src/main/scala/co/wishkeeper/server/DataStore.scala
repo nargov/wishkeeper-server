@@ -26,7 +26,7 @@ trait DataStore {
 
   def userBySession(session: UUID): Option[UUID]
 
-  def saveUserSession(userId: UUID, sessionId: UUID, created: DateTime)
+  def saveUserSession(userId: UUID, sessionId: UUID, created: DateTime): Boolean
 
   def saveUserEvents(userId: UUID, lastSeqNum: Option[Long], time: DateTime, events: Seq[UserEvent]): Boolean
 
@@ -118,8 +118,12 @@ class CassandraDataStore(dataStoreConfig: DataStoreConfig) extends DataStore {
     else None
   }
 
-  override def saveUserSession(userId: UUID, sessionId: UUID, created: DateTime = DateTime.now()): Unit = {
-    session.execute(insertUserSession.bind().setUUID("userId", userId).setUUID("sessionId", sessionId).setTimestamp("created", created.toDate))
+  override def saveUserSession(userId: UUID, sessionId: UUID, created: DateTime = DateTime.now()): Boolean = {
+    val resultSet = session.execute(insertUserSession.bind().
+      setUUID("userId", userId).
+      setUUID("sessionId", sessionId).
+      setTimestamp("created", created.toDate))
+    resultSet.wasApplied()
   }
 
   override def saveUserIdByFacebookId(facebookId: String, userId: UUID): Boolean = {

@@ -25,11 +25,15 @@ import scala.util.{Failure, Success}
 
 
 class RouteTest extends Specification with Specs2RouteTest with JMock {
-  "Management Route" should {
-    "Return a user profile" in {
-      val managementApi = mock[ManagementApi]
 
+  trait ManagementContext extends Scope {
+      val managementApi: ManagementApi = mock[ManagementApi]
       val webApi = new WebApi(null, managementApi)
+
+  }
+
+  "Management Route" should {
+    "Return a user profile" in new ManagementContext {
       val name = "Joe"
 
       checking {
@@ -39,6 +43,19 @@ class RouteTest extends Specification with Specs2RouteTest with JMock {
       Get(s"/users/${randomUUID()}/profile") ~> webApi.managementRoute ~> check {
         handled should beTrue
         responseAs[UserProfile].name should beSome(name)
+      }
+    }
+
+    "Reset flag facebook friends seen" in new ManagementContext {
+      val userId: UUID = randomUUID()
+
+      checking {
+        oneOf(managementApi).resetFacebookFriendsSeenFlag(userId)
+      }
+
+      Delete(s"/users/$userId/flags/facebook-friends") ~> webApi.managementRoute ~> check {
+        handled should beTrue
+        status should beEqualTo(StatusCodes.OK)
       }
     }
   }
@@ -192,7 +209,7 @@ class RouteTest extends Specification with Specs2RouteTest with JMock {
 
     "Set facebook friends list flag" in new LoggedInUserContext {
       checking {
-        oneOf(publicApi).processCommand(SetFlagFacebookFriendsListSeen, Option(sessionId))
+        oneOf(publicApi).processCommand(SetFlagFacebookFriendsListSeen(), Option(sessionId))
       }
 
       Post(s"/users/flags/facebook-friends").withHeaders(sessionIdHeader) ~> webApi.userRoute ~> check {

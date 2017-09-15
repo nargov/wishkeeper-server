@@ -60,5 +60,5 @@ object Events {
 
   case class WishDeleted(wishId: UUID) extends UserEvent
 
-  case object FacebookFriendsListSeen extends UserEvent
+  case class FacebookFriendsListSeen(seen: Boolean = true) extends UserEvent
 }

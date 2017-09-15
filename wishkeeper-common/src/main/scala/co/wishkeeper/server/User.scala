@@ -35,7 +35,7 @@ case class User(id: UUID, userProfile: UserProfile = UserProfile(), friends: Fri
     case WishImageSet(wishId, imageLinks) => updateWishProperty(wishId, _.withImage(imageLinks))
     case WishImageDeleted(wishId) => updateWishProperty(wishId, _.withoutImage)
     case WishDeleted(wishId) => updateWishProperty(wishId, _.withStatus(WishStatus.Deleted))
-    case FacebookFriendsListSeen => this.copy(flags = flags.copy(seenFacebookFriendsList = true))
+    case FacebookFriendsListSeen(seen) => this.copy(flags = flags.copy(seenFacebookFriendsList = seen))
     case _ => this
   }
 

@@ -22,7 +22,7 @@ class DelegatingPublicApiTest extends Specification with JMock {
 
     checking {
       allowing(dataStore).userBySession(sessionId).willReturn(Option(userId))
-      allowing(dataStore).userEventsFor(userId).willReturn(UserConnected(userId, sessionId = sessionId) :: FacebookFriendsListSeen :: Nil)
+      allowing(dataStore).userEventsFor(userId).willReturn(UserConnected(userId, sessionId = sessionId) :: FacebookFriendsListSeen() :: Nil)
     }
 
     api.userFlagsFor(sessionId).seenFacebookFriendsList must beTrue

@@ -9,7 +9,9 @@ import org.joda.time.DateTime
 import scala.annotation.tailrec
 
 trait CommandProcessor {
-  def process(command: UserCommand, sessionId: Option[UUID] = None): Unit
+  def process(command: UserCommand, sessionId: Option[UUID] = None): Boolean
+
+  def process(command: UserCommand, userId: UUID): Boolean
 
   def userIdForSession(sessionId: UUID): Option[UUID]
 }
@@ -17,7 +19,7 @@ trait CommandProcessor {
 class UserCommandProcessor(dataStore: DataStore, eventProcessors: List[EventProcessor] = Nil) extends CommandProcessor {
 
   //TODO unify as much as possible
-  override def process(command: UserCommand, sessionId: Option[UUID]): Unit = {
+  override def process(command: UserCommand, sessionId: Option[UUID]): Boolean = {
     command match {
       case connectUser: ConnectFacebookUser =>
         val now = DateTime.now()
@@ -28,21 +30,26 @@ class UserCommandProcessor(dataStore: DataStore, eventProcessors: List[EventProc
         val (user: User, lastSeqNum: Option[Long]) = userId.map(id =>
           (User.replay(dataStore.userEventsFor(id)), dataStore.lastSequenceNum(id))
         ).getOrElse((User.createNew(), None))
+        val savedSession = dataStore.saveUserSession(user.id, connectUser.sessionId, now)
         val events = command.process(user)
-        dataStore.saveUserEvents(user.id, lastSeqNum, now, events)
+        val savedEvents = dataStore.saveUserEvents(user.id, lastSeqNum, now, events)
         events.foreach(event => eventProcessors.foreach(_.process(event)))
-        dataStore.saveUserSession(user.id, connectUser.sessionId, now)
+        savedEvents && savedSession
 
       case _ =>
         val userId = sessionId.flatMap(userIdForSession).getOrElse(throw new SessionNotFoundException(sessionId))
-        val user = User.replay(dataStore.userEventsFor(userId))
+        process(command, userId)
+    }
+  }
 
-        retry {
-          val events: Seq[UserEvent] = command.process(user)
-          val success = dataStore.saveUserEvents(userId, dataStore.lastSequenceNum(userId), DateTime.now(), events)
-          events.foreach(event => eventProcessors.foreach(_.process(event)))
-          success
-        }
+  override def process(command: UserCommand, userId: UUID): Boolean = {
+    val user = User.replay(dataStore.userEventsFor(userId))
+
+    retry {
+      val events: Seq[UserEvent] = command.process(user)
+      val success = dataStore.saveUserEvents(userId, dataStore.lastSequenceNum(userId), DateTime.now(), events)
+      events.foreach(event => eventProcessors.foreach(_.process(event)))
+      success
     }
   }
 

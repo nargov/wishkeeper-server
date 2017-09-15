@@ -157,12 +157,18 @@ class UserTest extends Specification with MatcherMacros with JMock {
   }
 
   "apply wish links ordered by width" in new Context {
-    private val imageLinks = ImageLinks(
+    val imageLinks = ImageLinks(
       ImageLink("url", 30, 20, "image/jpeg") ::
-      ImageLink("url", 10, 20, "image/jpeg") ::
-      ImageLink("url", 20, 20, "image/jpeg") ::
+        ImageLink("url", 10, 20, "image/jpeg") ::
+        ImageLink("url", 20, 20, "image/jpeg") ::
         Nil)
-    user.applyEvent(WishImageSet(wish.id, imageLinks)).wishes(wish.id).image.get.links must beEqualTo(imageLinks.links.sortBy(_.width))
+    val sortedImageLinks = ImageLinks(
+      ImageLink("url", 10, 20, "image/jpeg") ::
+        ImageLink("url", 20, 20, "image/jpeg") ::
+        ImageLink("url", 30, 20, "image/jpeg") ::
+        Nil
+    )
+    user.applyEvent(WishImageSet(wish.id, imageLinks)).wishes(wish.id).image must beSome(sortedImageLinks)
   }
 
   "apply wish deleted" in new Context {
@@ -170,12 +176,14 @@ class UserTest extends Specification with MatcherMacros with JMock {
   }
 
   "apply facebook friends list seen" in new Context {
-    user.applyEvent(FacebookFriendsListSeen).seenFacebookFriends must beTrue
+    user.applyEvent(FacebookFriendsListSeen()).seenFacebookFriends must beTrue
   }
 
   "have default seenFacebookFriends flag set to false" in new Context {
     user.seenFacebookFriends must beFalse
   }
 
-  def haveCreationTime(time: DateTime): Matcher[Wish] = ===(time) ^^ {(_:Wish).creationTime}
+  def haveCreationTime(time: DateTime): Matcher[Wish] = ===(time) ^^ {
+    (_: Wish).creationTime
+  }
 }

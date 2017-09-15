@@ -155,7 +155,7 @@ class WebApi(publicApi: PublicApi, managementApi: ManagementApi)
               pathPrefix("flags") {
                 post {
                   path("facebook-friends") {
-                    publicApi.processCommand(SetFlagFacebookFriendsListSeen, sessionUUID)
+                    publicApi.processCommand(SetFlagFacebookFriendsListSeen(), sessionUUID)
                     complete(StatusCodes.OK)
                   }
                 } ~
@@ -188,7 +188,13 @@ class WebApi(publicApi: PublicApi, managementApi: ManagementApi)
             path(JavaUUID / "wishes") { userId =>
               complete(managementApi.wishesFor(userId))
             }
-        }
+        } ~
+          path(JavaUUID / "flags" / "facebook-friends") { userId =>
+            delete {
+              managementApi.resetFacebookFriendsSeenFlag(userId)
+              complete(StatusCodes.OK)
+            }
+          }
       }
     }
 

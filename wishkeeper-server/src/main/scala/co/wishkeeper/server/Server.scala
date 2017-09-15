@@ -5,7 +5,7 @@ import java.util.UUID
 import akka.actor.ActorSystem
 import akka.stream.ActorMaterializer
 import co.wishkeeper.json._
-import co.wishkeeper.server.api.{DelegatingPublicApi, ManagementApi}
+import co.wishkeeper.server.api.{DelegatingManagementApi, DelegatingPublicApi, ManagementApi}
 import co.wishkeeper.server.image.{GoogleCloudStorageImageStore, ImageStore}
 import co.wishkeeper.server.projections._
 import com.typesafe.config.ConfigFactory
@@ -14,7 +14,7 @@ import scala.collection.JavaConverters._
 import scala.concurrent.ExecutionContextExecutor
 
 
-class WishkeeperServer() extends ManagementApi {
+class WishkeeperServer{
   private val config = ConfigFactory.load()
   private val dataStoreConfig = DataStoreConfig(config.getStringList("wishkeeper.datastore.urls").asScala.toList)
   private val dataStore = new CassandraDataStore(dataStoreConfig)
@@ -35,7 +35,9 @@ class WishkeeperServer() extends ManagementApi {
   private val imageStore: ImageStore = new GoogleCloudStorageImageStore(config.getString("wishkeeper.image-store.bucket-name"))
   private val publicApi = new DelegatingPublicApi(commandProcessor, dataStore, facebookConnector,
     incomingFriendRequestsProjection, userProfileProjection, userFriendsProjection, imageStore)
-  private val webApi = new WebApi(publicApi, this)
+  private val managementApi: ManagementApi = new DelegatingManagementApi(userIdByFacebookIdProjection, userProfileProjection,
+    dataStore, commandProcessor)
+  private val webApi = new WebApi(publicApi, managementApi)
 
   def start(): Unit = {
     dataStore.connect()
@@ -47,12 +49,6 @@ class WishkeeperServer() extends ManagementApi {
     webApi.stop()
     dataStore.close()
   }
-
-  override def userIdFor(facebookId: String): Option[UUID] = userIdByFacebookIdProjection.get(facebookId)
-
-  override def profileFor(userId: UUID): UserProfile = userProfileProjection.get(userId)
-
-  override def wishesFor(userId: UUID): List[Wish] = User.replay(dataStore.userEventsFor(userId)).wishes.values.toList
 
 }
 

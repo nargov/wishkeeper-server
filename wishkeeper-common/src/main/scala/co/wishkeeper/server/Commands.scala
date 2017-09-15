@@ -87,7 +87,7 @@ object Commands {
     override def process(user: User): List[UserEvent] = WishDeleted(wishId) :: Nil
   }
 
-  case object SetFlagFacebookFriendsListSeen extends UserCommand {
-    override def process(user: User): List[UserEvent] = FacebookFriendsListSeen :: Nil
+  case class SetFlagFacebookFriendsListSeen(seen: Boolean = true) extends UserCommand {
+    override def process(user: User): List[UserEvent] = FacebookFriendsListSeen(seen) :: Nil
   }
 }
