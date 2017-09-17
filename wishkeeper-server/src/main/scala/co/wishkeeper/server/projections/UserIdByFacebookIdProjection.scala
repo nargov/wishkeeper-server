@@ -7,16 +7,12 @@ import co.wishkeeper.server.{DataStore, EventProcessor, Events}
 
 trait UserIdByFacebookIdProjection {
 
-  def get(facebookId: String): Option[UUID]
-
   def get(facebookIds: List[String]): Map[String, UUID]
 
   def process(event: Events.Event): Unit
 }
 
 class DataStoreUserIdByFacebookIdProjection(dataStore: DataStore) extends UserIdByFacebookIdProjection with EventProcessor {
-
-  override def get(facebookId: String): Option[UUID] = dataStore.userIdByFacebookId(facebookId)
 
   override def get(facebookIds: List[String]): Map[String, UUID] = dataStore.userIdsByFacebookIds(facebookIds)
 

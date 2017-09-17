@@ -10,7 +10,7 @@ import akka.stream.ActorMaterializer
 import co.wishkeeper.server.Commands._
 import co.wishkeeper.server._
 import co.wishkeeper.server.image._
-import co.wishkeeper.server.projections.{PotentialFriend, UserFriendsProjection, UserProfileProjection}
+import co.wishkeeper.server.projections.{IncomingFriendRequestsProjection, PotentialFriend, UserFriendsProjection, UserProfileProjection}
 
 import scala.concurrent.{ExecutionContext, Future}
 import scala.util.Try

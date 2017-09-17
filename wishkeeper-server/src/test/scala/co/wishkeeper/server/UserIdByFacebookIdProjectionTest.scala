@@ -34,14 +34,6 @@ class UserIdByFacebookIdProjectionTest extends Specification with JMock {
     facebookIdProjection.process(NoOp)
   }
 
-  "return a user id for a given facebook id" in new Context {
-    checking {
-      allowing(dataStore).userIdByFacebookId(facebookId).willReturn(Some(userId))
-    }
-
-    facebookIdProjection.get(facebookId) must beSome(userId)
-  }
-
   "return a list of users for given list of facebook ids" in new Context {
     val anotherFacebookId = "another-facebook-id"
     val anotherUserId = UUID.randomUUID()

@@ -14,6 +14,8 @@ trait ManagementApi {
   def wishesFor(userId: UUID): List[Wish]
 
   def resetFacebookFriendsSeenFlag(userId: UUID): Unit
+
+  def userByEmail(email: String): Option[UUID]
 }
 
 class DelegatingManagementApi(userIdByFacebookIdProjection: UserIdByFacebookIdProjection,
@@ -21,9 +23,11 @@ class DelegatingManagementApi(userIdByFacebookIdProjection: UserIdByFacebookIdPr
                               dataStore: DataStore,
                               commandProcessor: CommandProcessor) extends ManagementApi{
 
+  override def userByEmail(email: String): Option[UUID] = dataStore.userByEmail(email)
+
   override def resetFacebookFriendsSeenFlag(userId: UUID): Unit = commandProcessor.process(SetFlagFacebookFriendsListSeen(false), userId)
 
-  override def userIdFor(facebookId: String): Option[UUID] = userIdByFacebookIdProjection.get(facebookId)
+  override def userIdFor(facebookId: String): Option[UUID] = dataStore.userIdByFacebookId(facebookId)
 
   override def profileFor(userId: UUID): UserProfile = userProfileProjection.get(userId)
 

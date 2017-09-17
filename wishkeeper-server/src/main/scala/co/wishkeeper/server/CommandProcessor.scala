@@ -12,8 +12,6 @@ trait CommandProcessor {
   def process(command: UserCommand, sessionId: Option[UUID] = None): Boolean
 
   def process(command: UserCommand, userId: UUID): Boolean
-
-  def userIdForSession(sessionId: UUID): Option[UUID]
 }
 
 class UserCommandProcessor(dataStore: DataStore, eventProcessors: List[EventProcessor] = Nil) extends CommandProcessor {
@@ -37,7 +35,7 @@ class UserCommandProcessor(dataStore: DataStore, eventProcessors: List[EventProc
         savedEvents && savedSession
 
       case _ =>
-        val userId = sessionId.flatMap(userIdForSession).getOrElse(throw new SessionNotFoundException(sessionId))
+        val userId = sessionId.flatMap(dataStore.userBySession).getOrElse(throw new SessionNotFoundException(sessionId))
         process(command, userId)
     }
   }
@@ -58,31 +56,18 @@ class UserCommandProcessor(dataStore: DataStore, eventProcessors: List[EventProc
     val successful = f
     if (successful || retries == 0) successful else retry(f, retries - 1)
   }
-
-  //TODO Move this somewhere else - particular view, probably
-  override def userIdForSession(sessionId: UUID): Option[UUID] = dataStore.userBySession(sessionId)
 }
 
 trait EventProcessor {
   def process(event: Event): Unit
 }
 
-trait IncomingFriendRequestsProjection {
-  def awaitingApproval(userId: UUID): List[UUID]
-}
-
-class DataStoreIncomingFriendRequestsProjection(dataStore: DataStore) extends IncomingFriendRequestsProjection with EventProcessor {
-  def awaitingApproval(userId: UUID): List[UUID] = User.replay(dataStore.userEventsFor(userId)).friends.requestReceived
+class UserByEmailProjection(dataStore: DataStore) extends EventProcessor {
 
   override def process(event: Event): Unit = {
     event match {
-      case FriendRequestSent(sender, userId) =>
-        val lastSequenceNum = dataStore.lastSequenceNum(userId)
-        dataStore.saveUserEvents(userId, lastSequenceNum, DateTime.now(), FriendRequestReceived(userId, sender) :: Nil)
+      case UserEmailSet(userId, email) => dataStore.saveUserByEmail(email, userId)
       case _ =>
     }
   }
 }
-
-class SessionNotFoundException(sessionId: Option[UUID]) extends RuntimeException(
-  sessionId.map(id => s"Session ${id.toString} not found.").getOrElse("Session not found"))

@@ -4,6 +4,7 @@ import java.util.UUID
 
 import co.wishkeeper.server.Commands.ConnectFacebookUser
 import co.wishkeeper.server.Events.{FriendRequestReceived, FriendRequestSent, UserConnected}
+import co.wishkeeper.server.projections.DataStoreIncomingFriendRequestsProjection
 import com.wixpress.common.specs2.JMock
 import org.joda.time.DateTime
 import org.specs2.mutable.Specification

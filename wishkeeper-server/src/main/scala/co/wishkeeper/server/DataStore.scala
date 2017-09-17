@@ -18,6 +18,10 @@ import scala.collection.JavaConverters._
 
 trait DataStore {
 
+  def userByEmail(email: String): Option[UUID]
+
+  def saveUserByEmail(email: String, userId: UUID): Boolean
+
   def userIdsByFacebookIds(facebookIds: List[String]): Map[String, UUID]
 
   def userIdByFacebookId(facebookId: String): Option[UUID]
@@ -49,6 +53,7 @@ class CassandraDataStore(dataStoreConfig: DataStoreConfig) extends DataStore {
 
   val cluster = Cluster.builder().addContactPoints(dataStoreConfig.addresses: _*).build()
   private val clusterSession: AtomicReference[Session] = new AtomicReference(null)
+
   private def session = clusterSession.get()
 
   private lazy val selectMaxSeq = session.prepare(s"select seqMax from $userEventsTable where userId = :userId")
@@ -61,6 +66,8 @@ class CassandraDataStore(dataStoreConfig: DataStoreConfig) extends DataStore {
   private lazy val insertUserByFacebookId = session.prepare(s"insert into $userByFacebookId (facebookId, userId) values (:facebookId, :userId)")
   private lazy val selectUserByFacebookId = session.prepare(s"select userId from $userByFacebookId where facebookId = :facebookId")
   private lazy val selectUsersByFacebookIds = session.prepare(s"select facebookId, userId from $userByFacebookId where facebookId in :idList")
+  private lazy val insertUserByEmail = session.prepare(s"insert into $userByEmailTable (email, userId) values (:email, :userId) if not exists")
+  private lazy val selectUserByEmail = session.prepare(s"select userId from $userByEmailTable where email = :email")
 
 
   override def saveUserEvents(userId: UUID, lastSeqNum: Option[Long], time: DateTime, events: Seq[UserEvent]): Boolean = {
@@ -132,15 +139,29 @@ class CassandraDataStore(dataStoreConfig: DataStoreConfig) extends DataStore {
 
   override def userIdByFacebookId(facebookId: String): Option[UUID] = {
     val resultSet = session.execute(selectUserByFacebookId.bind().setString("facebookId", facebookId))
+    userIdFromSingleResult(resultSet)
+  }
+
+  override def userIdsByFacebookIds(facebookIds: List[String]): Map[String, UUID] = {
+    val resultSet = session.execute(selectUsersByFacebookIds.bind().setList("idList", facebookIds.asJava))
+    resultSet.asScala.map(row => row.getString("facebookId") -> row.getUUID("userId")).toMap
+  }
+
+  override def userByEmail(email: String): Option[UUID] = {
+    val resultSet = session.execute(selectUserByEmail.bind().setString("email", email))
+    userIdFromSingleResult(resultSet)
+  }
+
+  private def userIdFromSingleResult(resultSet: ResultSet) = {
     if (resultSet.getAvailableWithoutFetching > 0)
       Option(resultSet.one().getUUID("userId"))
     else
       None
   }
 
-  override def userIdsByFacebookIds(facebookIds: List[String]): Map[String, UUID] = {
-    val resultSet = session.execute(selectUsersByFacebookIds.bind().setList("idList", facebookIds.asJava))
-    resultSet.asScala.map(row => row.getString("facebookId") -> row.getUUID("userId")).toMap
+  override def saveUserByEmail(email: String, userId: UUID): Boolean = {
+    session.execute(insertUserByEmail.bind().setString("email", email).setUUID("userId", userId))
+    true
   }
 
   override def close(): Unit = {
@@ -155,7 +176,8 @@ class CassandraDataStore(dataStoreConfig: DataStoreConfig) extends DataStore {
 
 object CassandraDataStore {
   val keyspace = "wishkeeper"
-  val userEventsTable = keyspace + ".user_events"
-  val userByFacebookId = keyspace + ".user_by_facebook_id"
-  val userSession = keyspace + ".user_session"
+  val userEventsTable: String = keyspace + ".user_events"
+  val userByFacebookId: String = keyspace + ".user_by_facebook_id"
+  val userSession: String = keyspace + ".user_session"
+  val userByEmailTable: String = keyspace + ".user_by_email"
 }

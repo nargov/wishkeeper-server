@@ -182,6 +182,9 @@ class WebApi(publicApi: PublicApi, managementApi: ManagementApi)
               map(complete(_)).
               getOrElse(complete(StatusCodes.NotFound))
           } ~
+            path("email" / """.+@.+""".r / "id") { email =>
+              managementApi.userByEmail(email).map(complete(_)).get
+            } ~
             path(JavaUUID / "profile") { userId =>
               complete(managementApi.profileFor(userId))
             } ~

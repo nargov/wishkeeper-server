@@ -28,14 +28,6 @@ class UserCommandProcessorTest extends Specification with JMock with MatcherMacr
     override val commandProcessor = new UserCommandProcessor(dataStore, eventProcessor :: Nil)
   }
 
-  "return the user id by session id" in new Context {
-    checking {
-      oneOf(dataStore).userBySession(sessionId).willReturn(Some(userId))
-    }
-
-    commandProcessor.userIdForSession(sessionId) must beSome(userId)
-  }
-
   "notify event processors on new events" in new EventProcessorContext {
     checking {
       allowing(dataStore).userIdByFacebookId(facebookId).willReturn(None)

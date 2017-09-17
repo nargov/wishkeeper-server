@@ -1,7 +1,5 @@
 package co.wishkeeper.server
 
-import java.util.UUID
-
 import akka.actor.ActorSystem
 import akka.stream.ActorMaterializer
 import co.wishkeeper.json._

@@ -29,7 +29,7 @@ class RouteTest extends Specification with Specs2RouteTest with JMock {
   trait ManagementContext extends Scope {
       val managementApi: ManagementApi = mock[ManagementApi]
       val webApi = new WebApi(null, managementApi)
-
+      val userId: UUID = randomUUID()
   }
 
   "Management Route" should {
@@ -47,7 +47,6 @@ class RouteTest extends Specification with Specs2RouteTest with JMock {
     }
 
     "Reset flag facebook friends seen" in new ManagementContext {
-      val userId: UUID = randomUUID()
 
       checking {
         oneOf(managementApi).resetFacebookFriendsSeenFlag(userId)
@@ -56,6 +55,19 @@ class RouteTest extends Specification with Specs2RouteTest with JMock {
       Delete(s"/users/$userId/flags/facebook-friends") ~> webApi.managementRoute ~> check {
         handled should beTrue
         status should beEqualTo(StatusCodes.OK)
+      }
+    }
+
+    "Return a user id by email" in new ManagementContext {
+      val email = "blip@blup.com"
+
+      checking {
+        oneOf(managementApi).userByEmail(email).willReturn(Option(userId))
+      }
+
+      Get(s"/users/email/$email/id") ~> webApi.managementRoute ~> check {
+        handled should beTrue
+        responseAs[UUID] must beEqualTo(userId)
       }
     }
   }
@@ -95,8 +107,7 @@ class RouteTest extends Specification with Specs2RouteTest with JMock {
     }
 
     "Allow a user to send a friend request" in new LoggedInUserContext {
-      val potentialFriendId = randomUUID()
-      val friendRequest = SendFriendRequest(potentialFriendId)
+      val friendRequest = SendFriendRequest(randomUUID())
 
       checking {
         oneOf(publicApi).processCommand(friendRequest, Some(sessionId))
@@ -111,7 +122,6 @@ class RouteTest extends Specification with Specs2RouteTest with JMock {
     }
 
     "Validate facebook token" in new NotLoggedInContext {
-
       checking {
         oneOf(publicApi).connectFacebookUser(connectFacebookUser).willReturn(Future.successful(true))
       }
@@ -122,7 +132,7 @@ class RouteTest extends Specification with Specs2RouteTest with JMock {
     }
 
     "return existing incoming friend requests" in new LoggedInUserContext {
-      val friendRequestSender = randomUUID()
+      val friendRequestSender: UUID = randomUUID()
 
       checking {
         oneOf(publicApi).incomingFriendRequestSenders(sessionId).willReturn(Some(List(friendRequestSender)))

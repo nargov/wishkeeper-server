@@ -52,6 +52,12 @@ class CassandraDataStoreIT extends FlatSpec with Matchers with BeforeAndAfterAll
     eventStore.saveUserEvents(userId, maybeLastSeqNum, DateTime.now(), events) shouldBe false
   }
 
+  it should "return a user by email" in {
+    val email = "zaphod@beeblebrox.com"
+    eventStore.saveUserByEmail(email, userId)
+    eventStore.userByEmail(email) shouldBe Some(userId)
+  }
+
   val dataStoreTestHelper = DataStoreTestHelper()
 
   override protected def beforeAll(): Unit = {
