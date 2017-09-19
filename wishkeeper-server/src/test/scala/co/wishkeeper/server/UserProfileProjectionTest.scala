@@ -17,7 +17,10 @@ class UserProfileProjectionTest extends Specification with JMock {
     val joe = "Joe"
 
     checking {
-      allowing(dataStore).userEventsFor(userId).willReturn(List(UserConnected(userId, DateTime.now(), UUID.randomUUID()), UserNameSet(userId, joe)))
+      allowing(dataStore).userEvents(userId).willReturn(List(
+        UserEventInstant(UserConnected(userId, DateTime.now(), UUID.randomUUID()), DateTime.now()),
+        UserEventInstant(UserNameSet(userId, joe), DateTime.now())
+      ))
     }
 
     projection.get(userId) must beEqualTo(UserProfile(name = Some(joe)))

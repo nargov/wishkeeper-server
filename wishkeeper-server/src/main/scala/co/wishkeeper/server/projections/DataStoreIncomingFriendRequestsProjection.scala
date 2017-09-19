@@ -7,7 +7,7 @@ import co.wishkeeper.server.{DataStore, EventProcessor, User}
 import org.joda.time.DateTime
 
 class DataStoreIncomingFriendRequestsProjection(dataStore: DataStore) extends IncomingFriendRequestsProjection with EventProcessor {
-  def awaitingApproval(userId: UUID): List[UUID] = User.replay(dataStore.userEventsFor(userId)).friends.requestReceived
+  def awaitingApproval(userId: UUID): List[UUID] = User.replay2(dataStore.userEvents(userId)).friends.requestReceived
 
   override def process(event: Event): Unit = {
     event match {

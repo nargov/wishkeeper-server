@@ -31,6 +31,6 @@ class DelegatingManagementApi(userIdByFacebookIdProjection: UserIdByFacebookIdPr
 
   override def profileFor(userId: UUID): UserProfile = userProfileProjection.get(userId)
 
-  override def wishesFor(userId: UUID): List[Wish] = User.replay(dataStore.userEventsFor(userId)).wishes.values.toList
+  override def wishesFor(userId: UUID): List[Wish] = User.replay2(dataStore.userEvents(userId)).wishes.values.toList
 
 }

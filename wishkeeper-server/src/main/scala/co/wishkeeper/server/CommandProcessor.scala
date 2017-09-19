@@ -26,7 +26,7 @@ class UserCommandProcessor(dataStore: DataStore, eventProcessors: List[EventProc
            Prevent this by saving into userIdByFacebookId with IF NOT EXISTS before saving the events. */
         val userId = dataStore.userIdByFacebookId(connectUser.facebookId)
         val (user: User, lastSeqNum: Option[Long]) = userId.map(id =>
-          (User.replay(dataStore.userEventsFor(id)), dataStore.lastSequenceNum(id))
+          (User.replay2(dataStore.userEvents(id)), dataStore.lastSequenceNum(id))
         ).getOrElse((User.createNew(), None))
         val savedSession = dataStore.saveUserSession(user.id, connectUser.sessionId, now)
         val events = command.process(user)
@@ -41,7 +41,7 @@ class UserCommandProcessor(dataStore: DataStore, eventProcessors: List[EventProc
   }
 
   override def process(command: UserCommand, userId: UUID): Boolean = {
-    val user = User.replay(dataStore.userEventsFor(userId))
+    val user = User.replay2(dataStore.userEvents(userId))
 
     retry {
       val events: Seq[UserEvent] = command.process(user)

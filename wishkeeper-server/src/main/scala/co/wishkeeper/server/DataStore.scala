@@ -38,6 +38,8 @@ trait DataStore {
 
   def userEventsFor(userId: UUID): List[UserEvent]
 
+  def userEvents(userId: UUID): List[UserEventInstant]
+
   def connect(): Unit
 
   def close(): Unit
@@ -102,16 +104,19 @@ class CassandraDataStore(dataStoreConfig: DataStoreConfig) extends DataStore {
       None
   }
 
-  override def userEventsFor(userId: UUID): List[UserEvent] = {
+  override def userEventsFor(userId: UUID): List[UserEvent] = userEvents(userId).map(_.event)
+
+  override def userEvents(userId: UUID): List[UserEventInstant] = {
     val resultSet: ResultSet = session.execute(selectUserEvents.bind().setUUID("userId", userId))
-    resultSet.asScala.map(rowToUserEvent).toList
+    resultSet.asScala.map(rowToEventInstant).toList
   }
 
-  private val rowToUserEvent: Row ⇒ UserEvent = row ⇒ {
+  private val rowToEventInstant: Row => UserEventInstant = row => {
     val json = new String(row.getBytes("event").array())
+    val time = new DateTime(row.getTimestamp("time"))
     val eventOrError = decode[UserEvent](json)
     eventOrError match {
-      case Right(event: UserEvent) ⇒ event
+      case Right(event: UserEvent) ⇒ UserEventInstant(event, time)
       case Left(err: Throwable) ⇒ throw err
       case Left(err) ⇒ throw new RuntimeException(s"Error decoding json: $json [${err.toString}]")
     }

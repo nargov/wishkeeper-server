@@ -55,6 +55,13 @@ object User {
     }.getOrElse(throw new IllegalArgumentException("Event stream does not begin with UserConnected"))
   }
 
+  def replay2(events: List[UserEventInstant]): User = {
+    events.headOption.map {
+      case UserEventInstant(UserConnected(userId, _, _), _) =>
+        events.foldLeft(User(userId))((user, instant) => user.applyEvent(instant.event))
+    }.getOrElse(throw new IllegalArgumentException("Event stream does not begin with UserConnected"))
+  }
+
   def createNew() = new User(UUID.randomUUID())
 }
 

@@ -79,7 +79,7 @@ class DelegatingPublicApi(commandProcessor: CommandProcessor,
 
   override def wishListFor(sessionId: UUID): Option[UserWishes] = { //TODO missing tests here
     dataStore.userBySession(sessionId).map { userId =>
-      val wishList = User.replay(dataStore.userEventsFor(userId)).wishes.values.toList
+      val wishList = User.replay2(dataStore.userEvents(userId)).wishes.values.toList
       UserWishes(wishList.filter(_.status == WishStatus.Active).sortBy(_.creationTime.getMillis).reverse)
     }
   }
@@ -110,7 +110,7 @@ class DelegatingPublicApi(commandProcessor: CommandProcessor,
 
   override def userFlagsFor(sessionId: UUID): Flags = {
     dataStore.userBySession(sessionId).map { userId =>
-      User.replay(dataStore.userEventsFor(userId)).flags
+      User.replay2(dataStore.userEvents(userId)).flags
     }.getOrElse(throw new SessionNotFoundException(Option(sessionId)))
   }
 }

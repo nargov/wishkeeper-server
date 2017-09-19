@@ -2,7 +2,6 @@ package co.wishkeeper.server
 
 import java.util.UUID
 
-import co.wishkeeper.server.Commands.ConnectFacebookUser
 import co.wishkeeper.server.Events.{FriendRequestReceived, FriendRequestSent, UserConnected}
 import co.wishkeeper.server.projections.DataStoreIncomingFriendRequestsProjection
 import com.wixpress.common.specs2.JMock
@@ -38,9 +37,9 @@ class DataStoreIncomingFriendRequestsProjectionTest extends Specification with J
     val senderId = UUID.randomUUID()
 
     checking {
-      allowing(dataStore).userEventsFor(userId).willReturn(List(
-        EventsTestHelper.randomSession(userId),
-        FriendRequestReceived(userId, senderId)
+      allowing(dataStore).userEvents(userId).willReturn(List(
+        UserEventInstant(EventsTestHelper.randomSession(userId), DateTime.now()),
+          UserEventInstant(FriendRequestReceived(userId, senderId), DateTime.now())
       ))
     }
 
