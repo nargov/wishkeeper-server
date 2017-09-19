@@ -16,13 +16,16 @@ import scala.language.experimental.macros
 class UserTest extends Specification with MatcherMacros with JMock {
 
   trait Context extends Scope {
-    val user = User.createNew()
-    val wish = Wish(randomUUID())
+    val user: User = User.createNew()
+    val wish: Wish = Wish(randomUUID())
 
     def appliedEventCreatesExpectedWish(event: UserEvent, expectedWish: Wish): Any = {
-      user.applyEvent(event).wishes(expectedWish.id) must beEqualToIgnoringDates(expectedWish)
+      user.applyEvent(UserEventInstant(event, DateTime.now())).wishes(expectedWish.id) must beEqualToIgnoringDates(expectedWish)
     }
+
+    val now: DateTime = DateTime.now()
   }
+
 
   "create a new user" in new Context {
     user must matchA[User].id(beAnInstanceOf[UUID])
@@ -34,52 +37,52 @@ class UserTest extends Specification with MatcherMacros with JMock {
 
   "apply UserFacebookIdSet event" in new Context {
     val facebookId = "facebook-id"
-    user.applyEvent(UserFacebookIdSet(user.id, facebookId)).facebookId must beSome(facebookId)
+    user.applyEvent(UserEventInstant(UserFacebookIdSet(user.id, facebookId), now)).facebookId must beSome(facebookId)
   }
 
   "apply UserFirstNameSet" in new Context {
     val firstName = "George"
-    user.applyEvent(UserFirstNameSet(user.id, firstName)).userProfile.firstName must beSome(firstName)
+    user.applyEvent(UserEventInstant(UserFirstNameSet(user.id, firstName), now)).userProfile.firstName must beSome(firstName)
   }
 
   "apply UserLastNameSet" in new Context {
     val lastName = "Constanza"
-    user.applyEvent(UserLastNameSet(user.id, lastName)).userProfile.lastName must beSome(lastName)
+    user.applyEvent(UserEventInstant(UserLastNameSet(user.id, lastName), now)).userProfile.lastName must beSome(lastName)
   }
 
   "apply UserNameSet" in new Context {
     val name = "George Constanza"
-    user.applyEvent(UserNameSet(user.id, name)).userProfile.name must beSome(name)
+    user.applyEvent(UserEventInstant(UserNameSet(user.id, name), now)).userProfile.name must beSome(name)
   }
 
   "apply UserBirthdaySet" in new Context {
     val birthday = "05/13/1970"
-    user.applyEvent(UserBirthdaySet(user.id, birthday)).userProfile.birthday must beSome(birthday)
+    user.applyEvent(UserEventInstant(UserBirthdaySet(user.id, birthday), now)).userProfile.birthday must beSome(birthday)
   }
 
   "apply UserEmailSet" in new Context {
     val email = "abc@xyz.com"
-    user.applyEvent(UserEmailSet(user.id, email)).userProfile.email must beSome(email)
+    user.applyEvent(UserEventInstant(UserEmailSet(user.id, email), now)).userProfile.email must beSome(email)
   }
 
   "apply UserLocaleSet" in new Context {
     val locale = "en_UK"
-    user.applyEvent(UserLocaleSet(user.id, locale)).userProfile.locale must beSome(locale)
+    user.applyEvent(UserEventInstant(UserLocaleSet(user.id, locale), now)).userProfile.locale must beSome(locale)
   }
 
   "apply UserGenderSet" in new Context {
     val gender = "Female"
-    user.applyEvent(UserGenderSet(user.id, gender)).userProfile.gender must beSome(gender)
+    user.applyEvent(UserEventInstant(UserGenderSet(user.id, gender), now)).userProfile.gender must beSome(gender)
   }
 
   "apply UserTimeZoneSet" in new Context {
-    val timezone = +3
-    user.applyEvent(UserTimeZoneSet(user.id, timezone)).userProfile.timezone must beSome(timezone)
+    val timezone: Int = +3
+    user.applyEvent(UserEventInstant(UserTimeZoneSet(user.id, timezone), now)).userProfile.timezone must beSome(timezone)
   }
 
   "apply UserAgeRangeSet" in new Context {
     val ageRange = AgeRange(Some(20), Some(30))
-    user.applyEvent(UserAgeRangeSet(user.id, ageRange.min, ageRange.max)).userProfile.ageRange must beSome(ageRange)
+    user.applyEvent(UserEventInstant(UserAgeRangeSet(user.id, ageRange.min, ageRange.max), now)).userProfile.ageRange must beSome(ageRange)
   }
 
   "Recreate from Events" in new Context {
@@ -88,22 +91,22 @@ class UserTest extends Specification with MatcherMacros with JMock {
       UserEventInstant(UserConnected(user.id, DateTime.now(), randomUUID()), DateTime.now()),
       UserEventInstant(UserNameSet(user.id, name), DateTime.now())
     )
-    User.replay2(events) must beEqualTo(User(user.id, UserProfile(name = Option(name))))
+    User.replay(events) must beEqualTo(User(user.id, UserProfile(name = Option(name))))
   }
 
   "throw exception if first event is not UserConnected" in {
-    User.replay2(Nil) must throwAn[IllegalArgumentException]
+    User.replay(Nil) must throwAn[IllegalArgumentException]
   }
 
   "apply FriendRequestSent" in new Context {
     private val potentialFriend = randomUUID()
-    val friendRequest = FriendRequestSent(user.id, potentialFriend)
+    val friendRequest = UserEventInstant(FriendRequestSent(user.id, potentialFriend), now)
     user.applyEvent(friendRequest).friends.requestSent must contain(potentialFriend)
   }
 
   "apply FriendRequestReceived" in new Context {
     private val potentialFriend = randomUUID()
-    val friendRequest = FriendRequestReceived(user.id, potentialFriend)
+    val friendRequest = UserEventInstant(FriendRequestReceived(user.id, potentialFriend), now)
     user.applyEvent(friendRequest).friends.requestReceived must contain(potentialFriend)
   }
 
@@ -130,17 +133,20 @@ class UserTest extends Specification with MatcherMacros with JMock {
 
   "apply WishImageDeleted" in new Context {
     private val imageLinks = ImageLinks(ImageLink("", 0, 0, "") :: Nil)
-    user.applyEvent(WishImageSet(wish.id, imageLinks)).applyEvent(WishImageDeleted(wish.id)).wishes(wish.id).image must beNone
+    user
+      .applyEvent(UserEventInstant(WishImageSet(wish.id, imageLinks), now))
+      .applyEvent(UserEventInstant(WishImageDeleted(wish.id), now))
+      .wishes(wish.id).image must beNone
   }
 
   "apply UserPictureSet" in new Context {
     private val pic = "picture-link"
-    user.applyEvent(UserPictureSet(user.id, pic)).userProfile.picture must beSome(pic)
+    user.applyEvent(UserEventInstant(UserPictureSet(user.id, pic), now)).userProfile.picture must beSome(pic)
   }
 
   "apply WishCreated" in new Context {
-    val creationTime = DateTime.now()
-    private val wishCreated = WishCreated(wish.id, user.id, creationTime)
+    val creationTime: DateTime = DateTime.now()
+    private val wishCreated = UserEventInstant(WishCreated(wish.id, user.id, creationTime), now)
     user.applyEvent(wishCreated).wishes(wish.id) must haveCreationTime(creationTime)
   }
 
@@ -171,19 +177,29 @@ class UserTest extends Specification with MatcherMacros with JMock {
         ImageLink("url", 30, 20, "image/jpeg") ::
         Nil
     )
-    user.applyEvent(WishImageSet(wish.id, imageLinks)).wishes(wish.id).image must beSome(sortedImageLinks)
+    user.applyEvent(UserEventInstant(WishImageSet(wish.id, imageLinks), now)).wishes(wish.id).image must beSome(sortedImageLinks)
   }
 
   "apply wish deleted" in new Context {
-    user.applyEvent(WishCreated(wish.id, randomUUID(), DateTime.now())).applyEvent(WishDeleted(wish.id)).wishes(wish.id).status must beEqualTo(WishStatus.Deleted)
+    user
+      .applyEvent(UserEventInstant(WishCreated(wish.id, randomUUID(), DateTime.now()), now))
+      .applyEvent(UserEventInstant(WishDeleted(wish.id), now))
+      .wishes(wish.id).status must beEqualTo(WishStatus.Deleted)
   }
 
   "apply facebook friends list seen" in new Context {
-    user.applyEvent(FacebookFriendsListSeen()).seenFacebookFriends must beTrue
+    user.applyEvent(UserEventInstant(FacebookFriendsListSeen(), now)).seenFacebookFriends must beTrue
   }
 
   "have default seenFacebookFriends flag set to false" in new Context {
     user.seenFacebookFriends must beFalse
+  }
+
+  "add Notification on FriendRequestReceived" in new Context {
+    val friend: User = User.createNew()
+    user.applyEvent(UserEventInstant(FriendRequestReceived(user.id, friend.id), now))
+      .notifications must contain(
+      Notification(FriendRequestNotification(from = friend.id, status = FriendRequestNotificationStatus.Pending)))
   }
 
   def haveCreationTime(time: DateTime): Matcher[Wish] = ===(time) ^^ {

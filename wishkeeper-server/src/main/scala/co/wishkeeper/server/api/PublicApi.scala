@@ -16,6 +16,8 @@ import scala.concurrent.{ExecutionContext, Future}
 import scala.util.Try
 
 trait PublicApi {
+  def userNotificationsFor(sessionId: UUID): List[Notification]
+
   def userFlagsFor(sessionId: UUID): Flags
 
   def deleteWish(sessionId: UUID, wishId: UUID): Unit
@@ -79,7 +81,7 @@ class DelegatingPublicApi(commandProcessor: CommandProcessor,
 
   override def wishListFor(sessionId: UUID): Option[UserWishes] = { //TODO missing tests here
     dataStore.userBySession(sessionId).map { userId =>
-      val wishList = User.replay2(dataStore.userEvents(userId)).wishes.values.toList
+      val wishList = User.replay(dataStore.userEvents(userId)).wishes.values.toList
       UserWishes(wishList.filter(_.status == WishStatus.Active).sortBy(_.creationTime.getMillis).reverse)
     }
   }
@@ -110,7 +112,9 @@ class DelegatingPublicApi(commandProcessor: CommandProcessor,
 
   override def userFlagsFor(sessionId: UUID): Flags = {
     dataStore.userBySession(sessionId).map { userId =>
-      User.replay2(dataStore.userEvents(userId)).flags
+      User.replay(dataStore.userEvents(userId)).flags
     }.getOrElse(throw new SessionNotFoundException(Option(sessionId)))
   }
+
+  override def userNotificationsFor(sessionId: UUID): List[Notification] = ???
 }

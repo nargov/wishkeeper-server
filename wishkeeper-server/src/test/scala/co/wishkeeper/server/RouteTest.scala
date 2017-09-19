@@ -214,7 +214,6 @@ class RouteTest extends Specification with Specs2RouteTest with JMock {
       Post(s"/users/wishes/$wishId/image/url?$params").withHeaders(sessionIdHeader, imageDimensionsHeader) ~> webApi.userRoute ~> check {
         status must beEqualTo(StatusCodes.InternalServerError)
       }
-
     }
 
     "Set facebook friends list flag" in new LoggedInUserContext {
@@ -234,6 +233,20 @@ class RouteTest extends Specification with Specs2RouteTest with JMock {
 
       Get(s"/users/flags").withHeaders(sessionIdHeader) ~> webApi.userRoute ~> check {
         responseAs[Flags].seenFacebookFriendsList must beTrue
+      }
+    }
+
+    "get notifications" in new LoggedInUserContext {
+      val friendId = randomUUID()
+      val notificationData = FriendRequestNotification(friendId)
+      checking {
+        allowing(publicApi).userNotificationsFor(sessionId).willReturn(List(Notification(notificationData)))
+      }
+
+      Get(s"/users/notifications").withHeaders(sessionIdHeader) ~> webApi.userRoute ~> check {
+        responseAs[List[Notification]] match {
+          case x :: xs => x.notificationData must beEqualTo(notificationData)
+        }
       }
     }
   }

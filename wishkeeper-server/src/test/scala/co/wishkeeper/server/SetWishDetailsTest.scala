@@ -4,15 +4,14 @@ import java.util.UUID
 
 import co.wishkeeper.server.Commands.SetWishDetails
 import co.wishkeeper.server.Events._
+import co.wishkeeper.server.UserTestHelper._
 import org.joda.time.DateTime
 import org.specs2.matcher.Matcher
 import org.specs2.mutable.Specification
 
-import scala.collection.SortedMap
-
 class SetWishDetailsTest extends Specification {
 
-  val user = User(UUID.randomUUID())
+  val user = aUser
   val wishId = UUID.randomUUID()
 
   "should create event for name" in {
@@ -79,7 +78,7 @@ class SetWishDetailsTest extends Specification {
   }
 
   "should not create a wish creation event if the wish already exists" in {
-    SetWishDetails(Wish(wishId)).process(user.applyEvent(WishCreated(wishId, user.id, DateTime.now()))) must beEmpty
+    SetWishDetails(Wish(wishId)).process(user.withWish(wishId)) must beEmpty
   }
 
   def containWishCreatedEvent(wishId: UUID, createdBy: UUID): Matcher[List[UserEvent]] = { eventList: List[UserEvent] =>
@@ -87,5 +86,20 @@ class SetWishDetailsTest extends Specification {
       case WishCreated(wish, userId, _) if wish == wishId && userId == createdBy => true
       case _ => false
     }), s"$eventList does not contain WishCreated($wishId, $createdBy, any[DateTime])")
+  }
+}
+
+
+object UserTestHelper {
+  def aUser: User = {
+    val id = UUID.randomUUID()
+    User(id).applyEvent(UserEventInstant(UserConnected(id, DateTime.now().minusDays(1), UUID.randomUUID()), DateTime.now().minusDays(1)))
+  }
+
+  implicit class TestUserOps(user: User){
+    def withWish(id: UUID = UUID.randomUUID()) = {
+      val now = DateTime.now()
+      user.applyEvent(UserEventInstant(WishCreated(id, user.id, now), now))
+    }
   }
 }

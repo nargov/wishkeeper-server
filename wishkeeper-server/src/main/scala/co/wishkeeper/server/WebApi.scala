@@ -164,6 +164,13 @@ class WebApi(publicApi: PublicApi, managementApi: ManagementApi)
                       complete(publicApi.userFlagsFor(sessionId))
                     }.get
                   }
+              } ~
+              pathPrefix("notifications") {
+                get {
+                  sessionUUID.map { sessionId =>
+                    complete(publicApi.userNotificationsFor(sessionId))
+                  }.get
+                }
               }
           }
       } ~

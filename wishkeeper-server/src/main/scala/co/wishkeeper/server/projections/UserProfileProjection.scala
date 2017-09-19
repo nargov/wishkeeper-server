@@ -9,5 +9,5 @@ trait UserProfileProjection {
 }
 
 class ReplayingUserProfileProjection(dataStore: DataStore) extends UserProfileProjection {
-  def get(userId: UUID): UserProfile = User.replay2(dataStore.userEvents(userId)).userProfile
+  def get(userId: UUID): UserProfile = User.replay(dataStore.userEvents(userId)).userProfile
 }

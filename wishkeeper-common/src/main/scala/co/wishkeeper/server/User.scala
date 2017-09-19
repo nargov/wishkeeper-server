@@ -4,38 +4,45 @@ import java.util.UUID
 
 import co.wishkeeper.server.Events._
 
-case class User(id: UUID, userProfile: UserProfile = UserProfile(), friends: Friends = Friends(), wishes: Map[UUID, Wish] = Map.empty,
-                flags: Flags = Flags()) {
+case class User(id: UUID,
+                userProfile: UserProfile = UserProfile(),
+                friends: Friends = Friends(),
+                wishes: Map[UUID, Wish] = Map.empty,
+                flags: Flags = Flags(),
+                notifications: List[Notification] = Nil) {
 
-  def applyEvent(event: UserEvent): User = event match {
-    case UserFirstNameSet(_, value) => this.copy(userProfile = this.userProfile.copy(firstName = Option(value)))
-    case UserLastNameSet(_, value) => this.copy(userProfile = this.userProfile.copy(lastName = Option(value)))
-    case UserNameSet(_, value) => this.copy(userProfile = this.userProfile.copy(name = Option(value)))
-    case UserBirthdaySet(_, value) => this.copy(userProfile = this.userProfile.copy(birthday = Option(value)))
-    case UserEmailSet(_, value) => this.copy(userProfile = this.userProfile.copy(email = Option(value)))
-    case UserLocaleSet(_, value) => this.copy(userProfile = this.userProfile.copy(locale = Option(value)))
-    case UserGenderSet(_, value) => this.copy(userProfile = this.userProfile.copy(gender = Option(value)))
-    case UserTimeZoneSet(_, value) => this.copy(userProfile = this.userProfile.copy(timezone = Option(value)))
-    case UserAgeRangeSet(_, min, max) => this.copy(userProfile = this.userProfile.copy(ageRange = Option(AgeRange(min, max))))
-    case UserFacebookIdSet(_, fbId) => this.copy(userProfile = this.userProfile.copy(socialData =
+  def applyEvent(event: UserEventInstant): User = event match {
+    case UserEventInstant(UserFirstNameSet(_, value), _) => this.copy(userProfile = this.userProfile.copy(firstName = Option(value)))
+    case UserEventInstant(UserLastNameSet(_, value), _) => this.copy(userProfile = this.userProfile.copy(lastName = Option(value)))
+    case UserEventInstant(UserNameSet(_, value), _) => this.copy(userProfile = this.userProfile.copy(name = Option(value)))
+    case UserEventInstant(UserBirthdaySet(_, value), _) => this.copy(userProfile = this.userProfile.copy(birthday = Option(value)))
+    case UserEventInstant(UserEmailSet(_, value), _) => this.copy(userProfile = this.userProfile.copy(email = Option(value)))
+    case UserEventInstant(UserLocaleSet(_, value), _) => this.copy(userProfile = this.userProfile.copy(locale = Option(value)))
+    case UserEventInstant(UserGenderSet(_, value), _) => this.copy(userProfile = this.userProfile.copy(gender = Option(value)))
+    case UserEventInstant(UserTimeZoneSet(_, value), _) => this.copy(userProfile = this.userProfile.copy(timezone = Option(value)))
+    case UserEventInstant(UserAgeRangeSet(_, min, max), _) => this.copy(userProfile = this.userProfile.copy(ageRange = Option(AgeRange(min, max))))
+    case UserEventInstant(UserFacebookIdSet(_, fbId), _) => this.copy(userProfile = this.userProfile.copy(socialData =
       this.userProfile.socialData match {
         case Some(data) => Option(data.copy(facebookId = Option(fbId)))
         case None => Option(SocialData(Option(fbId)))
       }))
-    case UserPictureSet(_, link) => this.copy(userProfile = userProfile.copy(picture = Option(link)))
-    case FriendRequestSent(_, friendId) => this.copy(friends = this.friends.copy(requestSent = this.friends.requestSent :+ friendId))
-    case FriendRequestReceived(_, friendId) => this.copy(friends = this.friends.copy(requestReceived = this.friends.requestReceived :+ friendId))
-    case WishCreated(wishId, creator, creationTime) => updateWishProperty(wishId, _.withCreationTime(creationTime).withCreator(creator))
-    case WishNameSet(wishId, name) => updateWishProperty(wishId, _.withName(name))
-    case WishLinkSet(wishId, link) => updateWishProperty(wishId, _.withLink(link))
-    case WishPriceSet(wishId, price) => updateWishProperty(wishId, _.withPrice(price))
-    case WishCurrencySet(wishId, currency) => updateWishProperty(wishId, _.withCurrency(currency))
-    case WishStoreSet(wishId, store) => updateWishProperty(wishId, _.withStore(store))
-    case WishOtherInfoSet(wishId, info) => updateWishProperty(wishId, _.withOtherInfo(info))
-    case WishImageSet(wishId, imageLinks) => updateWishProperty(wishId, _.withImage(imageLinks))
-    case WishImageDeleted(wishId) => updateWishProperty(wishId, _.withoutImage)
-    case WishDeleted(wishId) => updateWishProperty(wishId, _.withStatus(WishStatus.Deleted))
-    case FacebookFriendsListSeen(seen) => this.copy(flags = flags.copy(seenFacebookFriendsList = seen))
+    case UserEventInstant(UserPictureSet(_, link), _) => this.copy(userProfile = userProfile.copy(picture = Option(link)))
+    case UserEventInstant(FriendRequestSent(_, friendId), _) => this.copy(
+      friends = this.friends.copy(requestSent = this.friends.requestSent :+ friendId))
+    case UserEventInstant(FriendRequestReceived(_, friendId), _) => this.copy(
+      friends = this.friends.copy(requestReceived = this.friends.requestReceived :+ friendId),
+      notifications = Notification(FriendRequestNotification(friendId)) :: notifications)
+    case UserEventInstant(WishCreated(wishId, creator, creationTime), _) => updateWishProperty(wishId, _.withCreationTime(creationTime).withCreator(creator))
+    case UserEventInstant(WishNameSet(wishId, name), _) => updateWishProperty(wishId, _.withName(name))
+    case UserEventInstant(WishLinkSet(wishId, link), _) => updateWishProperty(wishId, _.withLink(link))
+    case UserEventInstant(WishPriceSet(wishId, price), _) => updateWishProperty(wishId, _.withPrice(price))
+    case UserEventInstant(WishCurrencySet(wishId, currency), _) => updateWishProperty(wishId, _.withCurrency(currency))
+    case UserEventInstant(WishStoreSet(wishId, store), _) => updateWishProperty(wishId, _.withStore(store))
+    case UserEventInstant(WishOtherInfoSet(wishId, info), _) => updateWishProperty(wishId, _.withOtherInfo(info))
+    case UserEventInstant(WishImageSet(wishId, imageLinks), _) => updateWishProperty(wishId, _.withImage(imageLinks))
+    case UserEventInstant(WishImageDeleted(wishId), _) => updateWishProperty(wishId, _.withoutImage)
+    case UserEventInstant(WishDeleted(wishId), _) => updateWishProperty(wishId, _.withStatus(WishStatus.Deleted))
+    case UserEventInstant(FacebookFriendsListSeen(seen), _) => this.copy(flags = flags.copy(seenFacebookFriendsList = seen))
     case _ => this
   }
 
@@ -48,17 +55,10 @@ case class User(id: UUID, userProfile: UserProfile = UserProfile(), friends: Fri
 }
 
 object User {
-  def replay[T <: UserEvent](events: List[T]): User = {
-    events.headOption.map {
-      case UserConnected(userId, _, _) =>
-        events.foldLeft(User(userId))(_.applyEvent(_))
-    }.getOrElse(throw new IllegalArgumentException("Event stream does not begin with UserConnected"))
-  }
-
-  def replay2(events: List[UserEventInstant]): User = {
+  def replay(events: List[UserEventInstant]): User = {
     events.headOption.map {
       case UserEventInstant(UserConnected(userId, _, _), _) =>
-        events.foldLeft(User(userId))((user, instant) => user.applyEvent(instant.event))
+        events.foldLeft(User(userId))((user, instant) => user.applyEvent(instant))
     }.getOrElse(throw new IllegalArgumentException("Event stream does not begin with UserConnected"))
   }
 
@@ -66,4 +66,5 @@ object User {
 }
 
 case class Friends(current: List[UUID] = Nil, requestSent: List[UUID] = Nil, requestReceived: List[UUID] = Nil)
+
 case class Flags(seenFacebookFriendsList: Boolean = false)
