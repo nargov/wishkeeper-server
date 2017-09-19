@@ -6,7 +6,7 @@ import co.wishkeeper.server.FriendRequestNotificationStatus.Pending
 
 sealed trait NotificationData
 
-case class Notification(notificationData: NotificationData, viewed: Boolean = false)
+case class Notification(id: UUID, notificationData: NotificationData, viewed: Boolean = false)
 
 case class FriendRequestNotification(from: UUID, status: FriendRequestNotificationStatus = Pending) extends NotificationData
 

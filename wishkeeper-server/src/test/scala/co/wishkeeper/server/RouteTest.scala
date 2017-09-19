@@ -240,7 +240,7 @@ class RouteTest extends Specification with Specs2RouteTest with JMock {
       val friendId = randomUUID()
       val notificationData = FriendRequestNotification(friendId)
       checking {
-        allowing(publicApi).userNotificationsFor(sessionId).willReturn(List(Notification(notificationData)))
+        allowing(publicApi).userNotificationsFor(sessionId).willReturn(List(Notification(randomUUID(), notificationData)))
       }
 
       Get(s"/users/notifications").withHeaders(sessionIdHeader) ~> webApi.userRoute ~> check {

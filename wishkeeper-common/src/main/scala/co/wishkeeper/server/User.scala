@@ -30,8 +30,7 @@ case class User(id: UUID,
     case UserEventInstant(FriendRequestSent(_, friendId), _) => this.copy(
       friends = this.friends.copy(requestSent = this.friends.requestSent :+ friendId))
     case UserEventInstant(FriendRequestReceived(_, friendId), _) => this.copy(
-      friends = this.friends.copy(requestReceived = this.friends.requestReceived :+ friendId),
-      notifications = Notification(FriendRequestNotification(friendId)) :: notifications)
+      friends = this.friends.copy(requestReceived = this.friends.requestReceived :+ friendId))
     case UserEventInstant(WishCreated(wishId, creator, creationTime), _) => updateWishProperty(wishId, _.withCreationTime(creationTime).withCreator(creator))
     case UserEventInstant(WishNameSet(wishId, name), _) => updateWishProperty(wishId, _.withName(name))
     case UserEventInstant(WishLinkSet(wishId, link), _) => updateWishProperty(wishId, _.withLink(link))
@@ -43,6 +42,8 @@ case class User(id: UUID,
     case UserEventInstant(WishImageDeleted(wishId), _) => updateWishProperty(wishId, _.withoutImage)
     case UserEventInstant(WishDeleted(wishId), _) => updateWishProperty(wishId, _.withStatus(WishStatus.Deleted))
     case UserEventInstant(FacebookFriendsListSeen(seen), _) => this.copy(flags = flags.copy(seenFacebookFriendsList = seen))
+    case UserEventInstant(FriendRequestNotificationCreated(notificationId, _, from), _) => this.copy(
+      notifications = Notification(notificationId, FriendRequestNotification(from)) :: notifications)
     case _ => this
   }
 

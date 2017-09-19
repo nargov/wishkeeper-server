@@ -195,11 +195,12 @@ class UserTest extends Specification with MatcherMacros with JMock {
     user.seenFacebookFriends must beFalse
   }
 
-  "add Notification on FriendRequestReceived" in new Context {
-    val friend: User = User.createNew()
-    user.applyEvent(UserEventInstant(FriendRequestReceived(user.id, friend.id), now))
-      .notifications must contain(
-      Notification(FriendRequestNotification(from = friend.id, status = FriendRequestNotificationStatus.Pending)))
+  "apply FriendRequestNotificationCreated" in new Context {
+    private val friendId: UUID = randomUUID()
+    private val notificationId: UUID = randomUUID()
+    user.applyEvent(UserEventInstant(FriendRequestNotificationCreated(notificationId, user.id, friendId), now)).notifications.head must beEqualTo(
+      Notification(notificationId, FriendRequestNotification(friendId))
+    )
   }
 
   def haveCreationTime(time: DateTime): Matcher[Wish] = ===(time) ^^ {

@@ -2,7 +2,7 @@ package co.wishkeeper.server.projections
 
 import java.util.UUID
 
-import co.wishkeeper.server.Events.{Event, FriendRequestReceived, FriendRequestSent}
+import co.wishkeeper.server.Events.{Event, FriendRequestNotificationCreated, FriendRequestReceived, FriendRequestSent}
 import co.wishkeeper.server.{DataStore, EventProcessor, User}
 import org.joda.time.DateTime
 
@@ -13,7 +13,10 @@ class DataStoreIncomingFriendRequestsProjection(dataStore: DataStore) extends In
     event match {
       case FriendRequestSent(sender, userId) =>
         val lastSequenceNum = dataStore.lastSequenceNum(userId)
-        dataStore.saveUserEvents(userId, lastSequenceNum, DateTime.now(), FriendRequestReceived(userId, sender) :: Nil)
+        dataStore.saveUserEvents(userId, lastSequenceNum, DateTime.now(), List(
+          FriendRequestReceived(userId, sender),
+          FriendRequestNotificationCreated(UUID.randomUUID(), userId, sender)
+        ))
       case _ =>
     }
   }
