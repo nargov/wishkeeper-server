@@ -12,27 +12,31 @@ import scala.collection.JavaConverters._
 import scala.concurrent.ExecutionContextExecutor
 
 
-class WishkeeperServer{
+class WishkeeperServer {
   private val config = ConfigFactory.load()
-  private val dataStoreConfig = DataStoreConfig(config.getStringList("wishkeeper.datastore.urls").asScala.toList)
-  private val dataStore = new CassandraDataStore(dataStoreConfig)
-  private val userIdByFacebookIdProjection = new DataStoreUserIdByFacebookIdProjection(dataStore)
-  private val incomingFriendRequestsProjection = new DataStoreIncomingFriendRequestsProjection(dataStore)
-  private val commandProcessor: CommandProcessor = new UserCommandProcessor(dataStore,
-    List(userIdByFacebookIdProjection, incomingFriendRequestsProjection))
-  private val userProfileProjection: UserProfileProjection = new ReplayingUserProfileProjection(dataStore)
 
   private implicit val system = ActorSystem("web-api")
   private implicit val materializer = ActorMaterializer()
   private implicit val executionContext: ExecutionContextExecutor = system.dispatcher
 
+  private val dataStoreConfig = DataStoreConfig(config.getStringList("wishkeeper.datastore.urls").asScala.toList)
+  private val dataStore = new CassandraDataStore(dataStoreConfig)
+  private val userIdByFacebookIdProjection = new DataStoreUserIdByFacebookIdProjection(dataStore)
+  private val incomingFriendRequestsProjection = new DataStoreIncomingFriendRequestsProjection(dataStore)
+  private val notificationsProjection: NotificationsProjection = new DataStoreNotificationsProjection(dataStore)
+  private val commandProcessor: CommandProcessor = new UserCommandProcessor(dataStore, List(
+    userIdByFacebookIdProjection,
+    incomingFriendRequestsProjection,
+    notificationsProjection
+  ))
+  private val userProfileProjection: UserProfileProjection = new ReplayingUserProfileProjection(dataStore)
   private val facebookConnector: FacebookConnector = new AkkaHttpFacebookConnector(
     config.getString("wishkeeper.facebook.app-id"),
     config.getString("wishkeeper.facebook.app-secret"))
   private val userFriendsProjection: UserFriendsProjection = new DelegatingUserFriendsProjection(facebookConnector, userIdByFacebookIdProjection)
   private val imageStore: ImageStore = new GoogleCloudStorageImageStore(config.getString("wishkeeper.image-store.bucket-name"))
   private val publicApi = new DelegatingPublicApi(commandProcessor, dataStore, facebookConnector,
-    incomingFriendRequestsProjection, userProfileProjection, userFriendsProjection, imageStore)
+    incomingFriendRequestsProjection, userProfileProjection, userFriendsProjection, notificationsProjection, imageStore)
   private val managementApi: ManagementApi = new DelegatingManagementApi(userIdByFacebookIdProjection, userProfileProjection,
     dataStore, commandProcessor)
   private val webApi = new WebApi(publicApi, managementApi)

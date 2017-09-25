@@ -3,17 +3,15 @@ package co.wishkeeper.server
 import java.util.UUID
 import java.util.UUID.randomUUID
 
-import akka.http.scaladsl.model.StatusCode
 import co.wishkeeper.DataStoreTestHelper
 import co.wishkeeper.json._
 import co.wishkeeper.server.Commands.{ConnectFacebookUser, SendFriendRequest, SetWishDetails}
 import co.wishkeeper.server.HttpTestKit._
 import co.wishkeeper.server.projections.PotentialFriend
 import co.wishkeeper.test.utils.WishMatchers
-import io.circe.generic.auto._
-import org.joda.time.DateTime
+import io.circe.generic.extras.Configuration
+import io.circe.generic.extras.auto._
 import org.specs2.concurrent.ExecutionEnv
-import org.specs2.matcher.{AdaptableMatcher, MustThrownMatchers}
 import org.specs2.mutable.Specification
 import org.specs2.specification.BeforeAfterAll
 
@@ -23,6 +21,8 @@ import scala.language.postfixOps
 
 class WishkeeperServerIT(implicit ee: ExecutionEnv) extends Specification with BeforeAfterAll with ResponseMatchers with WishMatchers {
   sequential //TODO remove this when thread safe - see CommandProcessor FIXME for more details.
+
+  implicit val circeConfig = Configuration.default.withDefaults
 
   val dataStoreTestHelper = DataStoreTestHelper()
   val facebookTestHelper = new FacebookTestHelper
@@ -49,7 +49,7 @@ class WishkeeperServerIT(implicit ee: ExecutionEnv) extends Specification with B
     Post(s"$usersEndpoint/friends/request", SendFriendRequest(friends.head.userId), Map(user1SessionHeader)) must beOk
 
     eventually {
-      Get(s"$usersEndpoint/friends/requests/incoming", Map(user2SessionHeader)).to[List[UUID]] must have size 1
+      Get(s"$usersEndpoint/notifications", Map(user2SessionHeader)).to[List[Notification]] must have size 1
     }
   }
 

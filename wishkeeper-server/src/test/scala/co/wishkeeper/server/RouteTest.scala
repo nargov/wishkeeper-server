@@ -14,7 +14,8 @@ import co.wishkeeper.server.image.ImageMetadata
 import co.wishkeeper.server.projections.PotentialFriend
 import com.wixpress.common.specs2.JMock
 import de.heikoseeberger.akkahttpcirce.CirceSupport._
-import io.circe.generic.auto._
+import io.circe.generic.extras.Configuration
+import io.circe.generic.extras.auto._
 import io.circe.syntax._
 import org.specs2.matcher.Matcher
 import org.specs2.mutable.Specification
@@ -25,6 +26,8 @@ import scala.util.{Failure, Success}
 
 
 class RouteTest extends Specification with Specs2RouteTest with JMock {
+
+  implicit val circeConfig = Configuration.default.withDefaults
 
   trait ManagementContext extends Scope {
       val managementApi: ManagementApi = mock[ManagementApi]
@@ -131,18 +134,6 @@ class RouteTest extends Specification with Specs2RouteTest with JMock {
       }
     }
 
-    "return existing incoming friend requests" in new LoggedInUserContext {
-      val friendRequestSender: UUID = randomUUID()
-
-      checking {
-        oneOf(publicApi).incomingFriendRequestSenders(sessionId).willReturn(Some(List(friendRequestSender)))
-      }
-
-      Get("/users/friends/requests/incoming").withHeaders(sessionIdHeader) ~> webApi.userRoute ~> check {
-        responseAs[List[UUID]] must beEqualTo(List(friendRequestSender))
-      }
-    }
-
     "return user profile" in new LoggedInUserContext {
       val expectedProfile = UserProfile(
         socialData = Some(SocialData(Some("facebook-id"))),
@@ -245,7 +236,7 @@ class RouteTest extends Specification with Specs2RouteTest with JMock {
 
       Get(s"/users/notifications").withHeaders(sessionIdHeader) ~> webApi.userRoute ~> check {
         responseAs[List[Notification]] match {
-          case x :: xs => x.notificationData must beEqualTo(notificationData)
+          case x :: xs => x.data must beEqualTo(notificationData)
         }
       }
     }

@@ -10,7 +10,7 @@ import akka.stream.ActorMaterializer
 import co.wishkeeper.server.Commands._
 import co.wishkeeper.server._
 import co.wishkeeper.server.image._
-import co.wishkeeper.server.projections.{IncomingFriendRequestsProjection, PotentialFriend, UserFriendsProjection, UserProfileProjection}
+import co.wishkeeper.server.projections._
 
 import scala.concurrent.{ExecutionContext, Future}
 import scala.util.Try
@@ -32,8 +32,6 @@ trait PublicApi {
 
   def potentialFriendsFor(facebookAccessToken: String, sessionId: UUID): Option[Future[List[PotentialFriend]]]
 
-  def incomingFriendRequestSenders(sessionId: UUID): Option[List[UUID]]
-
   def uploadImage(inputStream: InputStream, imageMetadata: ImageMetadata, wishId: UUID, sessionId: UUID): Try[Unit]
 
   def uploadImage(url: String, imageMetadata: ImageMetadata, wishId: UUID, sessionId: UUID): Try[Unit]
@@ -47,6 +45,7 @@ class DelegatingPublicApi(commandProcessor: CommandProcessor,
                           incomingFriendRequestsProjection: IncomingFriendRequestsProjection,
                           userProfileProjection: UserProfileProjection,
                           userFriendsProjection: UserFriendsProjection,
+                          notificationsProjection: NotificationsProjection,
                           imageStore: ImageStore)
                          (implicit actorSystem: ActorSystem, ec: ExecutionContext, am: ActorMaterializer) extends PublicApi {
 
@@ -81,7 +80,7 @@ class DelegatingPublicApi(commandProcessor: CommandProcessor,
 
   override def wishListFor(sessionId: UUID): Option[UserWishes] = { //TODO missing tests here
     dataStore.userBySession(sessionId).map { userId =>
-      val wishList = User.replay(dataStore.userEvents(userId)).wishes.values.toList
+      val wishList = replayUser(userId).wishes.values.toList
       UserWishes(wishList.filter(_.status == WishStatus.Active).sortBy(_.creationTime.getMillis).reverse)
     }
   }
@@ -96,10 +95,6 @@ class DelegatingPublicApi(commandProcessor: CommandProcessor,
     }
   }
 
-  override def incomingFriendRequestSenders(sessionId: UUID): Option[List[UUID]] = {
-    dataStore.userBySession(sessionId).map(incomingFriendRequestsProjection.awaitingApproval)
-  }
-
   override def userProfileFor(sessionId: UUID): Option[UserProfile] = dataStore.userBySession(sessionId).map(userProfileProjection.get)
 
   override def potentialFriendsFor(facebookAccessToken: String, sessionId: UUID): Option[Future[List[PotentialFriend]]] = {
@@ -111,10 +106,22 @@ class DelegatingPublicApi(commandProcessor: CommandProcessor,
   }
 
   override def userFlagsFor(sessionId: UUID): Flags = {
-    dataStore.userBySession(sessionId).map { userId =>
-      User.replay(dataStore.userEvents(userId)).flags
-    }.getOrElse(throw new SessionNotFoundException(Option(sessionId)))
+    withValidSession(sessionId) { replayUser(_).flags }
   }
 
-  override def userNotificationsFor(sessionId: UUID): List[Notification] = ???
+  private def replayUser(userId: UUID) = User.replay(dataStore.userEvents(userId))
+
+  override def userNotificationsFor(sessionId: UUID): List[Notification] = {
+    withValidSession(sessionId) { notificationsProjection.notificationsFor }
+  }
+
+  def handleMissingSession(sessionId: UUID) = {
+    throw new SessionNotFoundException(Option(sessionId))
+  }
+
+  def withValidSession[T](sessionId: UUID)(f: UUID => T) =
+    dataStore.
+      userBySession(sessionId).
+      map(userId => f(userId)).
+      getOrElse(handleMissingSession(sessionId))
 }

@@ -83,10 +83,6 @@ class WebApi(publicApi: PublicApi, managementApi: ManagementApi)
                       publicApi.processCommand(sendFriendRequest, sessionUUID)
                       complete(StatusCodes.OK)
                     }
-                  } ~
-                  (path("requests" / "incoming") & get) {
-                    publicApi.incomingFriendRequestSenders(UUID.fromString(sessionId)).
-                      map(complete(_)).get //TODO test for rejection if user not found
                   }
               } ~
               pathPrefix("wishes") {
