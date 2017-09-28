@@ -4,6 +4,8 @@ import java.util.UUID
 import java.util.UUID.randomUUID
 
 import co.wishkeeper.server.Events._
+import co.wishkeeper.server.FriendRequestStatus.Approved
+import co.wishkeeper.server.UserTestHelper._
 import co.wishkeeper.test.utils.WishMatchers._
 import com.wixpress.common.specs2.JMock
 import org.joda.time.DateTime
@@ -99,15 +101,17 @@ class UserTest extends Specification with MatcherMacros with JMock {
   }
 
   "apply FriendRequestSent" in new Context {
-    private val potentialFriend = randomUUID()
-    val friendRequest = UserEventInstant(FriendRequestSent(user.id, potentialFriend), now)
-    user.applyEvent(friendRequest).friends.requestSent must contain(potentialFriend)
+    val potentialFriend = randomUUID()
+    val reqId = randomUUID()
+    val friendRequest = UserEventInstant(FriendRequestSent(user.id, potentialFriend, reqId), now)
+    user.applyEvent(friendRequest).friends.sentRequests must contain(FriendRequest(reqId, potentialFriend, user.id))
   }
 
   "apply FriendRequestReceived" in new Context {
-    private val potentialFriend = randomUUID()
-    val friendRequest = UserEventInstant(FriendRequestReceived(user.id, potentialFriend), now)
-    user.applyEvent(friendRequest).friends.requestReceived must contain(potentialFriend)
+    val potentialFriend = randomUUID()
+    val reqId: UUID = randomUUID()
+    val friendRequest = UserEventInstant(FriendRequestReceived(user.id, potentialFriend, reqId), now)
+    user.applyEvent(friendRequest).friends.receivedRequests must contain(FriendRequest(reqId, user.id, potentialFriend))
   }
 
   "apply WishNameSet" in new Context {
@@ -198,10 +202,41 @@ class UserTest extends Specification with MatcherMacros with JMock {
   "apply FriendRequestNotificationCreated" in new Context {
     private val friendId: UUID = randomUUID()
     private val notificationId: UUID = randomUUID()
-    user.applyEvent(UserEventInstant(FriendRequestNotificationCreated(notificationId, user.id, friendId), now)).notifications.head must beEqualTo(
-      Notification(notificationId, FriendRequestNotification(friendId))
+    private val requestId: UUID = randomUUID()
+    user.
+      applyEvent(UserEventInstant(FriendRequestNotificationCreated(notificationId, user.id, friendId, requestId), now)).
+      notifications.head must beEqualTo(Notification(notificationId, FriendRequestNotification(friendId, requestId), time = now)
     )
   }
+
+  "add friend to friends list when approved" in new Context {
+    val friendId: UUID = randomUUID()
+    val userWithFriend = user.withFriend(friendId)
+
+    userWithFriend.friends.current must contain(friendId)
+  }
+
+  "remove friend request when status changes" in new Context {
+    user.withFriend(randomUUID()).friends.receivedRequests must beEmpty
+  }
+
+  "Change friend request notification status when request status changes" in new Context {
+    private val requestId: UUID = randomUUID()
+    private val friendId: UUID = randomUUID()
+    user.withFriend(friendId, requestId).notifications must
+      contain(aNotificationWith(aFriendRequestNotificationWithStatus(Approved)))
+  }
+
+  //noinspection MatchToPartialFunction
+  def aFriendRequestNotificationWithStatus(expectedStatus: FriendRequestStatus): Matcher[NotificationData] =
+    (data: NotificationData) => data match {
+      case FriendRequestNotification(_, _, status, _) =>
+        (status == expectedStatus, s"Friend request notification status $status was not $expectedStatus")
+      case _ => (false, "Notification is not a FriendRequestNotification")
+    }
+
+  def aNotificationWith(matcher: Matcher[NotificationData]): Matcher[Notification] = (notification: Notification) =>
+    matcher(createExpectable(notification.data))
 
   def haveCreationTime(time: DateTime): Matcher[Wish] = ===(time) ^^ {
     (_: Wish).creationTime

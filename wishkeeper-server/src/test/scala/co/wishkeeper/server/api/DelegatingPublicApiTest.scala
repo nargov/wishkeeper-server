@@ -3,8 +3,9 @@ package co.wishkeeper.server.api
 import java.util.UUID
 import java.util.UUID.randomUUID
 
-import co.wishkeeper.server.Events.{FacebookFriendsListSeen, FriendRequestNotificationCreated, UserConnected}
-import co.wishkeeper.server.EventsTestHelper.{asEventInstants, userConnectEvent}
+import co.wishkeeper.server.Commands.ChangeFriendRequestStatus
+import co.wishkeeper.server.Events.{FacebookFriendsListSeen, UserConnected}
+import co.wishkeeper.server.FriendRequestStatus.{Approved, Ignored}
 import co.wishkeeper.server._
 import co.wishkeeper.server.projections.NotificationsProjection
 import com.wixpress.common.specs2.JMock
@@ -15,21 +16,7 @@ import org.specs2.specification.Scope
 
 class DelegatingPublicApiTest extends Specification with JMock {
 
-  trait Context extends Scope {
-    val sessionId: UUID = randomUUID()
-    val userId: UUID = randomUUID()
-    val dataStore: DataStore = mock[DataStore]
-    val notificationsProjection = mock[NotificationsProjection]
-    val api: PublicApi = new DelegatingPublicApi(null, dataStore, null, null, null, null, notificationsProjection, null)(null, null, null)
-
-    def assumingUserHasSession() = checking {
-      allowing(dataStore).userBySession(sessionId).willReturn(Option(userId))
-    }
-  }
-
-  "returns the flags for user by the given session" in new Context {
-    assumingUserHasSession()
-
+  "returns the flags for user by the given session" in new LoggedInContext {
     checking {
       allowing(dataStore).userEvents(userId).willReturn(List(
         UserEventInstant(UserConnected(userId, sessionId = sessionId), DateTime.now()),
@@ -48,16 +35,52 @@ class DelegatingPublicApiTest extends Specification with JMock {
     api.userFlagsFor(sessionId) must throwA[SessionNotFoundException]
   }
 
-  "returns user notifications" in new Context {
-    val sender: UUID = randomUUID()
-    private val notificationData = FriendRequestNotification(sender)
-    assumingUserHasSession()
-
+  "returns user notifications" in new LoggedInContext {
     checking {
       allowing(notificationsProjection).notificationsFor(userId).willReturn(List(Notification(randomUUID(), notificationData)))
     }
 
     api.userNotificationsFor(sessionId) must contain(aNotificationWith(notificationData, viewed = false))
+  }
+
+  "approve friend request" in new LoggedInContext {
+    val requestId = randomUUID()
+
+    checking {
+      oneOf(commandProcessor).process(ChangeFriendRequestStatus(requestId, Approved), userId)
+    }
+
+    api.approveFriendRequest(sessionId, requestId)
+  }
+
+  "ignore friend request" in new LoggedInContext {
+    val requestId = randomUUID()
+
+    checking {
+      oneOf(commandProcessor).process(ChangeFriendRequestStatus(requestId, Ignored), userId)
+    }
+
+    api.ignoreFriendRequest(sessionId, requestId)
+  }
+
+  trait Context extends Scope {
+    val sessionId: UUID = randomUUID()
+    val userId: UUID = randomUUID()
+    val dataStore: DataStore = mock[DataStore]
+    val notificationsProjection = mock[NotificationsProjection]
+    val commandProcessor = mock[CommandProcessor]
+    val api: PublicApi = new DelegatingPublicApi(
+      commandProcessor,
+      dataStore, null, null, null, null, notificationsProjection, null)(null, null, null)
+    val sender: UUID = randomUUID()
+    val friendRequestId = randomUUID()
+    val notificationData = FriendRequestNotification(sender, friendRequestId)
+  }
+
+  trait LoggedInContext extends Context {
+    checking {
+      allowing(dataStore).userBySession(sessionId).willReturn(Option(userId))
+    }
   }
 
   def aNotificationWith(data: NotificationData, viewed: Boolean): Matcher[Notification] = (notification: Notification) =>

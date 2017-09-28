@@ -3,6 +3,8 @@ package co.wishkeeper.server
 import java.util.UUID
 
 import co.wishkeeper.server.Events._
+import co.wishkeeper.server.FriendRequestStatus.{Approved, Pending}
+import co.wishkeeper.server.projections.NotificationsProjection
 import org.joda.time.DateTime
 
 object Commands {
@@ -89,5 +91,14 @@ object Commands {
 
   case class SetFlagFacebookFriendsListSeen(seen: Boolean = true) extends UserCommand {
     override def process(user: User): List[UserEvent] = FacebookFriendsListSeen(seen) :: Nil
+  }
+
+  case class ChangeFriendRequestStatus(requestId: UUID, status: FriendRequestStatus) extends UserCommand {
+    override def process(user: User): List[UserEvent] = {
+      user.friends.receivedRequests.
+        find(_.id == requestId).
+        map(request => FriendRequestStatusChanged(user.id, requestId, request.from, status) :: Nil).
+        getOrElse(Nil)
+    }
   }
 }

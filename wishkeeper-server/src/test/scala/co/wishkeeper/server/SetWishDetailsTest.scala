@@ -88,18 +88,3 @@ class SetWishDetailsTest extends Specification {
     }), s"$eventList does not contain WishCreated($wishId, $createdBy, any[DateTime])")
   }
 }
-
-
-object UserTestHelper {
-  def aUser: User = {
-    val id = UUID.randomUUID()
-    User(id).applyEvent(UserEventInstant(UserConnected(id, DateTime.now().minusDays(1), UUID.randomUUID()), DateTime.now().minusDays(1)))
-  }
-
-  implicit class TestUserOps(user: User){
-    def withWish(id: UUID = UUID.randomUUID()) = {
-      val now = DateTime.now()
-      user.applyEvent(UserEventInstant(WishCreated(id, user.id, now), now))
-    }
-  }
-}

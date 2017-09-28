@@ -17,6 +17,7 @@ class DataStoreNotificationsProjectionTest extends Specification with JMock {
   trait Context extends Scope {
     val userId = randomUUID()
     val senderId = randomUUID()
+    val friendReqId = randomUUID()
     val dataStore = mock[DataStore]
     val projection = new DataStoreNotificationsProjection(dataStore)
 
@@ -53,17 +54,19 @@ class DataStoreNotificationsProjectionTest extends Specification with JMock {
       )))
       allowing(dataStore).userEvents(userId).willReturn(asEventInstants(List(
         userConnectEvent(senderId),
-        FriendRequestNotificationCreated(notificationId, userId, senderId)
+        FriendRequestNotificationCreated(notificationId, userId, senderId, friendReqId)
       )))
     }
 
-    projection.notificationsFor(userId) must contain(Notification(
-      notificationId, FriendRequestNotification(senderId, profile = Option(senderProfile))))
+    projection.notificationsFor(userId) must contain(notificationIgnoringTime(Notification(
+      notificationId, FriendRequestNotification(senderId, requestId = friendReqId, profile = Option(senderProfile)))))
   }
 
   def aFriendRequestNotificationCreatedEvent(userId: UUID, from: UUID): Matcher[UserEvent] = (event: UserEvent) => (event match {
-    case FriendRequestNotificationCreated(_, uId, sender) => uId == userId && sender == from
+    case FriendRequestNotificationCreated(_, uId, sender, reqId) => uId == userId && sender == from
     case _ => false
   }, s"$event does not have userId $userId and from $from")
+
+  def notificationIgnoringTime = (===(_: Notification)) ^^^ ((_:Notification).copy(time = new DateTime(0)))
 
 }

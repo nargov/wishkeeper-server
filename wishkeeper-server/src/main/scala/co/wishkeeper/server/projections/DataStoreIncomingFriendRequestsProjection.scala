@@ -1,6 +1,7 @@
 package co.wishkeeper.server.projections
 
 import java.util.UUID
+import java.util.UUID.randomUUID
 
 import co.wishkeeper.server.Events.{Event, FriendRequestNotificationCreated, FriendRequestReceived, FriendRequestSent}
 import co.wishkeeper.server._
@@ -10,10 +11,10 @@ trait IncomingFriendRequestsProjection
 
 class DataStoreIncomingFriendRequestsProjection(dataStore: DataStore) extends IncomingFriendRequestsProjection with EventProcessor {
   override def process(event: Event): Unit = event match {
-    case FriendRequestSent(sender, userId) =>
+    case FriendRequestSent(sender, userId, id) =>
       val lastSequenceNum = dataStore.lastSequenceNum(userId)
       dataStore.saveUserEvents(userId, lastSequenceNum, DateTime.now(), List(
-        FriendRequestReceived(userId, sender)
+        FriendRequestReceived(userId, sender, id)
       ))
     case _ =>
   }
@@ -25,10 +26,10 @@ trait NotificationsProjection extends EventProcessor {
 
 class DataStoreNotificationsProjection(dataStore: DataStore) extends NotificationsProjection {
   override def process(event: Event): Unit = event match {
-    case FriendRequestSent(sender, userId) =>
+    case FriendRequestSent(sender, userId, id) =>
       val lastSeqNum = dataStore.lastSequenceNum(userId)
       dataStore.saveUserEvents(userId, lastSeqNum, DateTime.now(), List(
-        FriendRequestNotificationCreated(UUID.randomUUID(), userId, sender)
+        FriendRequestNotificationCreated(randomUUID(), userId, sender, id)
       ))
     case _ =>
   }

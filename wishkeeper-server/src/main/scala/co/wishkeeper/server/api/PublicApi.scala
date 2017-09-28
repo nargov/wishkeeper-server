@@ -8,6 +8,7 @@ import java.util.UUID
 import akka.actor.ActorSystem
 import akka.stream.ActorMaterializer
 import co.wishkeeper.server.Commands._
+import co.wishkeeper.server.FriendRequestStatus.{Approved, Ignored}
 import co.wishkeeper.server._
 import co.wishkeeper.server.image._
 import co.wishkeeper.server.projections._
@@ -15,7 +16,13 @@ import co.wishkeeper.server.projections._
 import scala.concurrent.{ExecutionContext, Future}
 import scala.util.Try
 
+case class Reason(message: String)
+
 trait PublicApi {
+  def ignoreFriendRequest(sessionId: UUID, reqId: UUID): Unit
+
+  def approveFriendRequest(sessionId: UUID, reqId: UUID): Unit
+
   def userNotificationsFor(sessionId: UUID): List[Notification]
 
   def userFlagsFor(sessionId: UUID): Flags
@@ -106,13 +113,17 @@ class DelegatingPublicApi(commandProcessor: CommandProcessor,
   }
 
   override def userFlagsFor(sessionId: UUID): Flags = {
-    withValidSession(sessionId) { replayUser(_).flags }
+    withValidSession(sessionId) {
+      replayUser(_).flags
+    }
   }
 
   private def replayUser(userId: UUID) = User.replay(dataStore.userEvents(userId))
 
   override def userNotificationsFor(sessionId: UUID): List[Notification] = {
-    withValidSession(sessionId) { notificationsProjection.notificationsFor }
+    withValidSession(sessionId) {
+      notificationsProjection.notificationsFor
+    }
   }
 
   def handleMissingSession(sessionId: UUID) = {
@@ -124,4 +135,12 @@ class DelegatingPublicApi(commandProcessor: CommandProcessor,
       userBySession(sessionId).
       map(userId => f(userId)).
       getOrElse(handleMissingSession(sessionId))
+
+  override def approveFriendRequest(sessionId: UUID, reqId: UUID): Unit = {
+    withValidSession(sessionId) { commandProcessor.process(ChangeFriendRequestStatus(reqId, Approved), _) }
+  }
+
+  override def ignoreFriendRequest(sessionId: UUID, reqId: UUID): Unit = {
+    withValidSession(sessionId) { commandProcessor.process(ChangeFriendRequestStatus(reqId, Ignored), _) }
+  }
 }

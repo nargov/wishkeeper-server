@@ -229,7 +229,8 @@ class RouteTest extends Specification with Specs2RouteTest with JMock {
 
     "get notifications" in new LoggedInUserContext {
       val friendId = randomUUID()
-      val notificationData = FriendRequestNotification(friendId)
+      val requestId = randomUUID()
+      val notificationData = FriendRequestNotification(friendId, requestId)
       checking {
         allowing(publicApi).userNotificationsFor(sessionId).willReturn(List(Notification(randomUUID(), notificationData)))
       }
@@ -238,6 +239,32 @@ class RouteTest extends Specification with Specs2RouteTest with JMock {
         responseAs[List[Notification]] match {
           case x :: xs => x.data must beEqualTo(notificationData)
         }
+      }
+    }
+
+    "approve friend request" in new LoggedInUserContext {
+      val reqId = randomUUID()
+
+      checking {
+        allowing(publicApi).approveFriendRequest(sessionId, reqId)
+      }
+
+      Post(s"/users/notifications/friendreq/$reqId/approve").withHeaders(sessionIdHeader) ~> webApi.userRoute ~> check {
+        handled must beTrue
+        status must beEqualTo(StatusCodes.OK)
+      }
+    }
+
+    "ignore friend request" in new LoggedInUserContext {
+      val reqId = randomUUID()
+
+      checking {
+        allowing(publicApi).ignoreFriendRequest(sessionId, reqId)
+      }
+
+      Post(s"/users/notifications/friendreq/$reqId/ignore").withHeaders(sessionIdHeader) ~> webApi.userRoute ~> check {
+        handled must beTrue
+        status must beEqualTo(StatusCodes.OK)
       }
     }
   }

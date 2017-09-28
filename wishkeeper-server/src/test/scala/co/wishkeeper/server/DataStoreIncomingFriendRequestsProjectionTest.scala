@@ -16,7 +16,10 @@ class DataStoreIncomingFriendRequestsProjectionTest extends Specification with J
     val senderId = UUID.randomUUID()
     val dataStore = mock[DataStore]
     val projection = new DataStoreIncomingFriendRequestsProjection(dataStore)
-    def processFriendRequest() = projection.process(FriendRequestSent(senderId, userId))
+    val friendRequestSent = FriendRequestSent(senderId, userId)
+    def processFriendRequest() = {
+      projection.process(friendRequestSent)
+    }
 
     def assumeExistingEvents() = checking {
       allowing(dataStore).lastSequenceNum(userId).willReturn(Some(5L))
@@ -30,7 +33,7 @@ class DataStoreIncomingFriendRequestsProjectionTest extends Specification with J
         having(equalTo(userId)),
         having(any[Option[Long]]),
         having(any[DateTime]),
-        having(contain(FriendRequestReceived(userId, senderId))))
+        having(contain(FriendRequestReceived(userId, senderId, friendRequestSent.id))))
     }
 
     processFriendRequest()

@@ -166,7 +166,23 @@ class WebApi(publicApi: PublicApi, managementApi: ManagementApi)
                   sessionUUID.map { sessionId =>
                     complete(publicApi.userNotificationsFor(sessionId))
                   }.get
-                }
+                } ~
+                  pathPrefix("friendreq" / JavaUUID) { reqId =>
+                    post {
+                      path("approve") {
+                        sessionUUID.map { sessionId =>
+                          publicApi.approveFriendRequest(sessionId, reqId)
+                          complete(StatusCodes.OK)
+                        }.get
+                      } ~
+                        path("ignore") {
+                          sessionUUID.map { sessionId =>
+                            publicApi.ignoreFriendRequest(sessionId, reqId)
+                            complete(StatusCodes.OK)
+                          }.get
+                        }
+                    }
+                  }
               }
           }
       } ~

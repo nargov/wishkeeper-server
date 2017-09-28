@@ -3,6 +3,7 @@ package co.wishkeeper.server
 import java.util.UUID
 
 import co.wishkeeper.server.Events._
+import co.wishkeeper.server.FriendRequestStatus.{Approved, Pending}
 
 case class User(id: UUID,
                 userProfile: UserProfile = UserProfile(),
@@ -27,11 +28,13 @@ case class User(id: UUID,
         case None => Option(SocialData(Option(fbId)))
       }))
     case UserEventInstant(UserPictureSet(_, link), _) => this.copy(userProfile = userProfile.copy(picture = Option(link)))
-    case UserEventInstant(FriendRequestSent(_, friendId), _) => this.copy(
-      friends = this.friends.copy(requestSent = this.friends.requestSent :+ friendId))
-    case UserEventInstant(FriendRequestReceived(_, friendId), _) => this.copy(
-      friends = this.friends.copy(requestReceived = this.friends.requestReceived :+ friendId))
-    case UserEventInstant(WishCreated(wishId, creator, creationTime), _) => updateWishProperty(wishId, _.withCreationTime(creationTime).withCreator(creator))
+    case UserEventInstant(FriendRequestSent(_, friendId, reqId), _) => this.copy(
+      friends = this.friends.copy(sentRequests = this.friends.sentRequests :+ FriendRequest(reqId, friendId, id)))
+    case UserEventInstant(FriendRequestReceived(_, friendId, reqId), _) => this.copy(friends = this.friends.copy(
+      receivedRequests = this.friends.receivedRequests :+ FriendRequest(reqId, id, friendId)
+    ))
+    case UserEventInstant(WishCreated(wishId, creator, creationTime), _) =>
+      updateWishProperty(wishId, _.withCreationTime(creationTime).withCreator(creator))
     case UserEventInstant(WishNameSet(wishId, name), _) => updateWishProperty(wishId, _.withName(name))
     case UserEventInstant(WishLinkSet(wishId, link), _) => updateWishProperty(wishId, _.withLink(link))
     case UserEventInstant(WishPriceSet(wishId, price), _) => updateWishProperty(wishId, _.withPrice(price))
@@ -42,8 +45,21 @@ case class User(id: UUID,
     case UserEventInstant(WishImageDeleted(wishId), _) => updateWishProperty(wishId, _.withoutImage)
     case UserEventInstant(WishDeleted(wishId), _) => updateWishProperty(wishId, _.withStatus(WishStatus.Deleted))
     case UserEventInstant(FacebookFriendsListSeen(seen), _) => this.copy(flags = flags.copy(seenFacebookFriendsList = seen))
-    case UserEventInstant(FriendRequestNotificationCreated(notificationId, _, from), time) => this.copy(
-      notifications = Notification(notificationId, FriendRequestNotification(from), time = time) :: notifications)
+    case UserEventInstant(FriendRequestNotificationCreated(notificationId, _, from, reqId), time) => this.copy(
+      notifications = Notification(notificationId, FriendRequestNotification(from, reqId), time = time) :: notifications)
+    case UserEventInstant(FriendRequestStatusChanged(_, reqId, from, toStatus), _) => this.copy(
+      friends = friends.copy( //TODO
+        receivedRequests = friends.receivedRequests.filterNot(_.id == reqId),
+        current = toStatus match {
+          case Approved => friends.current :+ from
+          case _ => friends.current
+        }),
+      notifications = notifications.map {
+        case n@Notification(_, FriendRequestNotification(_, friendReqId, status, _), _, _) if friendReqId == reqId && status == Pending =>
+          n.copy(data = n.data.asInstanceOf[FriendRequestNotification].copy(status = toStatus))
+        case n => n
+      }
+    )
     case _ => this
   }
 
@@ -66,6 +82,8 @@ object User {
   def createNew() = new User(UUID.randomUUID())
 }
 
-case class Friends(current: List[UUID] = Nil, requestSent: List[UUID] = Nil, requestReceived: List[UUID] = Nil)
+case class Friends(current: List[UUID] = Nil,
+                   sentRequests: List[FriendRequest] = Nil,
+                   receivedRequests: List[FriendRequest] = Nil)
 
 case class Flags(seenFacebookFriendsList: Boolean = false)
