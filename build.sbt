@@ -13,7 +13,6 @@ lazy val integrationSettings = inConfig(IntegrationTest)(Defaults.itSettings) ++
 )
 
 lazy val commonSettings = Seq(
-  version := "1.0.8",
   organization := "co.wishkeeper",
   scalaVersion := scalaVer,
   scalacOptions ++= Seq("-deprecation", "-feature"),

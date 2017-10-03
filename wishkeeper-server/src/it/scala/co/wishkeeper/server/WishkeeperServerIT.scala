@@ -126,6 +126,10 @@ class WishkeeperServerIT(implicit ee: ExecutionEnv) extends Specification with B
   }
 
   override def beforeAll(): Unit = {
+    println("***************************************")
+    println("*****  WishkeeperServerIT Starts  *****")
+    println("***************************************")
+
     CassandraDocker.start()
     dataStoreTestHelper.start()
     dataStoreTestHelper.createSchema()
@@ -134,5 +138,9 @@ class WishkeeperServerIT(implicit ee: ExecutionEnv) extends Specification with B
 
   override def afterAll(): Unit = {
     dataStoreTestHelper.stop()
+    server.stop()
+    println("***************************************")
+    println("******  WishkeeperServerIT Ends  (*****")
+    println("***************************************")
   }
 }
