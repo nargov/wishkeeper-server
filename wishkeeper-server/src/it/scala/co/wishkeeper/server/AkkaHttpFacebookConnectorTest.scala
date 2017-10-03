@@ -6,7 +6,6 @@ import akka.actor.ActorSystem
 import akka.stream.ActorMaterializer
 import co.wishkeeper.server.FacebookTestHelper.{testAppId, testAppSecret}
 import com.typesafe.config.{ConfigFactory, ConfigValueFactory}
-import org.joda.time.DateTime
 import org.specs2.concurrent.ExecutionEnv
 import org.specs2.matcher.Matcher
 import org.specs2.mutable.Specification
@@ -15,6 +14,7 @@ import org.specs2.specification.{AfterAll, Scope}
 import scala.concurrent.duration._
 
 class AkkaHttpFacebookConnectorTest extends Specification with AfterAll {
+  sequential
 
   implicit val executionEnv: ExecutionEnv = ExecutionEnv.fromExecutionContext(ExecutionEnv.createExecutionContext(
     Executors.newCachedThreadPool(), verbose = false, println))

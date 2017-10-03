@@ -24,10 +24,16 @@ class WishkeeperServer {
   private val userIdByFacebookIdProjection = new DataStoreUserIdByFacebookIdProjection(dataStore)
   private val incomingFriendRequestsProjection = new DataStoreIncomingFriendRequestsProjection(dataStore)
   private val notificationsProjection: NotificationsProjection = new DataStoreNotificationsProjection(dataStore)
+
+  // TODO the following projection is probably not necessary.
+  // The only reason it exists now is so that events are created for a different user.
+  // Rethink the way command creates events - can a command create events for multiple aggregate roots (users)?
+  private val friendRequestsProjection = new DataStoreFriendRequestsProjection(dataStore)
   private val commandProcessor: CommandProcessor = new UserCommandProcessor(dataStore, List(
     userIdByFacebookIdProjection,
     incomingFriendRequestsProjection,
-    notificationsProjection
+    notificationsProjection,
+    friendRequestsProjection
   ))
   private val userProfileProjection: UserProfileProjection = new ReplayingUserProfileProjection(dataStore)
   private val facebookConnector: FacebookConnector = new AkkaHttpFacebookConnector(

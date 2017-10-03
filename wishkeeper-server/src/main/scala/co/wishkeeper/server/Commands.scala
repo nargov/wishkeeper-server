@@ -3,8 +3,6 @@ package co.wishkeeper.server
 import java.util.UUID
 
 import co.wishkeeper.server.Events._
-import co.wishkeeper.server.FriendRequestStatus.{Approved, Pending}
-import co.wishkeeper.server.projections.NotificationsProjection
 import org.joda.time.DateTime
 
 object Commands {
@@ -101,4 +99,5 @@ object Commands {
         getOrElse(Nil)
     }
   }
+
 }

@@ -35,6 +35,16 @@ object UserTestHelper {
         applyEvent(asEventInstant(FriendRequestStatusChanged(user.id, reqId, friendId, Approved)))
     }
 
+    def withSentFriendRequest(reqId: UUID, friend: UUID): User = {
+      user.
+        applyEvent(asEventInstant(FriendRequestSent(user.id, friend, reqId)))
+    }
+
+    def withSentFriendRequestAccepted(reqId: UUID, friend: UUID): User = {
+      user.withSentFriendRequest(reqId, friend).
+        applyEvent(asEventInstant(FriendRequestStatusChanged(user.id, reqId, user.id, Approved)))
+    }
+
   }
 
 }

@@ -48,10 +48,11 @@ case class User(id: UUID,
     case UserEventInstant(FriendRequestNotificationCreated(notificationId, _, from, reqId), time) => this.copy(
       notifications = Notification(notificationId, FriendRequestNotification(from, reqId), time = time) :: notifications)
     case UserEventInstant(FriendRequestStatusChanged(_, reqId, from, toStatus), _) => this.copy(
-      friends = friends.copy( //TODO
-        receivedRequests = friends.receivedRequests.filterNot(_.id == reqId),
+      friends = friends.copy(
+        receivedRequests = if (from != id) friends.receivedRequests.filterNot(_.id == reqId) else friends.receivedRequests,
+        sentRequests = if (from == id) friends.sentRequests.filterNot(_.id == reqId) else friends.sentRequests,
         current = toStatus match {
-          case Approved => friends.current :+ from
+          case Approved => friends.current :+ (if(from == id) friends.sentRequests.find(_.id == reqId).map(_.userId).get else from)
           case _ => friends.current
         }),
       notifications = notifications.map {
@@ -60,6 +61,8 @@ case class User(id: UUID,
         case n => n
       }
     )
+    case UserEventInstant(FriendRequestAcceptedNotificationCreated(notificationId, _, by, requestId), time) => this.copy(
+      notifications = Notification(notificationId, FriendRequestAcceptedNotification(by, requestId), time = time) :: notifications)
     case _ => this
   }
 

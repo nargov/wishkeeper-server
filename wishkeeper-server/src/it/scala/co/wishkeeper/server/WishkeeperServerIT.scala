@@ -6,20 +6,22 @@ import java.util.UUID.randomUUID
 import co.wishkeeper.DataStoreTestHelper
 import co.wishkeeper.json._
 import co.wishkeeper.server.Commands.{ConnectFacebookUser, SendFriendRequest, SetWishDetails}
+import co.wishkeeper.server.FriendRequestStatus.Pending
 import co.wishkeeper.server.HttpTestKit._
 import co.wishkeeper.server.projections.PotentialFriend
 import co.wishkeeper.test.utils.WishMatchers
 import io.circe.generic.extras.Configuration
 import io.circe.generic.extras.auto._
 import org.specs2.concurrent.ExecutionEnv
-import org.specs2.mutable.Specification
-import org.specs2.specification.BeforeAfterAll
+import org.specs2.mutable.{BeforeAfter, Specification}
+import org.specs2.specification.{BeforeAfterAll, Scope}
 
 import scala.concurrent.Future
 import scala.concurrent.duration._
 import scala.language.postfixOps
 
-class WishkeeperServerIT(implicit ee: ExecutionEnv) extends Specification with BeforeAfterAll with ResponseMatchers with WishMatchers {
+class WishkeeperServerIT(implicit ee: ExecutionEnv) extends Specification with BeforeAfterAll with ResponseMatchers
+  with WishMatchers with NotificationMatchers {
   sequential //TODO remove this when thread safe - see CommandProcessor FIXME for more details.
 
   implicit val circeConfig = Configuration.default.withDefaults
@@ -33,7 +35,18 @@ class WishkeeperServerIT(implicit ee: ExecutionEnv) extends Specification with B
 
   var testUsers: List[TestFacebookUser] = _
 
-  "User should be able to send a friend request" in {
+  trait Context extends Scope with BeforeAfter {
+    override def after = {
+      facebookTestHelper.deleteTestUsers()
+    }
+
+    override def before = {
+      testUsers = facebookTestHelper.createTestUsers(2, installApp = true)
+      facebookTestHelper.makeFriends(testUsers.head, testUsers.tail)
+    }
+  }
+
+  "User should be able to send a friend request" in new Context {
     val connectRequests: Seq[ConnectFacebookUser] = testUsers.map(user => ConnectFacebookUser(user.id, user.access_token, randomUUID()))
     val user1Connect :: user2Connect :: Nil = connectRequests
     Future.sequence(connectRequests.map(Post.async(s"$usersEndpoint/connect/facebook", _))) must forall(beOk).await(20, 0.5.seconds)
@@ -49,11 +62,12 @@ class WishkeeperServerIT(implicit ee: ExecutionEnv) extends Specification with B
     Post(s"$usersEndpoint/friends/request", SendFriendRequest(friends.head.userId), Map(user1SessionHeader)) must beOk
 
     eventually {
-      Get(s"$usersEndpoint/notifications", Map(user2SessionHeader)).to[List[Notification]] must have size 1
+      Get(s"$usersEndpoint/notifications", Map(user2SessionHeader)).to[List[Notification]] must contain(
+        aNotificationWith(aFriendRequestNotificationWithStatus(Pending)))
     }
   }
 
-  "User should be able to save Wish details" in {
+  "User should be able to save Wish details" in new Context {
     val facebookUser = testUsers.head
     val sessionId = randomUUID()
 
@@ -68,7 +82,7 @@ class WishkeeperServerIT(implicit ee: ExecutionEnv) extends Specification with B
     response.to[List[Wish]] must contain(beEqualToIgnoringDates(wish.withCreator(userId)))
   }
 
-  "Upload a wish image" in {
+  "Upload a wish image" in new Context {
     val facebookUser = testUsers.head
     val sessionId = randomUUID()
     val testImage = TestImage.large()
@@ -91,18 +105,34 @@ class WishkeeperServerIT(implicit ee: ExecutionEnv) extends Specification with B
     maybeResponses must beSome(contain(beSuccessful))
   }
 
+  "Get a notification when friend approves friend request" in new Context {
+    val connectRequests: Seq[ConnectFacebookUser] = testUsers.map(user => ConnectFacebookUser(user.id, user.access_token, randomUUID()))
+    val user1Connect :: user2Connect :: Nil = connectRequests
+    Future.sequence(connectRequests.map(Post.async(s"$usersEndpoint/connect/facebook", _))) must forall(beOk).await(20, 0.5.seconds)
+
+    val user1SessionHeader = WebApi.sessionIdHeader -> user1Connect.sessionId.toString
+    val user2SessionHeader = WebApi.sessionIdHeader -> user2Connect.sessionId.toString
+    val accessTokenHeader = WebApi.facebookAccessTokenHeader -> user1Connect.authToken
+
+    val friends: List[PotentialFriend] = Get(s"$usersEndpoint/friends/facebook", Map(user1SessionHeader, accessTokenHeader)).to[List[PotentialFriend]]
+    Post(s"$usersEndpoint/friends/request", SendFriendRequest(friends.head.userId), Map(user1SessionHeader)) must beOk
+
+    val notifications = Get(s"$usersEndpoint/notifications", Map(user2SessionHeader)).to[List[Notification]]
+    val friendReqId = notifications.head.data.asInstanceOf[FriendRequestNotification].requestId
+    Post(s"$usersEndpoint/notifications/friendreq/$friendReqId/approve", (), Map(user2SessionHeader)) must beOk
+
+    val user1Notifications = Get(s"$usersEndpoint/notifications", Map(user1SessionHeader)).to[List[Notification]]
+    user1Notifications must contain(aNotificationType[FriendRequestAcceptedNotification])
+  }
+
   override def beforeAll(): Unit = {
     CassandraDocker.start()
     dataStoreTestHelper.start()
     dataStoreTestHelper.createSchema()
     server.start()
-
-    testUsers = facebookTestHelper.createTestUsers(2, installApp = true)
-    facebookTestHelper.makeFriends(testUsers.head, testUsers.tail)
   }
 
   override def afterAll(): Unit = {
-    facebookTestHelper.deleteTestUsers()
     dataStoreTestHelper.stop()
   }
 }

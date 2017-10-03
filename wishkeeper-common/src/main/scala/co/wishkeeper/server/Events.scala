@@ -47,6 +47,8 @@ object Events {
 
   case class FriendRequestNotificationCreated(id: UUID, userId: UUID, from: UUID, requestId: UUID) extends UserEvent
 
+  case class FriendRequestAcceptedNotificationCreated(id: UUID, userId: UUID, by: UUID, requestId: UUID) extends UserEvent
+
   case class WishNameSet(wishId: UUID, name: String) extends UserEvent
 
   case class WishLinkSet(wishId: UUID, link: String) extends UserEvent
