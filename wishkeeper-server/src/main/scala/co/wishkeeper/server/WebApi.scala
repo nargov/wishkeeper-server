@@ -164,7 +164,7 @@ class WebApi(publicApi: PublicApi, managementApi: ManagementApi)
               pathPrefix("notifications") {
                 get {
                   sessionUUID.map { sessionId =>
-                    complete(publicApi.userNotificationsFor(sessionId))
+                    complete(publicApi.notificationsFor(sessionId))
                   }.get
                 } ~
                   pathPrefix("friendreq" / JavaUUID) { reqId =>

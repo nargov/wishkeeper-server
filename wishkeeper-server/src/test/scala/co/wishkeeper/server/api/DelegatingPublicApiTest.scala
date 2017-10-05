@@ -36,11 +36,13 @@ class DelegatingPublicApiTest extends Specification with JMock {
   }
 
   "returns user notifications" in new LoggedInContext {
+    val notifications = List(Notification(randomUUID(), notificationData))
+
     checking {
-      allowing(notificationsProjection).notificationsFor(userId).willReturn(List(Notification(randomUUID(), notificationData)))
+      allowing(notificationsProjection).notificationsFor(userId).willReturn(notifications)
     }
 
-    api.userNotificationsFor(sessionId) must contain(aNotificationWith(notificationData, viewed = false))
+    api.notificationsFor(sessionId) must beEqualTo(UserNotifications(notifications, unread = 1))
   }
 
   "approve friend request" in new LoggedInContext {

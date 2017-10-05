@@ -21,3 +21,4 @@ case class FriendRequestAcceptedNotification(friendId: UUID, requestId: UUID, pr
   def withProfile(profile: UserProfile): FriendRequestAcceptedNotification = this.copy(profile = Option(profile))
 }
 
+case class UserNotifications(list: List[Notification], unread: Int)

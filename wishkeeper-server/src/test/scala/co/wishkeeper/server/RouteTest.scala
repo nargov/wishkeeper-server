@@ -232,11 +232,11 @@ class RouteTest extends Specification with Specs2RouteTest with JMock {
       val requestId = randomUUID()
       val notificationData = FriendRequestNotification(friendId, requestId)
       checking {
-        allowing(publicApi).userNotificationsFor(sessionId).willReturn(List(Notification(randomUUID(), notificationData)))
+        allowing(publicApi).notificationsFor(sessionId).willReturn(UserNotifications(List(Notification(randomUUID(), notificationData)), 1))
       }
 
       Get(s"/users/notifications").withHeaders(sessionIdHeader) ~> webApi.userRoute ~> check {
-        responseAs[List[Notification]] match {
+        responseAs[UserNotifications].list match {
           case x :: xs => x.data must beEqualTo(notificationData)
         }
       }

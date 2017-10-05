@@ -23,7 +23,7 @@ trait PublicApi {
 
   def approveFriendRequest(sessionId: UUID, reqId: UUID): Unit
 
-  def userNotificationsFor(sessionId: UUID): List[Notification]
+  def notificationsFor(sessionId: UUID): UserNotifications
 
   def userFlagsFor(sessionId: UUID): Flags
 
@@ -105,11 +105,12 @@ class DelegatingPublicApi(commandProcessor: CommandProcessor,
   override def userProfileFor(sessionId: UUID): Option[UserProfile] = dataStore.userBySession(sessionId).map(userProfileProjection.get)
 
   override def potentialFriendsFor(facebookAccessToken: String, sessionId: UUID): Option[Future[List[PotentialFriend]]] = {
-    for {
-      userId <- dataStore.userBySession(sessionId)
-      socialData <- userProfileProjection.get(userId).socialData
-      facebookId <- socialData.facebookId
-    } yield userFriendsProjection.potentialFacebookFriends(facebookId, facebookAccessToken)
+    withValidSession(sessionId) { userId =>
+      for {
+        socialData <- userProfileProjection.get(userId).socialData
+        facebookId <- socialData.facebookId
+      } yield userFriendsProjection.potentialFacebookFriends(facebookId, facebookAccessToken)
+    }
   }
 
   override def userFlagsFor(sessionId: UUID): Flags = {
@@ -120,15 +121,14 @@ class DelegatingPublicApi(commandProcessor: CommandProcessor,
 
   private def replayUser(userId: UUID) = User.replay(dataStore.userEvents(userId))
 
-  override def userNotificationsFor(sessionId: UUID): List[Notification] = {
-    withValidSession(sessionId) {
-      notificationsProjection.notificationsFor
+  override def notificationsFor(sessionId: UUID): UserNotifications = {
+    withValidSession(sessionId) { userId =>
+      val notifications = notificationsProjection.notificationsFor(userId)
+      UserNotifications(notifications, notifications.count(!_.viewed))
     }
   }
 
-  def handleMissingSession(sessionId: UUID) = {
-    throw new SessionNotFoundException(Option(sessionId))
-  }
+  def handleMissingSession(sessionId: UUID) = throw new SessionNotFoundException(Option(sessionId))
 
   def withValidSession[T](sessionId: UUID)(f: UUID => T) =
     dataStore.
@@ -137,10 +137,14 @@ class DelegatingPublicApi(commandProcessor: CommandProcessor,
       getOrElse(handleMissingSession(sessionId))
 
   override def approveFriendRequest(sessionId: UUID, reqId: UUID): Unit = {
-    withValidSession(sessionId) { commandProcessor.process(ChangeFriendRequestStatus(reqId, Approved), _) }
+    withValidSession(sessionId) {
+      commandProcessor.process(ChangeFriendRequestStatus(reqId, Approved), _)
+    }
   }
 
   override def ignoreFriendRequest(sessionId: UUID, reqId: UUID): Unit = {
-    withValidSession(sessionId) { commandProcessor.process(ChangeFriendRequestStatus(reqId, Ignored), _) }
+    withValidSession(sessionId) {
+      commandProcessor.process(ChangeFriendRequestStatus(reqId, Ignored), _)
+    }
   }
 }
