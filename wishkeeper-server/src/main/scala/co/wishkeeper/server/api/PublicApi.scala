@@ -19,6 +19,8 @@ import scala.util.Try
 case class Reason(message: String)
 
 trait PublicApi {
+  def friendsListFor(sessionId: UUID): UserFriends
+
   def ignoreFriendRequest(sessionId: UUID, reqId: UUID): Unit
 
   def approveFriendRequest(sessionId: UUID, reqId: UUID): Unit
@@ -147,4 +149,6 @@ class DelegatingPublicApi(commandProcessor: CommandProcessor,
       commandProcessor.process(ChangeFriendRequestStatus(reqId, Ignored), _)
     }
   }
+
+  override def friendsListFor(sessionId: UUID) = withValidSession(sessionId)(userFriendsProjection.friendsFor)
 }

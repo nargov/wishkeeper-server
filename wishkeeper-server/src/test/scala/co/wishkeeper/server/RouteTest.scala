@@ -11,7 +11,7 @@ import co.wishkeeper.json._
 import co.wishkeeper.server.Commands.{ConnectFacebookUser, SendFriendRequest, SetFlagFacebookFriendsListSeen}
 import co.wishkeeper.server.api.{ManagementApi, PublicApi}
 import co.wishkeeper.server.image.ImageMetadata
-import co.wishkeeper.server.projections.PotentialFriend
+import co.wishkeeper.server.projections.{Friend, PotentialFriend, UserFriends}
 import com.wixpress.common.specs2.JMock
 import de.heikoseeberger.akkahttpcirce.CirceSupport._
 import io.circe.generic.extras.Configuration
@@ -85,6 +85,8 @@ class RouteTest extends Specification with Specs2RouteTest with JMock {
   trait LoggedInUserContext extends BaseContext {
     val sessionId = randomUUID()
     val userId = randomUUID()
+    val friendId = randomUUID()
+    val requestId = randomUUID()
     val sessionIdHeader = RawHeader(WebApi.sessionIdHeader, sessionId.toString)
   }
 
@@ -228,8 +230,6 @@ class RouteTest extends Specification with Specs2RouteTest with JMock {
     }
 
     "get notifications" in new LoggedInUserContext {
-      val friendId = randomUUID()
-      val requestId = randomUUID()
       val notificationData = FriendRequestNotification(friendId, requestId)
       checking {
         allowing(publicApi).notificationsFor(sessionId).willReturn(UserNotifications(List(Notification(randomUUID(), notificationData)), 1))
@@ -265,6 +265,17 @@ class RouteTest extends Specification with Specs2RouteTest with JMock {
       Post(s"/users/notifications/friendreq/$reqId/ignore").withHeaders(sessionIdHeader) ~> webApi.userRoute ~> check {
         handled must beTrue
         status must beEqualTo(StatusCodes.OK)
+      }
+    }
+
+    "return friends list" in new LoggedInUserContext {
+      val userFriends = UserFriends(List(Friend(friendId, Some("friend name"), Some("http://friend.image.com"))))
+      checking {
+        allowing(publicApi).friendsListFor(sessionId).willReturn(userFriends)
+      }
+
+      Get(s"/users/friends").withHeaders(sessionIdHeader) ~> webApi.userRoute ~> check {
+        responseAs[UserFriends] must beEqualTo(userFriends)
       }
     }
   }

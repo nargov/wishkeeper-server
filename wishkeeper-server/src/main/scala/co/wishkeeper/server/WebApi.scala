@@ -23,7 +23,7 @@ import io.circe.generic.extras.auto._
 
 import scala.concurrent.duration._
 import scala.concurrent.{ExecutionContextExecutor, Future}
-import scala.util.{Success, Failure}
+import scala.util.{Failure, Success}
 
 class WebApi(publicApi: PublicApi, managementApi: ManagementApi)
             (implicit system: ActorSystem, mat: ActorMaterializer, ec: ExecutionContextExecutor) {
@@ -70,12 +70,17 @@ class WebApi(publicApi: PublicApi, managementApi: ManagementApi)
                 }
             } ~
               pathPrefix("friends") {
-                (path("facebook") & get) {
-                  headerValueByName(WebApi.facebookAccessTokenHeader) { accessToken =>
-                    publicApi.potentialFriendsFor(accessToken, sessionUUID.get).
-                      map(onSuccess(_) {
-                        complete(_)
-                      }).get //TODO test for rejection if user not found
+                get {
+                  pathEnd {
+                    sessionUUID.map(publicApi.friendsListFor).map(complete(_)).get
+                  } ~
+                  path("facebook") {
+                    headerValueByName(WebApi.facebookAccessTokenHeader) { accessToken =>
+                      publicApi.potentialFriendsFor(accessToken, sessionUUID.get).
+                        map(onSuccess(_) {
+                          complete(_)
+                        }).get //TODO test for rejection if user not found
+                    }
                   }
                 } ~
                   (path("request") & post) {

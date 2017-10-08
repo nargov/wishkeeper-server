@@ -62,7 +62,7 @@ class WishkeeperServerIT(implicit ee: ExecutionEnv) extends Specification with B
     Post(s"$usersEndpoint/friends/request", SendFriendRequest(friends.head.userId), Map(user1SessionHeader)) must beOk
 
     eventually {
-      Get(s"$usersEndpoint/notifications", Map(user2SessionHeader)).to[List[Notification]] must contain(
+      Get(s"$usersEndpoint/notifications", Map(user2SessionHeader)).to[UserNotifications].list must contain(
         aNotificationWith(aFriendRequestNotificationWithStatus(Pending)))
     }
   }
@@ -117,12 +117,12 @@ class WishkeeperServerIT(implicit ee: ExecutionEnv) extends Specification with B
     val friends: List[PotentialFriend] = Get(s"$usersEndpoint/friends/facebook", Map(user1SessionHeader, accessTokenHeader)).to[List[PotentialFriend]]
     Post(s"$usersEndpoint/friends/request", SendFriendRequest(friends.head.userId), Map(user1SessionHeader)) must beOk
 
-    val notifications = Get(s"$usersEndpoint/notifications", Map(user2SessionHeader)).to[List[Notification]]
+    val notifications = Get(s"$usersEndpoint/notifications", Map(user2SessionHeader)).to[UserNotifications].list
     val friendReqId = notifications.head.data.asInstanceOf[FriendRequestNotification].requestId
     Post(s"$usersEndpoint/notifications/friendreq/$friendReqId/approve", (), Map(user2SessionHeader)) must beOk
 
-    val user1Notifications = Get(s"$usersEndpoint/notifications", Map(user1SessionHeader)).to[List[Notification]]
-    user1Notifications must contain(aNotificationType[FriendRequestAcceptedNotification])
+    val user1Notifications = Get(s"$usersEndpoint/notifications", Map(user1SessionHeader)).to[UserNotifications]
+    user1Notifications.list must contain(aNotificationType[FriendRequestAcceptedNotification])
   }
 
   override def beforeAll(): Unit = {

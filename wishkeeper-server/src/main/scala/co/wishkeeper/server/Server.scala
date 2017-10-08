@@ -39,7 +39,8 @@ class WishkeeperServer {
   private val facebookConnector: FacebookConnector = new AkkaHttpFacebookConnector(
     config.getString("wishkeeper.facebook.app-id"),
     config.getString("wishkeeper.facebook.app-secret"))
-  private val userFriendsProjection: UserFriendsProjection = new DelegatingUserFriendsProjection(facebookConnector, userIdByFacebookIdProjection)
+  private val userFriendsProjection: UserFriendsProjection =
+    new SimpleUserFriendsProjection(facebookConnector, userIdByFacebookIdProjection, dataStore)
   private val imageStore: ImageStore = new GoogleCloudStorageImageStore(config.getString("wishkeeper.image-store.bucket-name"))
   private val publicApi = new DelegatingPublicApi(commandProcessor, dataStore, facebookConnector,
     incomingFriendRequestsProjection, userProfileProjection, userFriendsProjection, notificationsProjection, imageStore)
