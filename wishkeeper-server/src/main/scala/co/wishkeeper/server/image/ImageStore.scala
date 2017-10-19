@@ -1,6 +1,5 @@
 package co.wishkeeper.server.image
 
-import java.io.InputStream
 import java.nio.channels.Channels
 
 import com.google.cloud.storage.Bucket.BlobWriteOption
@@ -39,11 +38,7 @@ class GoogleCloudStorageImageStore(bucket: String) extends ImageStore {
   override def imageLinkBase = s"http://$bucket"
 }
 
-case class ImageData(content: InputStream, contentType: String) {
-  def readFully(): Array[Byte] = Iterator.continually(content.read()).takeWhile(_ != -1).map(_.toByte).toArray
-}
-object ImageData {
-  val defaultContentType = "application/octet-stream"
-}
+
+
 
 case class ImageMetadata(contentType: String, fileName: String, width: Int, height: Int)

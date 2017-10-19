@@ -231,6 +231,10 @@ class UserTest extends Specification with MatcherMacros with JMock with Notifica
     )
   }
 
+  "ignore FriendRequestReceived without id" in new Context {
+    user.applyEvent(asEventInstant(FriendRequestReceived(user.id, friendId))).friends.current must beEmpty
+  }
+
   def haveCreationTime(time: DateTime): Matcher[Wish] = ===(time) ^^ {
     (_: Wish).creationTime
   }

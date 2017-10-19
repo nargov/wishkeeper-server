@@ -5,8 +5,6 @@ val specs2Version = "3.9.5"
 
 val scalaVer = "2.11.8"
 
-val artifactsDir = "/home/nimrod/dev/wishkeeper-artifacts"
-
 lazy val integrationSettings = inConfig(IntegrationTest)(Defaults.itSettings) ++ Seq(
   fork in IntegrationTest := false,
   parallelExecution in IntegrationTest := false
@@ -102,8 +100,11 @@ lazy val testUtils = (project in file("test-utils")).
     commonSettings,
     integrationSettings,
     libraryDependencies ++= Seq(
-      "com.spotify" % "docker-client" % "8.3.1"
+      "com.spotify" % "docker-client" % "8.3.1",
+      "org.specs2" %% "specs2-core" % specs2Version,
+      "org.specs2" %% "specs2-matcher-extra" % specs2Version,
+      "com.typesafe.akka" %% "akka-http" % "10.0.5"
     )
-  )
+  ).dependsOn(common)
 
 conflictManager := ConflictManager.latestCompatible

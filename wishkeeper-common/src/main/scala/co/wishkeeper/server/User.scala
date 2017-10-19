@@ -28,11 +28,10 @@ case class User(id: UUID,
         case None => Option(SocialData(Option(fbId)))
       }))
     case UserEventInstant(UserPictureSet(_, link), _) => this.copy(userProfile = userProfile.copy(picture = Option(link)))
-    case UserEventInstant(FriendRequestSent(_, friendId, reqId), _) => this.copy(
-      friends = this.friends.copy(sentRequests = this.friends.sentRequests :+ FriendRequest(reqId, friendId, id)))
-    case UserEventInstant(FriendRequestReceived(_, friendId, reqId), _) => this.copy(friends = this.friends.copy(
-      receivedRequests = this.friends.receivedRequests :+ FriendRequest(reqId, id, friendId)
-    ))
+    case UserEventInstant(FriendRequestSent(_, friendId, reqId), _) => reqId.map(requestId => this.copy(
+      friends = this.friends.copy(sentRequests = this.friends.sentRequests :+ FriendRequest(requestId, friendId, id)))).getOrElse(this)
+    case UserEventInstant(FriendRequestReceived(_, friendId, reqId), _) => reqId.map(requestId => this.copy(
+      friends = this.friends.copy(receivedRequests = this.friends.receivedRequests :+ FriendRequest(requestId, id, friendId)))).getOrElse(this)
     case UserEventInstant(WishCreated(wishId, creator, creationTime), _) =>
       updateWishProperty(wishId, _.withCreationTime(creationTime).withCreator(creator))
     case UserEventInstant(WishNameSet(wishId, name), _) => updateWishProperty(wishId, _.withName(name))

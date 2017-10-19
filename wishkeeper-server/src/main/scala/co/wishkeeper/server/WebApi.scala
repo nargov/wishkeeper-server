@@ -17,6 +17,7 @@ import co.wishkeeper.server.Commands._
 import co.wishkeeper.server.WebApi.imageDimensionsHeader
 import co.wishkeeper.server.api.{ManagementApi, PublicApi}
 import co.wishkeeper.server.image.ImageMetadata
+import co.wishkeeper.server.web.ManagementRoute
 import de.heikoseeberger.akkahttpcirce.CirceSupport._
 import io.circe.generic.extras.Configuration
 import io.circe.generic.extras.auto._
@@ -74,14 +75,14 @@ class WebApi(publicApi: PublicApi, managementApi: ManagementApi)
                   pathEnd {
                     sessionUUID.map(publicApi.friendsListFor).map(complete(_)).get
                   } ~
-                  path("facebook") {
-                    headerValueByName(WebApi.facebookAccessTokenHeader) { accessToken =>
-                      publicApi.potentialFriendsFor(accessToken, sessionUUID.get).
-                        map(onSuccess(_) {
-                          complete(_)
-                        }).get //TODO test for rejection if user not found
+                    path("facebook") {
+                      headerValueByName(WebApi.facebookAccessTokenHeader) { accessToken =>
+                        publicApi.potentialFriendsFor(accessToken, sessionUUID.get).
+                          map(onSuccess(_) {
+                            complete(_)
+                          }).get //TODO test for rejection if user not found
+                      }
                     }
-                  }
                 } ~
                   (path("request") & post) {
                     entity(as[SendFriendRequest]) { sendFriendRequest =>
@@ -197,41 +198,13 @@ class WebApi(publicApi: PublicApi, managementApi: ManagementApi)
     }
 
 
-  val managementRoute: Route =
-    DebuggingDirectives.logRequestResult(LoggingMagnet(_ => printer)) {
-      pathPrefix("users") {
-        get {
-          path("facebook" / """\d+""".r) { facebookId ⇒
-            managementApi.userIdFor(facebookId).
-              map(complete(_)).
-              getOrElse(complete(StatusCodes.NotFound))
-          } ~
-            path("email" / """.+@.+""".r / "id") { email =>
-              managementApi.userByEmail(email).map(complete(_)).get
-            } ~
-            path(JavaUUID / "profile") { userId =>
-              complete(managementApi.profileFor(userId))
-            } ~
-            path(JavaUUID / "wishes") { userId =>
-              complete(managementApi.wishesFor(userId))
-            }
-        } ~
-          path(JavaUUID / "flags" / "facebook-friends") { userId =>
-            delete {
-              managementApi.resetFacebookFriendsSeenFlag(userId)
-              complete(StatusCodes.OK)
-            }
-          }
-      }
-    }
-
   private var bindings: Seq[Future[ServerBinding]] = Seq.empty
 
   def start(port: Int = WebApi.defaultPort, managementPort: Int = WebApi.defaultManagementPort): Unit = {
     val httpExt: HttpExt = Http()
     bindings = List(
       httpExt.bindAndHandle(userRoute, "0.0.0.0", port), //TODO replace IP with parameter
-      httpExt.bindAndHandle(managementRoute, "0.0.0.0", managementPort)
+      httpExt.bindAndHandle(ManagementRoute(managementApi), "0.0.0.0", managementPort)
     )
   }
 

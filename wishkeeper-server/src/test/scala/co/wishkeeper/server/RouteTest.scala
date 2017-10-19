@@ -12,6 +12,7 @@ import co.wishkeeper.server.Commands.{ConnectFacebookUser, SendFriendRequest, Se
 import co.wishkeeper.server.api.{ManagementApi, PublicApi}
 import co.wishkeeper.server.image.ImageMetadata
 import co.wishkeeper.server.projections.{Friend, PotentialFriend, UserFriends}
+import co.wishkeeper.server.web.ManagementRoute
 import com.wixpress.common.specs2.JMock
 import de.heikoseeberger.akkahttpcirce.CirceSupport._
 import io.circe.generic.extras.Configuration
@@ -31,7 +32,7 @@ class RouteTest extends Specification with Specs2RouteTest with JMock {
 
   trait ManagementContext extends Scope {
       val managementApi: ManagementApi = mock[ManagementApi]
-      val webApi = new WebApi(null, managementApi)
+      val managementRoute = ManagementRoute(managementApi)
       val userId: UUID = randomUUID()
   }
 
@@ -43,7 +44,7 @@ class RouteTest extends Specification with Specs2RouteTest with JMock {
         allowing(managementApi).profileFor(having(any[UUID])).willReturn(UserProfile(name = Option(name)))
       }
 
-      Get(s"/users/${randomUUID()}/profile") ~> webApi.managementRoute ~> check {
+      Get(s"/users/${randomUUID()}/profile") ~> managementRoute ~> check {
         handled should beTrue
         responseAs[UserProfile].name should beSome(name)
       }
@@ -55,7 +56,7 @@ class RouteTest extends Specification with Specs2RouteTest with JMock {
         oneOf(managementApi).resetFacebookFriendsSeenFlag(userId)
       }
 
-      Delete(s"/users/$userId/flags/facebook-friends") ~> webApi.managementRoute ~> check {
+      Delete(s"/users/$userId/flags/facebook-friends") ~> managementRoute ~> check {
         handled should beTrue
         status should beEqualTo(StatusCodes.OK)
       }
@@ -68,7 +69,7 @@ class RouteTest extends Specification with Specs2RouteTest with JMock {
         oneOf(managementApi).userByEmail(email).willReturn(Option(userId))
       }
 
-      Get(s"/users/email/$email/id") ~> webApi.managementRoute ~> check {
+      Get(s"/users/email/$email/id") ~> managementRoute ~> check {
         handled should beTrue
         responseAs[UUID] must beEqualTo(userId)
       }

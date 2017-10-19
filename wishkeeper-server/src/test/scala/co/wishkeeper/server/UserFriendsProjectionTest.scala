@@ -54,12 +54,12 @@ class UserFriendsProjectionTest(implicit ee: ExecutionEnv) extends Specification
     checking {
       allowing(dataStore).userEvents(userId).willReturn(asEventInstants(List(
         userConnectEvent(userId),
-        FriendRequestReceived(userId, friendId, requestId),
+        FriendRequestReceived(userId, friendId, Option(requestId)),
         FriendRequestStatusChanged(userId, requestId, friendId, Approved)
       )))
       allowing(dataStore).userEvents(friendId).willReturn(asEventInstants(List(
         userConnectEvent(friendId),
-        FriendRequestSent(friendId, userId, requestId),
+        FriendRequestSent(friendId, userId, Option(requestId)),
         FriendRequestStatusChanged(userId, requestId, friendId, Approved),
         UserPictureSet(friendId, image),
         UserNameSet(friendId, name)

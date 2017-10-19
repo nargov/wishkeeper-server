@@ -1,7 +1,6 @@
 package co.wishkeeper.server
 
 import java.util.UUID
-import java.util.UUID.randomUUID
 
 import org.joda.time.DateTime
 
@@ -37,9 +36,9 @@ object Events {
 
   case class UserPictureSet(userId: UUID, pictureLink: String) extends UserEvent
 
-  case class FriendRequestSent(userId: UUID, to: UUID, id: UUID = randomUUID()) extends UserEvent
+  case class FriendRequestSent(userId: UUID, to: UUID, id: Option[UUID] = None) extends UserEvent
 
-  case class FriendRequestReceived(userId: UUID, from: UUID, id: UUID) extends UserEvent
+  case class FriendRequestReceived(userId: UUID, from: UUID, id: Option[UUID] = None) extends UserEvent
 
   case class FriendRequestStatusChanged(userId: UUID, requestId: UUID, from: UUID, status: FriendRequestStatus) extends UserEvent
 

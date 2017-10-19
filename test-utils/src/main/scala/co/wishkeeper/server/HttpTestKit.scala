@@ -7,8 +7,8 @@ import akka.actor.ActorSystem
 import akka.http.scaladsl.Http
 import akka.http.scaladsl.marshalling.Marshal
 import akka.http.scaladsl.model.Multipart.FormData.BodyPart
-import akka.http.scaladsl.model._
 import akka.http.scaladsl.model.headers.RawHeader
+import akka.http.scaladsl.model._
 import akka.stream.ActorMaterializer
 import io.circe.parser.decode
 import io.circe.syntax._
@@ -34,6 +34,7 @@ object HttpTestKit {
 
   object Get {
     def apply(uri: String, headers: Map[String, String] = Map.empty): Response = new Get(uri, headers).waitFor
+    def async(uri: String, headers: Map[String, String] = Map.empty): Future[Response] = new Get(uri, headers).response
   }
 
   class Post[T] private(uri: String, headers: Map[String, String], payload: T)(implicit encoder: Encoder[T], timeout: Timeout) {

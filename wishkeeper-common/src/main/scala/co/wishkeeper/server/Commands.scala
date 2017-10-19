@@ -56,7 +56,7 @@ object Commands {
   }
 
   case class SendFriendRequest(friendId: UUID) extends UserCommand {
-    override def process(user: User): List[UserEvent] = List(FriendRequestSent(user.id, friendId))
+    override def process(user: User): List[UserEvent] = List(FriendRequestSent(user.id, friendId, Option(UUID.randomUUID())))
   }
 
   case class SetWishDetails(wish: Wish) extends UserCommand {

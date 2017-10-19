@@ -13,10 +13,12 @@ trait IncomingFriendRequestsProjection
 class DataStoreIncomingFriendRequestsProjection(dataStore: DataStore) extends IncomingFriendRequestsProjection with EventProcessor {
   override def process(event: Event): Unit = event match {
     case FriendRequestSent(sender, userId, id) =>
-      val lastSequenceNum = dataStore.lastSequenceNum(userId)
-      dataStore.saveUserEvents(userId, lastSequenceNum, DateTime.now(), List(
-        FriendRequestReceived(userId, sender, id)
-      ))
+      id.foreach { _ =>
+        val lastSequenceNum = dataStore.lastSequenceNum(userId)
+        dataStore.saveUserEvents(userId, lastSequenceNum, DateTime.now(), List(
+          FriendRequestReceived(userId, sender, id)
+        ))
+      }
     case _ =>
   }
 }
@@ -27,11 +29,12 @@ trait NotificationsProjection extends EventProcessor {
 
 class DataStoreNotificationsProjection(dataStore: DataStore) extends NotificationsProjection {
   override def process(event: Event): Unit = event match {
-    case FriendRequestSent(sender, userId, id) =>
+    case FriendRequestSent(sender, userId, id) => id.foreach { requestId =>
       val lastSeqNum = dataStore.lastSequenceNum(userId)
       dataStore.saveUserEvents(userId, lastSeqNum, DateTime.now(), List(
-        FriendRequestNotificationCreated(randomUUID(), userId, sender, id)
+        FriendRequestNotificationCreated(randomUUID(), userId, sender, requestId)
       ))
+    }
     case FriendRequestStatusChanged(userId, reqId, from, status) if status == Approved =>
       val lastSeqNum = dataStore.lastSequenceNum(from)
       dataStore.saveUserEvents(from, lastSeqNum, DateTime.now(), List(

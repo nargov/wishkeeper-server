@@ -1,5 +1,6 @@
 package co.wishkeeper.server
 
+import java.util.UUID
 import java.util.concurrent.atomic.AtomicReference
 import java.util.function.UnaryOperator
 
@@ -8,7 +9,7 @@ import akka.http.scaladsl.Http
 import akka.http.scaladsl.model.HttpMethods.POST
 import akka.http.scaladsl.model.{HttpMethods, HttpRequest, HttpResponse, StatusCodes}
 import akka.stream.ActorMaterializer
-import co.wishkeeper.server.FacebookTestHelper._
+import co.wishkeeper.server.FacebookTestHelper.{access_token, testAppId}
 import io.circe.generic.extras.Configuration
 import io.circe.generic.extras.auto._
 import io.circe.parser.decode
@@ -24,12 +25,16 @@ class FacebookTestHelper(implicit ec: ExecutionContext, actorSystem: ActorSystem
 
   private val testFbUsers = new AtomicReference[Map[String, TestFacebookUser]](Map.empty)
 
-  def makeFriends(testUser: TestFacebookUser, friends: List[TestFacebookUser]): Unit = {
-    val eventualFriends = friends.map { friend =>
+  def makeFriendsAsync(testUser: TestFacebookUser, friends: List[TestFacebookUser]): Seq[Future[HttpResponse]] = {
+    friends.map { friend =>
       friendRequestFor(testUser, friend).flatMap {
         case res if res.status == StatusCodes.OK => friendRequestFor(friend, testUser)
       }
     }
+  }
+
+  def makeFriends(testUser: TestFacebookUser, friends: List[TestFacebookUser]): Unit = {
+    val eventualFriends = makeFriendsAsync(testUser, friends)
 
     val results = Await.result(Future.sequence(eventualFriends), 20.seconds * friends.size)
     if (results.exists(_.status != StatusCodes.OK)) throw new IllegalStateException("Failed to create relationships")
@@ -43,9 +48,10 @@ class FacebookTestHelper(implicit ec: ExecutionContext, actorSystem: ActorSystem
 
   def addAccessToken(user: TestFacebookUser): Future[TestFacebookUser] = addAccessTokens(user :: Nil).map(_.head)
 
-  def addAccessTokens(users: List[TestFacebookUser]): Future[List[TestFacebookUser]] = {
+  def addAccessTokens(users: List[TestFacebookUser], testAppId: String = testAppId,
+                      accessToken: String = access_token): Future[List[TestFacebookUser]] = {
     val eventualResponse = Http().singleRequest(HttpRequest().
-      withUri(s"https://graph.facebook.com/v2.9/$testAppId/accounts/test-users?access_token=$access_token"))
+      withUri(s"https://graph.facebook.com/v2.9/$testAppId/accounts/test-users?access_token=$accessToken"))
     val eventualJson: Future[String] = eventualResponse.flatMap(_.entity.dataBytes.runFold("")(_ + _.utf8String))
     val eventualUsersAccessDataList = eventualJson.map(json => decode[TestUsersAccessDataList](json)).map {
       case Right(list) => list
@@ -55,17 +61,33 @@ class FacebookTestHelper(implicit ec: ExecutionContext, actorSystem: ActorSystem
     tokensMap.map(tokens => users.map(user => user.copy(access_token = tokens(user.id).access_token)))
   }
 
+  def setPasswordTo(users: List[TestFacebookUser], password: String, accessToken: String = access_token): Future[List[TestFacebookUser]] = {
+    val futurePasswordSetResponses = Future.sequence(users.map(user =>
+        Http().singleRequest(HttpRequest().withMethod(POST).
+          withUri(s"https://graph.facebook.com/v2.9/${user.id}?access_token=$accessToken&password=$password"))))
+
+    futurePasswordSetResponses.map(responses =>
+      if(responses.forall(_.status.isSuccess())) {
+        println(s"${responses.size} passwords set to $password")
+        users.map(_.copy(password = password))
+      }
+      else throw new IllegalStateException("Error setting password for test user"))
+  }
+
   def createTestUser(): TestFacebookUser = createTestUsers().head
 
   def createPreInstalledTestUser(): TestFacebookUser = createTestUsers(installApp = true).head
 
-  def createTestUsers(numUsers: Int = 1, installApp: Boolean = false): List[TestFacebookUser] = {
+  def createTestUsers(numUsers: Int = 1,
+                      installApp: Boolean = false,
+                      accessToken: String = access_token,
+                      testAppId: String = testAppId): List[TestFacebookUser] = {
     println(s"Creating $numUsers test user${if (numUsers > 1) "s" else ""}")
     val eventualUsers = Future.sequence((1 to numUsers).toList.map { _ =>
       val eventualTestUserResponse = Http().singleRequest(HttpRequest().
         withMethod(POST).
         withUri(s"https://graph.facebook.com/v2.9/$testAppId/accounts/test-users").
-        withEntity(s"access_token=$access_token&installed=$installApp"))
+        withEntity(s"access_token=$accessToken&installed=$installApp"))
       val eventualJson: Future[String] = eventualTestUserResponse.flatMap(_.entity.dataBytes.runFold("")(_ + _.utf8String))
       val eventualUser = eventualJson.map(json => decode[TestFacebookUser](json)).map {
         case Right(user) => user
@@ -75,6 +97,7 @@ class FacebookTestHelper(implicit ec: ExecutionContext, actorSystem: ActorSystem
         testFbUsers.updateAndGet(new UnaryOperator[Map[String, TestFacebookUser]] {
           override def apply(t: Map[String, TestFacebookUser]): Map[String, TestFacebookUser] = t + (user.id -> user)
         })
+
         user
       }
     })
@@ -129,4 +152,9 @@ case class TestUsersAccessDataList(data: List[TestUserAccessToken])
 
 case class TestUserAccessToken(id: String, access_token: String)
 
-case class TestFacebookUser(id: String, email: String, password: String, access_token: String = "", userProfile: Option[UserProfile] = None)
+case class TestFacebookUser(id: String,
+                            email: String,
+                            password: String,
+                            access_token: String = "",
+                            userProfile: Option[UserProfile] = None,
+                            sessionId: Option[UUID] = None)

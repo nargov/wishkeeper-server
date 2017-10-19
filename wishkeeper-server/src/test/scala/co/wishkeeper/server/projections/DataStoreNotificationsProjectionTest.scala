@@ -76,11 +76,6 @@ class DataStoreNotificationsProjectionTest extends Specification with JMock {
   }
 
 
-  /*
-    FriendRequestStatusChanged(request.from, requestId, request.from, status)
-    FriendRequestAcceptedNotificationCreated(randomUUID(), request.from, user.id, requestId)
-   */
-
   trait Context extends Scope {
     val userId = randomUUID()
     val friendId = randomUUID()
@@ -90,7 +85,7 @@ class DataStoreNotificationsProjectionTest extends Specification with JMock {
     val friendProfile = UserProfile(name = Option("Luke Skywalker"), picture = Option("http://example.com/mypicture"))
     val notificationId = randomUUID()
 
-    def processFriendRequest() = projection.process(FriendRequestSent(friendId, userId))
+    def processFriendRequest() = projection.process(FriendRequestSent(friendId, userId, Option(friendReqId)))
 
     def assumeExistingEvents() = checking {
       allowing(dataStore).lastSequenceNum(having(any[UUID])).willReturn(Some(5L))

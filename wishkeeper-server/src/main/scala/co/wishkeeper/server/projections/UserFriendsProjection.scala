@@ -35,6 +35,6 @@ class SimpleUserFriendsProjection(facebookConnector: FacebookConnector,
   }
 }
 
-case class PotentialFriend(userId: UUID, name: String, image: String, requestSent: Boolean = false)
+
 case class Friend(userId: UUID, name: Option[String], image: Option[String])
 case class UserFriends(list: List[Friend])

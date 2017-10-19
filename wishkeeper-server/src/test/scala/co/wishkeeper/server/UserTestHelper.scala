@@ -21,7 +21,7 @@ object UserTestHelper {
     }
 
     def withExistingFriendRequest(reqId: UUID, from: UUID): User = {
-      user.applyEvent(UserEventInstant(FriendRequestReceived(user.id, from, reqId), now))
+      user.applyEvent(UserEventInstant(FriendRequestReceived(user.id, from, Option(reqId)), now))
     }
 
     def withFriendRequestNotification(notificationId: UUID, reqId: UUID, from: UUID): User = {
@@ -37,7 +37,7 @@ object UserTestHelper {
 
     def withSentFriendRequest(reqId: UUID, friend: UUID): User = {
       user.
-        applyEvent(asEventInstant(FriendRequestSent(user.id, friend, reqId)))
+        applyEvent(asEventInstant(FriendRequestSent(user.id, friend, Option(reqId))))
     }
 
     def withSentFriendRequestAccepted(reqId: UUID, friend: UUID): User = {
