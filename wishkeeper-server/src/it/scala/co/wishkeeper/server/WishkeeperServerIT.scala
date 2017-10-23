@@ -8,6 +8,7 @@ import co.wishkeeper.json._
 import co.wishkeeper.server.Commands.{ConnectFacebookUser, SendFriendRequest, SetWishDetails}
 import co.wishkeeper.server.FriendRequestStatus.Pending
 import co.wishkeeper.server.HttpTestKit._
+import co.wishkeeper.server.NotificationsData.{FriendRequestAcceptedNotification, FriendRequestNotification}
 import co.wishkeeper.server.projections.PotentialFriend
 import co.wishkeeper.test.utils.WishMatchers
 import io.circe.generic.extras.Configuration

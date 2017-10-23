@@ -105,6 +105,6 @@ lazy val testUtils = (project in file("test-utils")).
       "org.specs2" %% "specs2-matcher-extra" % specs2Version,
       "com.typesafe.akka" %% "akka-http" % "10.0.5"
     )
-  ).dependsOn(common)
+  ).dependsOn(common % "compile;test->test;it->test")
 
 conflictManager := ConflictManager.latestCompatible

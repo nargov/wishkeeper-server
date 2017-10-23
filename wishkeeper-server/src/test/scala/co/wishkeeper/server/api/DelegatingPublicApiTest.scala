@@ -6,6 +6,7 @@ import java.util.UUID.randomUUID
 import co.wishkeeper.server.Commands.ChangeFriendRequestStatus
 import co.wishkeeper.server.Events.{FacebookFriendsListSeen, UserConnected}
 import co.wishkeeper.server.FriendRequestStatus.{Approved, Ignored}
+import co.wishkeeper.server.NotificationsData.{FriendRequestNotification, NotificationData}
 import co.wishkeeper.server._
 import co.wishkeeper.server.projections.NotificationsProjection
 import com.wixpress.common.specs2.JMock

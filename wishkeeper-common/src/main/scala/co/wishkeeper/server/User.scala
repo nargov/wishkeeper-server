@@ -4,6 +4,7 @@ import java.util.UUID
 
 import co.wishkeeper.server.Events._
 import co.wishkeeper.server.FriendRequestStatus.{Approved, Pending}
+import co.wishkeeper.server.NotificationsData.{FriendRequestAcceptedNotification, FriendRequestNotification}
 
 case class User(id: UUID,
                 userProfile: UserProfile = UserProfile(),

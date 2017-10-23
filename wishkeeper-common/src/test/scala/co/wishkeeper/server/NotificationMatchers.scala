@@ -2,6 +2,7 @@ package co.wishkeeper.server
 
 import java.util.UUID
 
+import co.wishkeeper.server.NotificationsData.{FriendRequestAcceptedNotification, FriendRequestNotification, NotificationData}
 import org.specs2.matcher.{Matcher, MustThrownMatchers}
 
 import scala.reflect.ClassTag

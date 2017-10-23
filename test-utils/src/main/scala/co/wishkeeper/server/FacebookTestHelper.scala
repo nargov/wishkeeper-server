@@ -156,5 +156,6 @@ case class TestFacebookUser(id: String,
                             email: String,
                             password: String,
                             access_token: String = "",
+                            login_url: String,
                             userProfile: Option[UserProfile] = None,
                             sessionId: Option[UUID] = None)

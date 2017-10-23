@@ -7,7 +7,7 @@ import co.wishkeeper.server.{DataStore, FacebookConnector, User}
 import scala.concurrent.{ExecutionContext, Future}
 
 trait UserFriendsProjection {
-  def potentialFacebookFriends(facebookId: String, accessToken: String): Future[List[PotentialFriend]]
+  def potentialFacebookFriends(facebookId: String, accessToken: String, friends: List[UUID] = Nil): Future[List[PotentialFriend]]
   def friendsFor(userId: UUID): UserFriends
 }
 
@@ -17,14 +17,17 @@ class SimpleUserFriendsProjection(facebookConnector: FacebookConnector,
                                  (implicit ex: ExecutionContext) extends UserFriendsProjection {
 
 
-  override def potentialFacebookFriends(facebookId: String, accessToken: String): Future[List[PotentialFriend]] = {
-    val eventualFriends = facebookConnector.friendsFor(facebookId, accessToken)
-    eventualFriends.map { friends =>
-      val facebookIdsToUserIds = userIdByFacebookId.get(friends.map(_.id))
-      facebookIdsToUserIds.map {
-        case (fbId, userId) => PotentialFriend(userId, friends.find(_.id == fbId).get.name, s"https://graph.facebook.com/v2.9/$fbId/picture")
+  override def potentialFacebookFriends(facebookId: String, accessToken: String, friends: List[UUID]): Future[List[PotentialFriend]] = {
+    val existingFriend: ((String, UUID)) => Boolean = tuple => friends.contains(tuple._2)
+
+    val eventualFacebookFriends = facebookConnector.friendsFor(facebookId, accessToken)
+    eventualFacebookFriends.map { facebookFriends =>
+      val facebookIdsToUserIds = userIdByFacebookId.get(facebookFriends.map(_.id))
+      facebookIdsToUserIds.filterNot(existingFriend).map {
+        case (fbId, userId) => PotentialFriend(userId, facebookFriends.find(_.id == fbId).get.name, s"https://graph.facebook.com/v2.9/$fbId/picture")
       }.toList
     }
+
   }
 
   override def friendsFor(userId: UUID): UserFriends = {

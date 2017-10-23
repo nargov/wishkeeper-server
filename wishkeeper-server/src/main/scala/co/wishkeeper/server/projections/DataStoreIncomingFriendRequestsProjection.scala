@@ -5,6 +5,7 @@ import java.util.UUID.randomUUID
 
 import co.wishkeeper.server.Events._
 import co.wishkeeper.server.FriendRequestStatus.Approved
+import co.wishkeeper.server.NotificationsData.{FriendRequestAcceptedNotification, FriendRequestNotification}
 import co.wishkeeper.server._
 import org.joda.time.DateTime
 

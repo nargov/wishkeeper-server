@@ -9,6 +9,7 @@ import akka.http.scaladsl.model.headers.RawHeader
 import akka.http.scaladsl.testkit.Specs2RouteTest
 import co.wishkeeper.json._
 import co.wishkeeper.server.Commands.{ConnectFacebookUser, SendFriendRequest, SetFlagFacebookFriendsListSeen}
+import co.wishkeeper.server.NotificationsData.FriendRequestNotification
 import co.wishkeeper.server.api.{ManagementApi, PublicApi}
 import co.wishkeeper.server.image.ImageMetadata
 import co.wishkeeper.server.projections.{Friend, PotentialFriend, UserFriends}

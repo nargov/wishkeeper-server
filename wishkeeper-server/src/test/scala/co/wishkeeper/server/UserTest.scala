@@ -6,6 +6,7 @@ import java.util.UUID.randomUUID
 import co.wishkeeper.server.Events._
 import co.wishkeeper.server.EventsTestHelper.asEventInstant
 import co.wishkeeper.server.FriendRequestStatus.Approved
+import co.wishkeeper.server.NotificationsData.FriendRequestNotification
 import co.wishkeeper.server.UserTestHelper._
 import co.wishkeeper.test.utils.WishMatchers._
 import com.wixpress.common.specs2.JMock

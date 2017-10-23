@@ -6,6 +6,7 @@ import java.util.UUID.randomUUID
 import co.wishkeeper.server.Events._
 import co.wishkeeper.server.EventsTestHelper.{asEventInstants, userConnectEvent}
 import co.wishkeeper.server.FriendRequestStatus.{Approved, Ignored}
+import co.wishkeeper.server.NotificationsData.{FriendRequestAcceptedNotification, FriendRequestNotification}
 import co.wishkeeper.server._
 import com.wixpress.common.specs2.JMock
 import org.joda.time.DateTime
