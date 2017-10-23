@@ -16,8 +16,6 @@ import co.wishkeeper.server.projections._
 import scala.concurrent.{ExecutionContext, Future}
 import scala.util.Try
 
-case class Reason(message: String)
-
 trait PublicApi {
   def friendsListFor(sessionId: UUID): UserFriends
 
@@ -38,6 +36,8 @@ trait PublicApi {
   def connectFacebookUser(command: ConnectFacebookUser): Future[Boolean]
 
   def userProfileFor(sessionId: UUID): Option[UserProfile]
+
+  def userProfileFor(sessionId: UUID, friendId: UUID): Either[Reason, UserProfile]
 
   def potentialFriendsFor(facebookAccessToken: String, sessionId: UUID): Option[Future[List[PotentialFriend]]]
 
@@ -151,4 +151,22 @@ class DelegatingPublicApi(commandProcessor: CommandProcessor,
   }
 
   override def friendsListFor(sessionId: UUID) = withValidSession(sessionId)(userFriendsProjection.friendsFor)
+
+  override def userProfileFor(sessionId: UUID, friendId: UUID): Either[Reason, UserProfile] = {
+    withValidSession(sessionId) { userId =>
+      val user = User.replay(dataStore.userEvents(userId))
+      if(user.friends.current.contains(friendId)){
+        Right(userProfileProjection.get(friendId))
+      }
+      else
+        Left(NotFriends)
+    }
+  }
+}
+
+trait Reason{
+  val msg: String
+}
+case object NotFriends extends Reason {
+  override val msg: String = "Users are not friends"
 }

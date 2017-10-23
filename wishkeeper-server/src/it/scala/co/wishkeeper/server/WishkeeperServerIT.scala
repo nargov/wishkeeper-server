@@ -10,6 +10,7 @@ import co.wishkeeper.server.FriendRequestStatus.Pending
 import co.wishkeeper.server.HttpTestKit._
 import co.wishkeeper.server.NotificationsData.{FriendRequestAcceptedNotification, FriendRequestNotification}
 import co.wishkeeper.server.projections.PotentialFriend
+import co.wishkeeper.server.web.WebApi
 import co.wishkeeper.test.utils.WishMatchers
 import io.circe.generic.extras.Configuration
 import io.circe.generic.extras.auto._

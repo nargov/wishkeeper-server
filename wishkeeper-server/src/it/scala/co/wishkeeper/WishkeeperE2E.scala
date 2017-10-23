@@ -10,6 +10,7 @@ import akka.http.scaladsl.model._
 import akka.http.scaladsl.unmarshalling.{Unmarshal, Unmarshaller}
 import akka.stream.{ActorMaterializer, Materializer}
 import co.wishkeeper.server._
+import co.wishkeeper.server.web.WebApi
 import de.heikoseeberger.akkahttpcirce.CirceSupport._
 import io.appium.java_client.remote.MobileCapabilityType._
 import io.appium.java_client.remote.MobilePlatform.ANDROID

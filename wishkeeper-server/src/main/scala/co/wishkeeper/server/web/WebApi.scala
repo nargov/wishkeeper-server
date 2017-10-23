@@ -1,4 +1,4 @@
-package co.wishkeeper.server
+package co.wishkeeper.server.web
 
 import java.util.UUID
 
@@ -14,13 +14,13 @@ import akka.stream.scaladsl.StreamConverters
 import akka.util.Timeout
 import co.wishkeeper.json._
 import co.wishkeeper.server.Commands._
-import co.wishkeeper.server.WebApi.imageDimensionsHeader
 import co.wishkeeper.server.api.{ManagementApi, PublicApi}
 import co.wishkeeper.server.image.ImageMetadata
-import co.wishkeeper.server.web.ManagementRoute
+import co.wishkeeper.server.web.WebApi.imageDimensionsHeader
 import de.heikoseeberger.akkahttpcirce.CirceSupport._
 import io.circe.generic.extras.Configuration
 import io.circe.generic.extras.auto._
+import cats.syntax.either._
 
 import scala.concurrent.duration._
 import scala.concurrent.{ExecutionContextExecutor, Future}
@@ -62,12 +62,15 @@ class WebApi(publicApi: PublicApi, managementApi: ManagementApi)
                   }
                 }
               } ~
-                pathEnd {
-                  get {
+                get {
+                  pathEnd {
                     publicApi.userProfileFor(UUID.fromString(sessionId)).
                       map(complete(_)).
                       getOrElse(reject(AuthorizationFailedRejection))
-                  }
+                  } ~
+                    pathPrefix(JavaUUID) { friendId =>
+                      sessionUUID.map(publicApi.userProfileFor(_, friendId)).map(_.right.get).map(complete(_)).get
+                    }
                 }
             } ~
               pathPrefix("friends") {

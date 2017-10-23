@@ -5,10 +5,11 @@ import java.util.UUID.randomUUID
 
 import co.wishkeeper.server.Commands.ChangeFriendRequestStatus
 import co.wishkeeper.server.Events.{FacebookFriendsListSeen, UserConnected}
+import co.wishkeeper.server.EventsTestHelper.EventsList
 import co.wishkeeper.server.FriendRequestStatus.{Approved, Ignored}
 import co.wishkeeper.server.NotificationsData.{FriendRequestNotification, NotificationData}
 import co.wishkeeper.server._
-import co.wishkeeper.server.projections.NotificationsProjection
+import co.wishkeeper.server.projections.{NotificationsProjection, ReplayingUserProfileProjection, UserProfileProjection}
 import com.wixpress.common.specs2.JMock
 import org.joda.time.DateTime
 import org.specs2.matcher.Matcher
@@ -47,23 +48,37 @@ class DelegatingPublicApiTest extends Specification with JMock {
   }
 
   "approve friend request" in new LoggedInContext {
-    val requestId = randomUUID()
-
     checking {
-      oneOf(commandProcessor).process(ChangeFriendRequestStatus(requestId, Approved), userId)
+      oneOf(commandProcessor).process(ChangeFriendRequestStatus(friendRequestId, Approved), userId)
     }
 
-    api.approveFriendRequest(sessionId, requestId)
+    api.approveFriendRequest(sessionId, friendRequestId)
   }
 
   "ignore friend request" in new LoggedInContext {
-    val requestId = randomUUID()
-
     checking {
-      oneOf(commandProcessor).process(ChangeFriendRequestStatus(requestId, Ignored), userId)
+      oneOf(commandProcessor).process(ChangeFriendRequestStatus(friendRequestId, Ignored), userId)
     }
 
-    api.ignoreFriendRequest(sessionId, requestId)
+    api.ignoreFriendRequest(sessionId, friendRequestId)
+  }
+
+  "return friend profile" in new LoggedInContext {
+    val friendName = "Joe"
+
+    checking {
+      allowing(dataStore).userEvents(userId).willReturn(EventsList(userId).withFriend(friendId, friendRequestId).list)
+      allowing(dataStore).userEvents(friendId).willReturn(EventsList(friendId).withName(friendName).list)
+    }
+
+    api.userProfileFor(sessionId, friendId) must beRight(UserProfile(name = Some(friendName)))
+  }
+
+  "return error when not friends" in new LoggedInContext {
+    checking {
+      allowing(dataStore).userEvents(userId).willReturn(EventsList(userId).list)
+    }
+    api.userProfileFor(sessionId, friendId) must beLeft[Reason](NotFriends)
   }
 
   trait Context extends Scope {
@@ -72,12 +87,13 @@ class DelegatingPublicApiTest extends Specification with JMock {
     val dataStore: DataStore = mock[DataStore]
     val notificationsProjection = mock[NotificationsProjection]
     val commandProcessor = mock[CommandProcessor]
+    val userProfileProjection: UserProfileProjection = new ReplayingUserProfileProjection(dataStore)
     val api: PublicApi = new DelegatingPublicApi(
       commandProcessor,
-      dataStore, null, null, null, null, notificationsProjection, null)(null, null, null)
-    val sender: UUID = randomUUID()
+      dataStore, null, null, userProfileProjection, null, notificationsProjection, null)(null, null, null)
+    val friendId: UUID = randomUUID()
     val friendRequestId = randomUUID()
-    val notificationData = FriendRequestNotification(sender, friendRequestId)
+    val notificationData = FriendRequestNotification(friendId, friendRequestId)
   }
 
   trait LoggedInContext extends Context {

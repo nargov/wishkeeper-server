@@ -13,7 +13,7 @@ import co.wishkeeper.server.NotificationsData.FriendRequestNotification
 import co.wishkeeper.server.api.{ManagementApi, PublicApi}
 import co.wishkeeper.server.image.ImageMetadata
 import co.wishkeeper.server.projections.{Friend, PotentialFriend, UserFriends}
-import co.wishkeeper.server.web.ManagementRoute
+import co.wishkeeper.server.web.{ManagementRoute, WebApi}
 import com.wixpress.common.specs2.JMock
 import de.heikoseeberger.akkahttpcirce.CirceSupport._
 import io.circe.generic.extras.Configuration
@@ -278,6 +278,17 @@ class RouteTest extends Specification with Specs2RouteTest with JMock {
 
       Get(s"/users/friends").withHeaders(sessionIdHeader) ~> webApi.userRoute ~> check {
         responseAs[UserFriends] must beEqualTo(userFriends)
+      }
+    }
+
+    "return friend profile" in new LoggedInUserContext {
+      val userProfile = UserProfile(email = Some("expected@email.com"))
+      checking {
+        allowing(publicApi).userProfileFor(sessionId, friendId).willReturn(Right(userProfile))
+      }
+
+      Get(s"/users/profile/${friendId.toString}/").withHeaders(sessionIdHeader) ~> webApi.userRoute ~> check {
+        responseAs[UserProfile] must beEqualTo(userProfile)
       }
     }
   }

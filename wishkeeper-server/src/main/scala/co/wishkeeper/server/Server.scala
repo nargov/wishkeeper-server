@@ -6,6 +6,7 @@ import co.wishkeeper.json._
 import co.wishkeeper.server.api.{DelegatingManagementApi, DelegatingPublicApi, ManagementApi}
 import co.wishkeeper.server.image.{GoogleCloudStorageImageStore, ImageStore}
 import co.wishkeeper.server.projections._
+import co.wishkeeper.server.web.WebApi
 import com.typesafe.config.ConfigFactory
 
 import scala.collection.JavaConverters._
