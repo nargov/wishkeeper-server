@@ -14,13 +14,12 @@ import akka.stream.scaladsl.StreamConverters
 import akka.util.Timeout
 import co.wishkeeper.json._
 import co.wishkeeper.server.Commands._
-import co.wishkeeper.server.api.{ManagementApi, PublicApi}
+import co.wishkeeper.server.api.{ManagementApi, NotFriends, PublicApi}
 import co.wishkeeper.server.image.ImageMetadata
 import co.wishkeeper.server.web.WebApi.imageDimensionsHeader
 import de.heikoseeberger.akkahttpcirce.CirceSupport._
 import io.circe.generic.extras.Configuration
 import io.circe.generic.extras.auto._
-import cats.syntax.either._
 
 import scala.concurrent.duration._
 import scala.concurrent.{ExecutionContextExecutor, Future}
@@ -69,7 +68,12 @@ class WebApi(publicApi: PublicApi, managementApi: ManagementApi)
                       getOrElse(reject(AuthorizationFailedRejection))
                   } ~
                     pathPrefix(JavaUUID) { friendId =>
-                      sessionUUID.map(publicApi.userProfileFor(_, friendId)).map(_.right.get).map(complete(_)).get
+                      sessionUUID.
+                        map(publicApi.userProfileFor(_, friendId)).
+                        map {
+                          case Right(profile) => complete(profile)
+                          case Left(reason) if reason == NotFriends => complete(StatusCodes.Forbidden -> reason)
+                        }.get
                     }
                 }
             } ~
@@ -95,22 +99,26 @@ class WebApi(publicApi: PublicApi, managementApi: ManagementApi)
                   }
               } ~
               pathPrefix("wishes") {
-                post {
-                  entity(as[SetWishDetails]) { setWishDetails =>
-                    publicApi.processCommand(setWishDetails, sessionUUID)
-                    complete(StatusCodes.OK)
-                  }
+                (post & entity(as[SetWishDetails])) { setWishDetails =>
+                  publicApi.processCommand(setWishDetails, sessionUUID)
+                  complete(StatusCodes.OK)
                 } ~
                   get {
-                    sessionUUID.flatMap(publicApi.wishListFor).map(complete(_)).get
+                    pathEnd {
+                      sessionUUID.flatMap(publicApi.wishListFor).map(complete(_)).get
+                    } ~
+                      path(JavaUUID) { friendId =>
+                        sessionUUID.map(publicApi.wishListFor(_, friendId)).map{
+                          case Right(userWishes) => complete(userWishes)
+                          case Left(err) if err == NotFriends => complete(StatusCodes.Forbidden -> err)
+                        }.get
+                      }
                   } ~
-                  delete {
-                    path(JavaUUID) { wishId =>
-                      sessionUUID.map { sessionId =>
-                        publicApi.deleteWish(sessionId, wishId)
-                        complete(StatusCodes.OK)
-                      }.get
-                    }
+                  (delete & path(JavaUUID)) { wishId =>
+                    sessionUUID.map { sessionId =>
+                      publicApi.deleteWish(sessionId, wishId)
+                      complete(StatusCodes.OK)
+                    }.get
                   } ~
                   pathPrefix(JavaUUID / "image") { wishId =>
                     post {
@@ -119,7 +127,6 @@ class WebApi(publicApi: PublicApi, managementApi: ManagementApi)
                           val imageWidth :: imageHeight :: Nil = imageDimensionsHeader.split(",").toList
                           pathEnd {
                             fileUpload("file") { case (metadata, byteSource) =>
-
                               val inputStream = byteSource.runWith(StreamConverters.asInputStream())
                               publicApi.uploadImage(inputStream,
                                 ImageMetadata(

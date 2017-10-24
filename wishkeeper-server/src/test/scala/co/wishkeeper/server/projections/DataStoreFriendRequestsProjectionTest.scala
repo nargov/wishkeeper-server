@@ -21,7 +21,7 @@ class DataStoreFriendRequestsProjectionTest extends Specification with JMock {
       allowing(dataStore).lastSequenceNum(friendId).willReturn(Some(5L))
       oneOf(dataStore).saveUserEvents(having(===(friendId)), having(any[Option[Long]]), having(any[DateTime]), having(contain(
         FriendRequestStatusChanged(friendId, requestId, friendId, Approved)
-      )))
+      ))).willReturn(true)
     }
 
     notificationsProjection.process(FriendRequestStatusChanged(userId, requestId, friendId, Approved))

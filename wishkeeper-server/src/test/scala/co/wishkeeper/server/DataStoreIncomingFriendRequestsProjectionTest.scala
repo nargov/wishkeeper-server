@@ -31,7 +31,7 @@ class DataStoreIncomingFriendRequestsProjectionTest extends Specification with J
         having(equalTo(userId)),
         having(any[Option[Long]]),
         having(any[DateTime]),
-        having(contain(FriendRequestReceived(userId, senderId, Option(requestId)))))
+        having(contain(FriendRequestReceived(userId, senderId, Option(requestId))))).willReturn(true)
     }
 
     projection.process(friendRequestSent)

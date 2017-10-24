@@ -68,6 +68,12 @@ case class User(id: UUID,
 
   def seenFacebookFriends: Boolean = flags.seenFacebookFriendsList
 
+  def hasFriend(friendId: UUID): Boolean = friends.current.contains(friendId)
+
+  def hasPendingFriend(friendId: UUID): Boolean =
+    friends.sentRequests.exists(_.userId == friendId) ||
+      friends.receivedRequests.exists(_.from == friendId)
+
   private def updateWishProperty(wishId: UUID, updater: Wish => Wish) =
     this.copy(wishes = wishes + (wishId -> updater(wishes.getOrElse(wishId, Wish(wishId)))))
 

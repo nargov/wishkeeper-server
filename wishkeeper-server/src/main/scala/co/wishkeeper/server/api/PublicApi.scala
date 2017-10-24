@@ -17,6 +17,7 @@ import scala.concurrent.{ExecutionContext, Future}
 import scala.util.Try
 
 trait PublicApi {
+
   def friendsListFor(sessionId: UUID): UserFriends
 
   def ignoreFriendRequest(sessionId: UUID, reqId: UUID): Unit
@@ -31,13 +32,15 @@ trait PublicApi {
 
   def wishListFor(sessionId: UUID): Option[UserWishes]
 
+  def wishListFor(sessionId: UUID, friendId: UUID): Either[ValidationError, UserWishes]
+
   def processCommand(command: UserCommand, sessionId: Option[UUID]): Unit
 
   def connectFacebookUser(command: ConnectFacebookUser): Future[Boolean]
 
   def userProfileFor(sessionId: UUID): Option[UserProfile]
 
-  def userProfileFor(sessionId: UUID, friendId: UUID): Either[Reason, UserProfile]
+  def userProfileFor(sessionId: UUID, friendId: UUID): Either[ValidationError, UserProfile]
 
   def potentialFriendsFor(facebookAccessToken: String, sessionId: UUID): Option[Future[List[PotentialFriend]]]
 
@@ -94,6 +97,10 @@ class DelegatingPublicApi(commandProcessor: CommandProcessor,
     }
   }
 
+  override def wishListFor(sessionId: UUID, friendId: UUID): Either[ValidationError, UserWishes] = withValidSession(sessionId){ userId =>
+    ???
+  }
+
   override def processCommand(command: UserCommand, sessionId: Option[UUID]): Unit = commandProcessor.process(command, sessionId)
 
   override def connectFacebookUser(command: ConnectFacebookUser): Future[Boolean] = {
@@ -106,12 +113,20 @@ class DelegatingPublicApi(commandProcessor: CommandProcessor,
 
   override def userProfileFor(sessionId: UUID): Option[UserProfile] = dataStore.userBySession(sessionId).map(userProfileProjection.get)
 
+  override def userProfileFor(sessionId: UUID, friendId: UUID): Either[ValidationError, UserProfile] = {
+    withValidSession(sessionId) { userId =>
+      val user = User.replay(dataStore.userEvents(userId))
+      if(user.friends.current.contains(friendId)){
+        Right(userProfileProjection.get(friendId))
+      }
+      else
+        Left(NotFriends)
+    }
+  }
+
   override def potentialFriendsFor(facebookAccessToken: String, sessionId: UUID): Option[Future[List[PotentialFriend]]] = {
     withValidSession(sessionId) { userId =>
-      for {
-        socialData <- userProfileProjection.get(userId).socialData
-        facebookId <- socialData.facebookId
-      } yield userFriendsProjection.potentialFacebookFriends(facebookId, facebookAccessToken)
+      Option(userFriendsProjection.potentialFacebookFriends(userId, facebookAccessToken))
     }
   }
 
@@ -151,22 +166,11 @@ class DelegatingPublicApi(commandProcessor: CommandProcessor,
   }
 
   override def friendsListFor(sessionId: UUID) = withValidSession(sessionId)(userFriendsProjection.friendsFor)
-
-  override def userProfileFor(sessionId: UUID, friendId: UUID): Either[Reason, UserProfile] = {
-    withValidSession(sessionId) { userId =>
-      val user = User.replay(dataStore.userEvents(userId))
-      if(user.friends.current.contains(friendId)){
-        Right(userProfileProjection.get(friendId))
-      }
-      else
-        Left(NotFriends)
-    }
-  }
 }
 
-trait Reason{
+sealed trait ValidationError{
   val msg: String
 }
-case object NotFriends extends Reason {
+case object NotFriends extends ValidationError {
   override val msg: String = "Users are not friends"
 }

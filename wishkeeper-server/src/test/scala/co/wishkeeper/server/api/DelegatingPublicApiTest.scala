@@ -78,8 +78,10 @@ class DelegatingPublicApiTest extends Specification with JMock {
     checking {
       allowing(dataStore).userEvents(userId).willReturn(EventsList(userId).list)
     }
-    api.userProfileFor(sessionId, friendId) must beLeft[Reason](NotFriends)
+    api.userProfileFor(sessionId, friendId) must beLeft[ValidationError](NotFriends)
   }
+
+
 
   trait Context extends Scope {
     val sessionId: UUID = randomUUID()

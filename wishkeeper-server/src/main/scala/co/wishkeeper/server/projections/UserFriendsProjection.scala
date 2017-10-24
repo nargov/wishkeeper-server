@@ -7,7 +7,7 @@ import co.wishkeeper.server.{DataStore, FacebookConnector, User}
 import scala.concurrent.{ExecutionContext, Future}
 
 trait UserFriendsProjection {
-  def potentialFacebookFriends(facebookId: String, accessToken: String, friends: List[UUID] = Nil): Future[List[PotentialFriend]]
+  def potentialFacebookFriends(userId: UUID, accessToken: String): Future[List[PotentialFriend]]
   def friendsFor(userId: UUID): UserFriends
 }
 
@@ -16,18 +16,20 @@ class SimpleUserFriendsProjection(facebookConnector: FacebookConnector,
                                   dataStore: DataStore)
                                  (implicit ex: ExecutionContext) extends UserFriendsProjection {
 
-
-  override def potentialFacebookFriends(facebookId: String, accessToken: String, friends: List[UUID]): Future[List[PotentialFriend]] = {
-    val existingFriend: ((String, UUID)) => Boolean = tuple => friends.contains(tuple._2)
+  override def potentialFacebookFriends(userId: UUID, accessToken: String): Future[List[PotentialFriend]] = {
+    val user = User.replay(dataStore.userEvents(userId))
+    val facebookId = user.userProfile.socialData.flatMap(_.facebookId).get //TODO
+    val existingOrRequestedFriend: ((String, UUID)) => Boolean = { case (_, friendId) =>
+      user.hasFriend(friendId) || user.hasPendingFriend(friendId)
+    }
 
     val eventualFacebookFriends = facebookConnector.friendsFor(facebookId, accessToken)
     eventualFacebookFriends.map { facebookFriends =>
       val facebookIdsToUserIds = userIdByFacebookId.get(facebookFriends.map(_.id))
-      facebookIdsToUserIds.filterNot(existingFriend).map {
-        case (fbId, userId) => PotentialFriend(userId, facebookFriends.find(_.id == fbId).get.name, s"https://graph.facebook.com/v2.9/$fbId/picture")
+      facebookIdsToUserIds.filterNot(existingOrRequestedFriend).map {
+        case (fbId, id) => PotentialFriend(id, facebookFriends.find(_.id == fbId).get.name, s"https://graph.facebook.com/v2.9/$fbId/picture")
       }.toList
     }
-
   }
 
   override def friendsFor(userId: UUID): UserFriends = {

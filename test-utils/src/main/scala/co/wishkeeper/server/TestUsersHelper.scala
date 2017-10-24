@@ -50,23 +50,27 @@ class TestUsersHelper {
     Await.result(Future.sequence(Seq(usersWithSessionIds, futureFriends, futureLogins)), 2.minutes) match {
       case testUsers :: _ :: _ =>
         val friends = testUsers.asInstanceOf[List[TestFacebookUser]]
-        withRetries(sendFriendRequests(sessionIdHeader, facebookAccessTokenHeader, friends))
-        withRetries(approveFriendRequests(sessionIdHeader, friends))
+        sendFriendRequests(sessionIdHeader, facebookAccessTokenHeader, friends)
+        approveFriendRequests(sessionIdHeader, friends)
     }
 
-    usersWithSessionIds.map(users => println(users.head))
+    println("######################################################")
+    println("####################    Test Users    ################\n")
+    users.foreach(println)
     println("Done")
     System.exit(0)
   }
 
-  private def withRetries(f: => Unit, retries: Int = 10, delay: Duration = 1.second): Unit = {
+  private def withRetries[T](f: => T, retries: Int = 10, delay: Duration = 1.second): T = {
     try {
-      if (retries > 0) f
+      f
     }
     catch {
-      case _: Exception =>
+      case e: Exception =>
         Thread.sleep(delay.toMillis)
-        withRetries(f, retries - 1, delay)
+        if (retries > 0)
+          withRetries(f, retries - 1, delay)
+        else throw e
     }
   }
 
@@ -80,15 +84,18 @@ class TestUsersHelper {
 
   private def sendFriendRequests(sessionIdHeader: String, facebookAccessTokenHeader: String, friends: List[TestFacebookUser]) = {
     val headers = Map(facebookAccessTokenHeader -> friends.head.access_token, sessionIdHeader -> friends.head.sessionId.get.toString)
-    val potentialFriends = Get(s"$usersEndpoint/friends/facebook", headers).to[List[PotentialFriend]]
-    println("Potential Friends:")
-    println(potentialFriends)
-    if (potentialFriends.size != friends.size - 1)
-      throw new IllegalStateException("Wrong number of potential friends. Facebook friends api probably not in sync.")
+    val potentialFriends = withRetries(getPotentialFriends(headers, friends.size - 1))
     val futureFriendRequests = potentialFriends.map { potentialFriend =>
       Post.async(s"$usersEndpoint/friends/request", SendFriendRequest(potentialFriend.userId), headers)
     }
     Await.ready(Future.sequence(futureFriendRequests), 10.seconds)
+  }
+
+  private def getPotentialFriends(headers: Map[String, String], expectedSize: Int): List[PotentialFriend] = {
+    val potentialFriends = Get(s"$usersEndpoint/friends/facebook", headers).to[List[PotentialFriend]]
+    if (potentialFriends.size != expectedSize)
+      throw new IllegalStateException("Wrong number of potential friends. Facebook friends api probably not in sync.")
+    potentialFriends
   }
 
   private def approveFriendRequests(sessionIdHeader: String, friends: List[TestFacebookUser]) = {
@@ -97,7 +104,6 @@ class TestUsersHelper {
         Get.async(s"$usersEndpoint/notifications", Map(sessionIdHeader -> friend.sessionId.get.toString)).
           map(_.to[UserNotifications])
       futureNotifications.flatMap { notifications =>
-        if (notifications.list.isEmpty) throw new IllegalStateException("Expecting notification but was empty.")
         val friendRequestNotification = notifications.list.head.data.asInstanceOf[FriendRequestNotification]
         Post.async(s"$usersEndpoint/notifications/friendreq/${friendRequestNotification.requestId}/approve", (),
           Map(sessionIdHeader -> friend.sessionId.get.toString))

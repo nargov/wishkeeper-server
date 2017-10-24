@@ -2,6 +2,7 @@ package co.wishkeeper.server
 
 import java.util.UUID
 
+import co.wishkeeper.server.CommandProcessor.retry
 import co.wishkeeper.server.Commands.{ConnectFacebookUser, UserCommand}
 import co.wishkeeper.server.Events._
 import org.joda.time.DateTime
@@ -41,18 +42,21 @@ class UserCommandProcessor(dataStore: DataStore, eventProcessors: List[EventProc
   }
 
   override def process(command: UserCommand, userId: UUID): Boolean = {
-    val user = User.replay(dataStore.userEvents(userId))
-
     retry {
+      val lastSeqNum = dataStore.lastSequenceNum(userId)
+      val user = User.replay(dataStore.userEvents(userId))
       val events: Seq[UserEvent] = command.process(user)
-      val success = dataStore.saveUserEvents(userId, dataStore.lastSequenceNum(userId), DateTime.now(), events)
-      events.foreach(event => eventProcessors.foreach(_.process(event)))
+      val success = dataStore.saveUserEvents(userId, lastSeqNum, DateTime.now(), events)
+      if (success)
+        events.foreach(event => eventProcessors.foreach(_.process(event)))
       success
     }
   }
 
+}
+object CommandProcessor {
   @tailrec
-  private def retry(f: => Boolean, retries: Int = 50): Boolean = {
+  def retry(f: => Boolean, retries: Int = 50): Boolean = {
     val successful = f
     if (successful || retries == 0) successful else retry(f, retries - 1)
   }

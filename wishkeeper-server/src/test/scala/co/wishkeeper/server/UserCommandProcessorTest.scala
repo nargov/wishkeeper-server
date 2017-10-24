@@ -4,6 +4,7 @@ import java.util.UUID
 
 import co.wishkeeper.server.Commands.{ConnectFacebookUser, SetFacebookUserInfo}
 import co.wishkeeper.server.Events.{Event, UserConnected, UserEvent, UserFacebookIdSet}
+import co.wishkeeper.server.EventsTestHelper.{asEventInstants, userConnectEvent}
 import com.wixpress.common.specs2.JMock
 import org.joda.time.DateTime
 import org.specs2.matcher.{Matcher, MatcherMacros}
@@ -42,7 +43,7 @@ class UserCommandProcessorTest extends Specification with JMock with MatcherMacr
     }
 
     def ignoringSaveUserEvents() = checking {
-      ignoring(dataStore).saveUserEvents(having(any[UUID]), having(any), having(any[DateTime]), having(any[Seq[Event]]))
+      ignoring(dataStore).saveUserEvents(having(any[UUID]), having(any), having(any[DateTime]), having(any[Seq[Event]])).willReturn(true)
     }
 
     def ignoringSaveUserSession() = checking {
@@ -104,8 +105,7 @@ class UserCommandProcessorTest extends Specification with JMock with MatcherMacr
 
     checking {
       oneOf(dataStore).userBySession(sessionId).willReturn(Some(userId))
-      oneOf(dataStore).userEvents(userId).willReturn(
-        UserEventInstant(UserConnected(userId, DateTime.now().minusDays(1), UUID.randomUUID()), DateTime.now().minusDays(1)) :: Nil)
+      oneOf(dataStore).userEvents(userId).willReturn(asEventInstants(List(userConnectEvent(userId))))
     }
 
     commandProcessor.process(SetFacebookUserInfo(), Some(sessionId))
@@ -130,6 +130,19 @@ class UserCommandProcessorTest extends Specification with JMock with MatcherMacr
     checking {
       exactly(2).of(dataStore).saveUserEvents(having(===(userId)), having(beSome(3L)), having(any[DateTime]), having(contain(any[UserEvent]))).
         will(returnValue(false), returnValue(true))
+    }
+
+    commandProcessor.process(SetFacebookUserInfo(name = Option("name")), Some(sessionId))
+  }
+
+  "notify event processors only once" in new EventProcessorContext {
+    assumeExistingUser()
+    assumeHasSequenceNum()
+
+    checking {
+      allowing(dataStore).saveUserEvents(having(===(userId)), having(beSome(3L)), having(any[DateTime]), having(contain(any[UserEvent]))).
+        will(returnValue(false), returnValue(true))
+      oneOf(eventProcessor).process(having(any[Event]))
     }
 
     commandProcessor.process(SetFacebookUserInfo(name = Option("name")), Some(sessionId))

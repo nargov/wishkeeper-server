@@ -10,7 +10,7 @@ import akka.http.scaladsl.testkit.Specs2RouteTest
 import co.wishkeeper.json._
 import co.wishkeeper.server.Commands.{ConnectFacebookUser, SendFriendRequest, SetFlagFacebookFriendsListSeen}
 import co.wishkeeper.server.NotificationsData.FriendRequestNotification
-import co.wishkeeper.server.api.{ManagementApi, PublicApi}
+import co.wishkeeper.server.api.{ManagementApi, NotFriends, PublicApi, ValidationError}
 import co.wishkeeper.server.image.ImageMetadata
 import co.wishkeeper.server.projections.{Friend, PotentialFriend, UserFriends}
 import co.wishkeeper.server.web.{ManagementRoute, WebApi}
@@ -32,9 +32,9 @@ class RouteTest extends Specification with Specs2RouteTest with JMock {
   implicit val circeConfig = Configuration.default.withDefaults
 
   trait ManagementContext extends Scope {
-      val managementApi: ManagementApi = mock[ManagementApi]
-      val managementRoute = ManagementRoute(managementApi)
-      val userId: UUID = randomUUID()
+    val managementApi: ManagementApi = mock[ManagementApi]
+    val managementRoute = ManagementRoute(managementApi)
+    val userId: UUID = randomUUID()
   }
 
   "Management Route" should {
@@ -75,26 +75,6 @@ class RouteTest extends Specification with Specs2RouteTest with JMock {
         responseAs[UUID] must beEqualTo(userId)
       }
     }
-  }
-
-  trait BaseContext extends Scope {
-    val publicApi = mock[PublicApi]
-    val managementApi = mock[ManagementApi]
-
-    val webApi = new WebApi(publicApi, managementApi)
-  }
-
-  trait LoggedInUserContext extends BaseContext {
-    val sessionId = randomUUID()
-    val userId = randomUUID()
-    val friendId = randomUUID()
-    val requestId = randomUUID()
-    val sessionIdHeader = RawHeader(WebApi.sessionIdHeader, sessionId.toString)
-  }
-
-  trait NotLoggedInContext extends BaseContext {
-    val token = "auth-token"
-    val connectFacebookUser = ConnectFacebookUser("facebook-id", token, randomUUID())
   }
 
   "Route" should {
@@ -291,6 +271,59 @@ class RouteTest extends Specification with Specs2RouteTest with JMock {
         responseAs[UserProfile] must beEqualTo(userProfile)
       }
     }
+
+    "return not friends" in new LoggedInUserContext {
+      checking {
+        allowing(publicApi).userProfileFor(sessionId, friendId).willReturn(Left(NotFriends))
+      }
+
+      Get(s"/users/profile/${friendId.toString}/").withHeaders(sessionIdHeader) ~> webApi.userRoute ~> check {
+        status must beEqualTo(StatusCodes.Forbidden)
+      }
+    }
+
+    "return friend wishes" in new LoggedInUserContext {
+      val friendWishes = UserWishes(List(Wish(randomUUID(), name = Some("friend wish"))))
+
+      checking {
+        allowing(publicApi).wishListFor(sessionId, friendId).willReturn(Right(friendWishes))
+      }
+
+      Get(s"/users/wishes/${friendId.toString}").withHeaders(sessionIdHeader) ~> webApi.userRoute ~> check {
+        responseAs[UserWishes] must beEqualTo(friendWishes)
+      }
+    }
+
+    "return not friends" in new LoggedInUserContext {
+      checking {
+        allowing(publicApi).wishListFor(sessionId, friendId).willReturn(Left(NotFriends))
+      }
+
+      Get(s"/users/wishes/${friendId.toString}").withHeaders(sessionIdHeader) ~> webApi.userRoute ~> check {
+        status must beEqualTo(StatusCodes.Forbidden)
+        responseAs[ValidationError] must beEqualTo(NotFriends)
+      }
+    }
+  }
+
+  trait BaseContext extends Scope {
+    val publicApi = mock[PublicApi]
+    val managementApi = mock[ManagementApi]
+
+    val webApi = new WebApi(publicApi, managementApi)
+  }
+
+  trait LoggedInUserContext extends BaseContext {
+    val sessionId = randomUUID()
+    val userId = randomUUID()
+    val friendId = randomUUID()
+    val requestId = randomUUID()
+    val sessionIdHeader = RawHeader(WebApi.sessionIdHeader, sessionId.toString)
+  }
+
+  trait NotLoggedInContext extends BaseContext {
+    val token = "auth-token"
+    val connectFacebookUser = ConnectFacebookUser("facebook-id", token, randomUUID())
   }
 
   def aPotentialFriendWith(id: UUID, name: String): Matcher[PotentialFriend] =

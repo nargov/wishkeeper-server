@@ -24,7 +24,7 @@ class DataStoreNotificationsProjectionTest extends Specification with JMock {
         having(equalTo(userId)),
         having(any[Option[Long]]),
         having(any[DateTime]),
-        having(contain(aFriendRequestNotificationCreatedEvent(userId, friendId))))
+        having(contain(aFriendRequestNotificationCreatedEvent(userId, friendId)))).willReturn(true)
     }
 
     processFriendRequest()
@@ -66,7 +66,7 @@ class DataStoreNotificationsProjectionTest extends Specification with JMock {
         having(equalTo(friendId)),
         having(any[Option[Long]]),
         having(any[DateTime]),
-        having(contain(aFriendRequesdAcceptedNotificationCreatedEvent(friendId, userId, friendReqId))))
+        having(contain(aFriendRequesdAcceptedNotificationCreatedEvent(friendId, userId, friendReqId)))).willReturn(true)
     }
 
     projection.process(FriendRequestStatusChanged(userId, friendReqId, friendId, Approved))
