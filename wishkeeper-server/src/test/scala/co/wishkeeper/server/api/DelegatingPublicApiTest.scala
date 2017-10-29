@@ -81,6 +81,29 @@ class DelegatingPublicApiTest extends Specification with JMock {
     api.userProfileFor(sessionId, friendId) must beLeft[ValidationError](NotFriends)
   }
 
+  "return friend wishlist" in new LoggedInContext {
+    val friendName = "Joe"
+    val wishId = randomUUID()
+    val wishName = "expected wish"
+
+    checking {
+      allowing(dataStore).userEvents(userId).willReturn(EventsList(userId).withFriend(friendId, friendRequestId).list)
+      allowing(dataStore).userEvents(friendId).willReturn(EventsList(friendId).withName(friendName).withWish(wishId, wishName).list)
+    }
+
+    api.wishListFor(sessionId, friendId) must beRight(userWishesWith(wishId, wishName))
+  }
+
+  "return error when not friends" in new LoggedInContext {
+    checking {
+      allowing(dataStore).userEvents(userId).willReturn(EventsList(userId).list)
+    }
+    api.wishListFor(sessionId, friendId) must beLeft[ValidationError](NotFriends)
+  }
+
+  def userWishesWith(wishId: UUID, wishName: String): Matcher[UserWishes] = contain(aWishWith(wishId, wishName)) ^^ {(_:UserWishes).wishes}
+  def aWishWith(id: UUID, name: String): Matcher[Wish] = (wish: Wish) =>
+    (wish.id == id && wish.name.isDefined && wish.name.get == name, s"Wish $wish does not match name $name and id $id")
 
 
   trait Context extends Scope {

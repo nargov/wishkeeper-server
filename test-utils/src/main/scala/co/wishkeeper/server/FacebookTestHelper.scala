@@ -29,6 +29,9 @@ class FacebookTestHelper(implicit ec: ExecutionContext, actorSystem: ActorSystem
     friends.map { friend =>
       friendRequestFor(testUser, friend).flatMap {
         case res if res.status == StatusCodes.OK => friendRequestFor(friend, testUser)
+        case res =>
+          println("Error making friends " + res.entity.dataBytes.fold("")(_ + _.mkString))
+          Future.successful(res)
       }
     }
   }

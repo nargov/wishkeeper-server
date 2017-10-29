@@ -90,15 +90,25 @@ class DelegatingPublicApi(commandProcessor: CommandProcessor,
     }
   }
 
-  override def wishListFor(sessionId: UUID): Option[UserWishes] = { //TODO missing tests here
-    dataStore.userBySession(sessionId).map { userId =>
-      val wishList = replayUser(userId).wishes.values.toList
-      UserWishes(wishList.filter(_.status == WishStatus.Active).sortBy(_.creationTime.getMillis).reverse)
+  override def wishListFor(sessionId: UUID): Option[UserWishes] = { dataStore.userBySession(sessionId).map { userId =>
+      UserWishes(activeWishesByDate(replayUser(userId)))
     }
   }
 
+  private def activeWishesByDate(user: User) = {
+    val wishList = user.wishes.values.toList
+    wishList.
+      filter(_.status == WishStatus.Active).
+      sortBy(_.creationTime.getMillis).
+      reverse
+  }
+
   override def wishListFor(sessionId: UUID, friendId: UUID): Either[ValidationError, UserWishes] = withValidSession(sessionId){ userId =>
-    ???
+    val user = replayUser(userId)
+    if(user.hasFriend(friendId))
+      Right(UserWishes(activeWishesByDate(replayUser(friendId))))
+    else
+      Left(NotFriends)
   }
 
   override def processCommand(command: UserCommand, sessionId: Option[UUID]): Unit = commandProcessor.process(command, sessionId)
@@ -116,7 +126,7 @@ class DelegatingPublicApi(commandProcessor: CommandProcessor,
   override def userProfileFor(sessionId: UUID, friendId: UUID): Either[ValidationError, UserProfile] = {
     withValidSession(sessionId) { userId =>
       val user = User.replay(dataStore.userEvents(userId))
-      if(user.friends.current.contains(friendId)){
+      if(user.hasFriend(friendId)){
         Right(userProfileProjection.get(friendId))
       }
       else

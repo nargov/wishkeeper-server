@@ -22,6 +22,10 @@ object EventsTestHelper {
     )))
 
     def withName(name: String) = this.copy(list = list :+ asEventInstant(UserNameSet(userId, name)))
+    def withWish(id: UUID, name: String) = this.copy(list = list ++ asEventInstants(List(
+      WishCreated(id, userId, DateTime.now().minusDays(1)),
+      WishNameSet(id, name)
+    )))
   }
   object EventsList{
     def apply(userId: UUID): EventsList = EventsList(userId, asEventInstants(List(userConnectEvent(userId))))
