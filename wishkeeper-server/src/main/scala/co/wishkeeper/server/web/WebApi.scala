@@ -52,31 +52,39 @@ class WebApi(publicApi: PublicApi, managementApi: ManagementApi)
         } ~
           headerValueByName(WebApi.sessionIdHeader) { sessionId =>
             val sessionUUID = Option(UUID.fromString(sessionId))
-            pathPrefix("profile") {
-              path("facebook") {
-                post {
-                  entity(as[SetFacebookUserInfo]) { info =>
-                    publicApi.processCommand(info, sessionUUID) //TODO move the UUID parsing to a custom directive
-                    complete(StatusCodes.OK)
-                  }
-                }
-              } ~
-                get {
-                  pathEnd {
-                    publicApi.userProfileFor(UUID.fromString(sessionId)).
-                      map(complete(_)).
-                      getOrElse(reject(AuthorizationFailedRejection))
-                  } ~
-                    pathPrefix(JavaUUID) { friendId =>
-                      sessionUUID.
-                        map(publicApi.userProfileFor(_, friendId)).
-                        map {
-                          case Right(profile) => complete(profile)
-                          case Left(reason) if reason == NotFriends => complete(StatusCodes.Forbidden -> reason)
-                        }.get
-                    }
-                }
+            pathPrefix(JavaUUID) { userId =>
+              (path("friends") & get) {
+                sessionUUID.map(publicApi.friendsListFor(_, userId)).map {
+                  case Right(userFriends) => complete(userFriends)
+                  case Left(reason) if reason == NotFriends => complete(StatusCodes.Forbidden -> reason)
+                }.get
+              }
             } ~
+              pathPrefix("profile") {
+                path("facebook") {
+                  post {
+                    entity(as[SetFacebookUserInfo]) { info =>
+                      publicApi.processCommand(info, sessionUUID) //TODO move the UUID parsing to a custom directive
+                      complete(StatusCodes.OK)
+                    }
+                  }
+                } ~
+                  get {
+                    pathEnd {
+                      publicApi.userProfileFor(UUID.fromString(sessionId)).
+                        map(complete(_)).
+                        getOrElse(reject(AuthorizationFailedRejection))
+                    } ~
+                      pathPrefix(JavaUUID) { friendId =>
+                        sessionUUID.
+                          map(publicApi.userProfileFor(_, friendId)).
+                          map {
+                            case Right(profile) => complete(profile)
+                            case Left(reason) if reason == NotFriends => complete(StatusCodes.Forbidden -> reason)
+                          }.get
+                      }
+                  }
+              } ~
               pathPrefix("friends") {
                 get {
                   pathEnd {
@@ -108,7 +116,7 @@ class WebApi(publicApi: PublicApi, managementApi: ManagementApi)
                       sessionUUID.flatMap(publicApi.wishListFor).map(complete(_)).get
                     } ~
                       path(JavaUUID) { friendId =>
-                        sessionUUID.map(publicApi.wishListFor(_, friendId)).map{
+                        sessionUUID.map(publicApi.wishListFor(_, friendId)).map {
                           case Right(userWishes) => complete(userWishes)
                           case Left(err) if err == NotFriends => complete(StatusCodes.Forbidden -> err)
                         }.get

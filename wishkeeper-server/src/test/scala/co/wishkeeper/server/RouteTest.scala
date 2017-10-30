@@ -304,6 +304,28 @@ class RouteTest extends Specification with Specs2RouteTest with JMock {
         responseAs[ValidationError] must beEqualTo(NotFriends)
       }
     }
+
+    "return friend friends" in new LoggedInUserContext {
+      val friends = UserFriends(List(Friend(friendId, None, None)))
+      checking {
+        oneOf(publicApi).friendsListFor(sessionId, friendId).willReturn(Right(friends))
+      }
+
+      Get(s"/users/${friendId.toString}/friends").withHeaders(sessionIdHeader) ~> webApi.userRoute ~> check {
+        responseAs[UserFriends] must beEqualTo(friends)
+      }
+    }
+
+    "return not friends" in new LoggedInUserContext {
+      checking {
+        allowing(publicApi).friendsListFor(sessionId, friendId).willReturn(Left(NotFriends))
+      }
+
+      Get(s"/users/${friendId.toString}/friends").withHeaders(sessionIdHeader) ~> webApi.userRoute ~> check {
+        status must beEqualTo(StatusCodes.Forbidden)
+        responseAs[ValidationError] must beEqualTo(NotFriends)
+      }
+    }
   }
 
   trait BaseContext extends Scope {

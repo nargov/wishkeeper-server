@@ -18,6 +18,8 @@ import scala.util.Try
 
 trait PublicApi {
 
+  def friendsListFor(sessionId: UUID, friendId: UUID): Either[ValidationError, UserFriends]
+
   def friendsListFor(sessionId: UUID): UserFriends
 
   def ignoreFriendRequest(sessionId: UUID, reqId: UUID): Unit
@@ -90,7 +92,8 @@ class DelegatingPublicApi(commandProcessor: CommandProcessor,
     }
   }
 
-  override def wishListFor(sessionId: UUID): Option[UserWishes] = { dataStore.userBySession(sessionId).map { userId =>
+  override def wishListFor(sessionId: UUID): Option[UserWishes] = {
+    dataStore.userBySession(sessionId).map { userId =>
       UserWishes(activeWishesByDate(replayUser(userId)))
     }
   }
@@ -103,9 +106,9 @@ class DelegatingPublicApi(commandProcessor: CommandProcessor,
       reverse
   }
 
-  override def wishListFor(sessionId: UUID, friendId: UUID): Either[ValidationError, UserWishes] = withValidSession(sessionId){ userId =>
+  override def wishListFor(sessionId: UUID, friendId: UUID): Either[ValidationError, UserWishes] = withValidSession(sessionId) { userId =>
     val user = replayUser(userId)
-    if(user.hasFriend(friendId))
+    if (user.hasFriend(friendId))
       Right(UserWishes(activeWishesByDate(replayUser(friendId))))
     else
       Left(NotFriends)
@@ -126,7 +129,7 @@ class DelegatingPublicApi(commandProcessor: CommandProcessor,
   override def userProfileFor(sessionId: UUID, friendId: UUID): Either[ValidationError, UserProfile] = {
     withValidSession(sessionId) { userId =>
       val user = User.replay(dataStore.userEvents(userId))
-      if(user.hasFriend(friendId)){
+      if (user.hasFriend(friendId)) {
         Right(userProfileProjection.get(friendId))
       }
       else
@@ -175,12 +178,21 @@ class DelegatingPublicApi(commandProcessor: CommandProcessor,
     }
   }
 
-  override def friendsListFor(sessionId: UUID) = withValidSession(sessionId)(userFriendsProjection.friendsFor)
+  override def friendsListFor(sessionId: UUID): UserFriends = withValidSession(sessionId)(userFriendsProjection.friendsFor)
+
+  override def friendsListFor(sessionId: UUID, friendId: UUID): Either[ValidationError, UserFriends] = withValidSession(sessionId) { userId =>
+    val user = User.replay(dataStore.userEvents(userId))
+    if (user.hasFriend(friendId))
+      Right(userFriendsProjection.friendsFor(friendId))
+    else
+      Left(NotFriends)
+  }
 }
 
-sealed trait ValidationError{
+sealed trait ValidationError {
   val msg: String
 }
+
 case object NotFriends extends ValidationError {
   override val msg: String = "Users are not friends"
 }

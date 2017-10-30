@@ -18,12 +18,11 @@ class SimpleUserFriendsProjection(facebookConnector: FacebookConnector,
 
   override def potentialFacebookFriends(userId: UUID, accessToken: String): Future[List[PotentialFriend]] = {
     val user = User.replay(dataStore.userEvents(userId))
-    val facebookId = user.userProfile.socialData.flatMap(_.facebookId).get //TODO
     val existingOrRequestedFriend: ((String, UUID)) => Boolean = { case (_, friendId) =>
       user.hasFriend(friendId) || user.hasPendingFriend(friendId)
     }
 
-    val eventualFacebookFriends = facebookConnector.friendsFor(facebookId, accessToken)
+    val eventualFacebookFriends = facebookConnector.friendsFor(user.facebookId.get, accessToken)
     eventualFacebookFriends.map { facebookFriends =>
       val facebookIdsToUserIds = userIdByFacebookId.get(facebookFriends.map(_.id))
       facebookIdsToUserIds.filterNot(existingOrRequestedFriend).map {
@@ -41,5 +40,5 @@ class SimpleUserFriendsProjection(facebookConnector: FacebookConnector,
 }
 
 
-case class Friend(userId: UUID, name: Option[String], image: Option[String])
+case class Friend(userId: UUID, name: Option[String] = None, image: Option[String] = None)
 case class UserFriends(list: List[Friend])

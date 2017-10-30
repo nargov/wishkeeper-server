@@ -9,7 +9,7 @@ import co.wishkeeper.server.EventsTestHelper.EventsList
 import co.wishkeeper.server.FriendRequestStatus.{Approved, Ignored}
 import co.wishkeeper.server.NotificationsData.{FriendRequestNotification, NotificationData}
 import co.wishkeeper.server._
-import co.wishkeeper.server.projections.{NotificationsProjection, ReplayingUserProfileProjection, UserProfileProjection}
+import co.wishkeeper.server.projections._
 import com.wixpress.common.specs2.JMock
 import org.joda.time.DateTime
 import org.specs2.matcher.Matcher
@@ -101,6 +101,24 @@ class DelegatingPublicApiTest extends Specification with JMock {
     api.wishListFor(sessionId, friendId) must beLeft[ValidationError](NotFriends)
   }
 
+  "return friend friends" in new LoggedInContext {
+    val friends = UserFriends(List(Friend(userId, None, None)))
+    checking {
+      allowing(dataStore).userEvents(userId).willReturn(EventsList(userId).withFriend(friendId, friendRequestId).list)
+      allowing(userFriendsProjection).friendsFor(friendId).willReturn(friends)
+    }
+
+    api.friendsListFor(sessionId, friendId) must beRight(UserFriends(List(Friend(userId))))
+  }
+
+  "return error when not friends" in new LoggedInContext {
+    checking {
+      allowing(dataStore).userEvents(userId).willReturn(EventsList(userId).list)
+    }
+
+    api.friendsListFor(sessionId, friendId) must beLeft[ValidationError](NotFriends)
+  }
+
   def userWishesWith(wishId: UUID, wishName: String): Matcher[UserWishes] = contain(aWishWith(wishId, wishName)) ^^ {(_:UserWishes).wishes}
   def aWishWith(id: UUID, name: String): Matcher[Wish] = (wish: Wish) =>
     (wish.id == id && wish.name.isDefined && wish.name.get == name, s"Wish $wish does not match name $name and id $id")
@@ -112,10 +130,11 @@ class DelegatingPublicApiTest extends Specification with JMock {
     val dataStore: DataStore = mock[DataStore]
     val notificationsProjection = mock[NotificationsProjection]
     val commandProcessor = mock[CommandProcessor]
+    val userFriendsProjection: UserFriendsProjection = mock[UserFriendsProjection]
     val userProfileProjection: UserProfileProjection = new ReplayingUserProfileProjection(dataStore)
     val api: PublicApi = new DelegatingPublicApi(
       commandProcessor,
-      dataStore, null, null, userProfileProjection, null, notificationsProjection, null)(null, null, null)
+      dataStore, null, null, userProfileProjection, userFriendsProjection, notificationsProjection, null)(null, null, null)
     val friendId: UUID = randomUUID()
     val friendRequestId = randomUUID()
     val notificationData = FriendRequestNotification(friendId, friendRequestId)
