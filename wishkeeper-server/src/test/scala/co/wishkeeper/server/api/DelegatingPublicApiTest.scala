@@ -102,13 +102,14 @@ class DelegatingPublicApiTest extends Specification with JMock {
   }
 
   "return friend friends" in new LoggedInContext {
-    val friends = UserFriends(List(Friend(userId, None, None)))
+    val otherFriend = Friend(randomUUID())
+    val friends = UserFriends(List(Friend(userId), otherFriend))
     checking {
       allowing(dataStore).userEvents(userId).willReturn(EventsList(userId).withFriend(friendId, friendRequestId).list)
       allowing(userFriendsProjection).friendsFor(friendId).willReturn(friends)
     }
 
-    api.friendsListFor(sessionId, friendId) must beRight(UserFriends(List(Friend(userId))))
+    api.friendsListFor(sessionId, friendId) must beRight(UserFriends(List(otherFriend)))
   }
 
   "return error when not friends" in new LoggedInContext {

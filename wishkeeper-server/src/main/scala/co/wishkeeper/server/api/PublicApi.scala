@@ -183,7 +183,7 @@ class DelegatingPublicApi(commandProcessor: CommandProcessor,
   override def friendsListFor(sessionId: UUID, friendId: UUID): Either[ValidationError, UserFriends] = withValidSession(sessionId) { userId =>
     val user = User.replay(dataStore.userEvents(userId))
     if (user.hasFriend(friendId))
-      Right(userFriendsProjection.friendsFor(friendId))
+      Right(userFriendsProjection.friendsFor(friendId).excluding(user.id))
     else
       Left(NotFriends)
   }

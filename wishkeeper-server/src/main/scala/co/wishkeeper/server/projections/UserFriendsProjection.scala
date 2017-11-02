@@ -7,7 +7,9 @@ import co.wishkeeper.server.{DataStore, FacebookConnector, User}
 import scala.concurrent.{ExecutionContext, Future}
 
 trait UserFriendsProjection {
+
   def potentialFacebookFriends(userId: UUID, accessToken: String): Future[List[PotentialFriend]]
+
   def friendsFor(userId: UUID): UserFriends
 }
 
@@ -18,8 +20,9 @@ class SimpleUserFriendsProjection(facebookConnector: FacebookConnector,
 
   override def potentialFacebookFriends(userId: UUID, accessToken: String): Future[List[PotentialFriend]] = {
     val user = User.replay(dataStore.userEvents(userId))
-    val existingOrRequestedFriend: ((String, UUID)) => Boolean = { case (_, friendId) =>
-      user.hasFriend(friendId) || user.hasPendingFriend(friendId)
+    val existingOrRequestedFriend: ((String, UUID)) => Boolean = {
+      case (_, friendId) =>
+        user.hasFriend(friendId) || user.hasPendingFriend(friendId)
     }
 
     val eventualFacebookFriends = facebookConnector.friendsFor(user.facebookId.get, accessToken)
@@ -41,4 +44,7 @@ class SimpleUserFriendsProjection(facebookConnector: FacebookConnector,
 
 
 case class Friend(userId: UUID, name: Option[String] = None, image: Option[String] = None)
-case class UserFriends(list: List[Friend])
+
+case class UserFriends(list: List[Friend]){
+  def excluding(friendId: UUID) = copy(list = list.filterNot(_.userId == friendId))
+}
