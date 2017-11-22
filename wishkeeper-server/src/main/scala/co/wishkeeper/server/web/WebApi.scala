@@ -56,7 +56,7 @@ class WebApi(publicApi: PublicApi, managementApi: ManagementApi)
               (path("friends") & get) {
                 sessionUUID.map(publicApi.friendsListFor(_, userId)).map {
                   case Right(userFriends) => complete(userFriends)
-                  case Left(reason) if reason == NotFriends => complete(StatusCodes.Forbidden -> reason)
+                  case Left(reason) => complete(StatusCodes.ServerError -> reason)
                 }.get
               }
             } ~

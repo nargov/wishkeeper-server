@@ -4,7 +4,7 @@ import java.util.UUID
 import java.util.UUID.randomUUID
 
 import co.wishkeeper.server.Events._
-import co.wishkeeper.server.EventsTestHelper.{asEventInstants, userConnectEvent}
+import co.wishkeeper.server.EventsTestHelper.{EventsList, asEventInstants, userConnectEvent}
 import co.wishkeeper.server.FriendRequestStatus.Approved
 import co.wishkeeper.server.projections._
 import com.wixpress.common.specs2.JMock
@@ -15,7 +15,7 @@ import org.specs2.specification.Scope
 
 import scala.concurrent.Future
 
-class UserFriendsProjectionTest(implicit ee: ExecutionEnv) extends Specification with JMock {
+class SimpleUserFriendsProjectionTest(implicit ee: ExecutionEnv) extends Specification with JMock {
 
   "return a list of potential friends that are wishkeeper users" in new Context {
     assumingExistingFacebookFriends()
@@ -69,6 +69,43 @@ class UserFriendsProjectionTest(implicit ee: ExecutionEnv) extends Specification
     }
 
     userFriendsProjection.potentialFacebookFriends(userId, accessToken) must beEmpty[List[PotentialFriend]].await
+  }
+
+  "return mutual friends" in new Context {
+    val mutualFriendId = randomUUID()
+
+    checking {
+      allowing(dataStore).userEvents(userId).willReturn(EventsList(userId).withFriend(friendId).withFriend(mutualFriendId).list)
+      allowing(dataStore).userEvents(friendId).willReturn(EventsList(friendId).withFriend(userId).withFriend(mutualFriendId).list)
+      allowing(dataStore).userEvents(mutualFriendId).willReturn(EventsList(mutualFriendId).withFriend(userId).withFriend(friendId).list)
+    }
+
+    userFriendsProjection.friendsFor(friendId, userId) must beEqualTo(UserFriends(List(Friend(userId)), List(Friend(mutualFriendId))))
+  }
+
+  "return friends of friend for which friend request exists" in new Context {
+    val potentialMutualFriend = randomUUID()
+    checking {
+      allowing(dataStore).userEvents(userId).willReturn(EventsList(userId).withFriend(friendId).withFriendRequest(potentialMutualFriend).list)
+      allowing(dataStore).userEvents(friendId).willReturn(EventsList(friendId).withFriend(potentialMutualFriend).list)
+      allowing(dataStore).userEvents(potentialMutualFriend).willReturn(EventsList(potentialMutualFriend).withFriend(friendId).list)
+    }
+
+    userFriendsProjection.friendsFor(friendId, userId) must beEqualTo(UserFriends(Nil, Nil, List(Friend(potentialMutualFriend))))
+  }
+
+  "return only mutual friends if not direct friend" in new Context {
+    val mutualFriendId = randomUUID()
+    val nonMutualFriend = randomUUID()
+
+    checking {
+      allowing(dataStore).userEvents(userId).willReturn(EventsList(userId).withFriend(mutualFriendId).list)
+      allowing(dataStore).userEvents(friendId).willReturn(EventsList(friendId).withFriend(mutualFriendId).withFriend(nonMutualFriend).list)
+      allowing(dataStore).userEvents(mutualFriendId).willReturn(EventsList(mutualFriendId).withFriend(userId).withFriend(friendId).list)
+      allowing(dataStore).userEvents(nonMutualFriend).willReturn(EventsList(nonMutualFriend).list)
+    }
+
+    userFriendsProjection.friendsFor(friendId, userId) must beEqualTo(UserFriends(Nil, List(Friend(mutualFriendId)), Nil))
   }
 
 

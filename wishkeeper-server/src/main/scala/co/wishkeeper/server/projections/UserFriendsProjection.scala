@@ -11,6 +11,8 @@ trait UserFriendsProjection {
   def potentialFacebookFriends(userId: UUID, accessToken: String): Future[List[PotentialFriend]]
 
   def friendsFor(userId: UUID): UserFriends
+
+  def friendsFor(friendId: UUID, userId: UUID): UserFriends
 }
 
 class SimpleUserFriendsProjection(facebookConnector: FacebookConnector,
@@ -37,14 +39,27 @@ class SimpleUserFriendsProjection(facebookConnector: FacebookConnector,
   override def friendsFor(userId: UUID): UserFriends = {
     UserFriends(User.replay(dataStore.userEvents(userId)).friends.current.map { friendId =>
       val friend = User.replay(dataStore.userEvents(friendId))
-      Friend(friendId, friend.userProfile.name, friend.userProfile.picture)
+      Friend(friendId, friend.userProfile.name, friend.userProfile.picture, friend.userProfile.firstName)
     })
+  }
+
+  override def friendsFor(friendId: UUID, userId: UUID) = {
+    val userFriends = User.replay(dataStore.userEvents(userId)).friends
+    val userCurrentFriends = userFriends.current.toSet
+    val sentFriendRequests = userFriends.sentRequests.toSet
+    val friendFriends = friendsFor(friendId)
+    val (mutualFriends, friends) = friendFriends.list.partition(friend => userCurrentFriends.contains(friend.userId))
+    val (potentialMutual, onlyFriendFriends) = friends.partition(friend => sentFriendRequests.exists(_.userId == friend.userId))
+    if (userFriends.current.contains(friendId))
+      UserFriends(onlyFriendFriends, mutualFriends, potentialMutual)
+    else
+      UserFriends(Nil, mutualFriends, Nil)
   }
 }
 
 
-case class Friend(userId: UUID, name: Option[String] = None, image: Option[String] = None)
+case class Friend(userId: UUID, name: Option[String] = None, image: Option[String] = None, firstName: Option[String] = None)
 
-case class UserFriends(list: List[Friend]){
+case class UserFriends(list: List[Friend], mutual: List[Friend] = Nil, requested: List[Friend] = Nil) {
   def excluding(friendId: UUID) = copy(list = list.filterNot(_.userId == friendId))
 }

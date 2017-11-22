@@ -74,11 +74,16 @@ class DelegatingPublicApiTest extends Specification with JMock {
     api.userProfileFor(sessionId, friendId) must beRight(UserProfile(name = Some(friendName)))
   }
 
-  "return error when not friends" in new LoggedInContext {
+  "return minimal profile when not friends" in new LoggedInContext {
+    val strangerFirstName = "Martin"
+    val strangerName = strangerFirstName + " Strange"
+    val strangerImage = "expectedImageLink"
+
     checking {
       allowing(dataStore).userEvents(userId).willReturn(EventsList(userId).list)
+      allowing(dataStore).userEvents(friendId).willReturn(EventsList(friendId).withName(strangerName).withPic(strangerImage).list)
     }
-    api.userProfileFor(sessionId, friendId) must beLeft[ValidationError](NotFriends)
+    api.userProfileFor(sessionId, friendId) must beRight(UserProfile(name = Option(strangerName), picture = Option(strangerImage)))
   }
 
   "return friend wishlist" in new LoggedInContext {
@@ -106,18 +111,10 @@ class DelegatingPublicApiTest extends Specification with JMock {
     val friends = UserFriends(List(Friend(userId), otherFriend))
     checking {
       allowing(dataStore).userEvents(userId).willReturn(EventsList(userId).withFriend(friendId, friendRequestId).list)
-      allowing(userFriendsProjection).friendsFor(friendId).willReturn(friends)
+      allowing(userFriendsProjection).friendsFor(friendId, userId).willReturn(friends)
     }
 
     api.friendsListFor(sessionId, friendId) must beRight(UserFriends(List(otherFriend)))
-  }
-
-  "return error when not friends" in new LoggedInContext {
-    checking {
-      allowing(dataStore).userEvents(userId).willReturn(EventsList(userId).list)
-    }
-
-    api.friendsListFor(sessionId, friendId) must beLeft[ValidationError](NotFriends)
   }
 
   def userWishesWith(wishId: UUID, wishName: String): Matcher[UserWishes] = contain(aWishWith(wishId, wishName)) ^^ {(_:UserWishes).wishes}

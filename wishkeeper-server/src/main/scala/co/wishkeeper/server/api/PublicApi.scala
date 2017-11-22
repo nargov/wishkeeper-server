@@ -129,11 +129,10 @@ class DelegatingPublicApi(commandProcessor: CommandProcessor,
   override def userProfileFor(sessionId: UUID, friendId: UUID): Either[ValidationError, UserProfile] = {
     withValidSession(sessionId) { userId =>
       val user = User.replay(dataStore.userEvents(userId))
-      if (user.hasFriend(friendId)) {
+      if (user.hasFriend(friendId))
         Right(userProfileProjection.get(friendId))
-      }
       else
-        Left(NotFriends)
+        Right(userProfileProjection.strangerProfile(friendId))
     }
   }
 
@@ -182,10 +181,7 @@ class DelegatingPublicApi(commandProcessor: CommandProcessor,
 
   override def friendsListFor(sessionId: UUID, friendId: UUID): Either[ValidationError, UserFriends] = withValidSession(sessionId) { userId =>
     val user = User.replay(dataStore.userEvents(userId))
-    if (user.hasFriend(friendId))
-      Right(userFriendsProjection.friendsFor(friendId).excluding(user.id))
-    else
-      Left(NotFriends)
+    Right(userFriendsProjection.friendsFor(friendId, user.id).excluding(user.id))
   }
 }
 
