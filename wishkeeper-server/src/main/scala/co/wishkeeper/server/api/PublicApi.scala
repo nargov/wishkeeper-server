@@ -88,8 +88,8 @@ class DelegatingPublicApi(commandProcessor: CommandProcessor,
       connection.setRequestProperty("User-Agent",
         "Mozilla/5.0 (Windows NT 6.4; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/41.0.2225.0 Safari/537.36")
       connection.connect()
-      uploadImage(connection.getInputStream, imageMetadata, wishId, sessionId)
-    }
+      connection
+    }.flatMap(con => uploadImage(con.getInputStream, imageMetadata, wishId, sessionId))
   }
 
   override def wishListFor(sessionId: UUID): Option[UserWishes] = {

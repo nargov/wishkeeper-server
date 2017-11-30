@@ -34,7 +34,8 @@ class WishkeeperServer {
     userIdByFacebookIdProjection,
     incomingFriendRequestsProjection,
     notificationsProjection,
-    friendRequestsProjection
+    friendRequestsProjection,
+    new UserByEmailProjection(dataStore)
   ))
   private val userProfileProjection: UserProfileProjection = new ReplayingUserProfileProjection(dataStore)
   private val facebookConnector: FacebookConnector = new AkkaHttpFacebookConnector(

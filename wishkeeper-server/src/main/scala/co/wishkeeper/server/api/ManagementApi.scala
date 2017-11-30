@@ -3,8 +3,8 @@ package co.wishkeeper.server.api
 import java.util.UUID
 
 import co.wishkeeper.server.Commands.SetFlagFacebookFriendsListSeen
-import co.wishkeeper.server.projections.{UserIdByFacebookIdProjection, UserProfileProjection}
 import co.wishkeeper.server._
+import co.wishkeeper.server.projections.{UserIdByFacebookIdProjection, UserProfileProjection}
 
 trait ManagementApi {
   def userIdFor(facebookId: String): Option[UUID]
@@ -21,7 +21,7 @@ trait ManagementApi {
 class DelegatingManagementApi(userIdByFacebookIdProjection: UserIdByFacebookIdProjection,
                               userProfileProjection: UserProfileProjection,
                               dataStore: DataStore,
-                              commandProcessor: CommandProcessor) extends ManagementApi{
+                              commandProcessor: CommandProcessor) extends ManagementApi {
 
   override def userByEmail(email: String): Option[UUID] = dataStore.userByEmail(email)
 

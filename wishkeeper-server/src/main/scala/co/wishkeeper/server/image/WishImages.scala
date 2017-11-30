@@ -23,6 +23,7 @@ class WishImages(imageStore: ImageStore, imageProcessor: ImageProcessor, maxUplo
   private val log = LoggerFactory.getLogger(getClass)
 
   def uploadImageAndResizedCopies(imageMetadata: ImageMetadata, origFile: Path, timeout: Duration = 2.minutes): ImageLinks = {
+    log.debug(s"Image Metadata: $imageMetadata")
     val sizesAndExtensions = (".full", imageMetadata.width) :: WishImages.sizeExtensions
 
     val eventualLinks: List[Future[ImageLink]] = sizesAndExtensions.filter {
