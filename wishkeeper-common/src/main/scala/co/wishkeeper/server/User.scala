@@ -63,6 +63,10 @@ case class User(id: UUID,
     )
     case UserEventInstant(FriendRequestAcceptedNotificationCreated(notificationId, _, by, requestId), time) => this.copy(
       notifications = Notification(notificationId, FriendRequestAcceptedNotification(by, requestId), time = time) :: notifications)
+    case UserEventInstant(NotificationViewed(notificationId), _) =>
+      val index = notifications.indexWhere(_.id == notificationId)
+      val updatedNotification = notifications(index).copy(viewed = true)
+      this.copy(notifications = notifications.updated(index, updatedNotification))
     case _ => this
   }
 

@@ -18,6 +18,8 @@ import scala.util.Try
 
 trait PublicApi {
 
+  def markAllNotificationsViewed(sessionId: UUID): Unit
+
   def friendsListFor(sessionId: UUID, friendId: UUID): Either[ValidationError, UserFriends]
 
   def friendsListFor(sessionId: UUID): UserFriends
@@ -171,10 +173,8 @@ class DelegatingPublicApi(commandProcessor: CommandProcessor,
     }
   }
 
-  override def ignoreFriendRequest(sessionId: UUID, reqId: UUID): Unit = {
-    withValidSession(sessionId) {
-      commandProcessor.process(ChangeFriendRequestStatus(reqId, Ignored), _)
-    }
+  override def ignoreFriendRequest(sessionId: UUID, reqId: UUID): Unit = withValidSession(sessionId) {
+    commandProcessor.process(ChangeFriendRequestStatus(reqId, Ignored), _)
   }
 
   override def friendsListFor(sessionId: UUID): UserFriends = withValidSession(sessionId)(userFriendsProjection.friendsFor)
@@ -182,6 +182,10 @@ class DelegatingPublicApi(commandProcessor: CommandProcessor,
   override def friendsListFor(sessionId: UUID, friendId: UUID): Either[ValidationError, UserFriends] = withValidSession(sessionId) { userId =>
     val user = User.replay(dataStore.userEvents(userId))
     Right(userFriendsProjection.friendsFor(friendId, user.id).excluding(user.id))
+  }
+
+  override def markAllNotificationsViewed(sessionId: UUID): Unit = withValidSession(sessionId) {
+    commandProcessor.process(MarkAllNotificationsViewed, _)
   }
 }
 

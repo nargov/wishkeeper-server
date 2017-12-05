@@ -315,6 +315,16 @@ class RouteTest extends Specification with Specs2RouteTest with JMock {
         responseAs[UserFriends] must beEqualTo(friends)
       }
     }
+
+    "mark notifications as viewed" in new LoggedInUserContext {
+      checking {
+        oneOf(publicApi).markAllNotificationsViewed(sessionId)
+      }
+
+      Post(s"/users/notifications/all/viewed").withHeaders(sessionIdHeader) ~> webApi.userRoute ~> check {
+        handled must beTrue
+      }
+    }
   }
 
   trait BaseContext extends Scope {

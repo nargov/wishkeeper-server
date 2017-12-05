@@ -191,8 +191,8 @@ class WebApi(publicApi: PublicApi, managementApi: ManagementApi)
                     complete(publicApi.notificationsFor(sessionId))
                   }.get
                 } ~
-                  pathPrefix("friendreq" / JavaUUID) { reqId =>
-                    post {
+                  post {
+                    pathPrefix("friendreq" / JavaUUID) { reqId =>
                       path("approve") {
                         sessionUUID.map { sessionId =>
                           publicApi.approveFriendRequest(sessionId, reqId)
@@ -205,7 +205,13 @@ class WebApi(publicApi: PublicApi, managementApi: ManagementApi)
                             complete(StatusCodes.OK)
                           }.get
                         }
-                    }
+                    } ~
+                      pathPrefix("all" / "viewed") {
+                        sessionUUID.map { sessionId =>
+                          publicApi.markAllNotificationsViewed(sessionId)
+                          complete(StatusCodes.OK)
+                        }.get
+                      }
                   }
               }
           }

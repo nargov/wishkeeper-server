@@ -104,4 +104,8 @@ object Commands {
     }
   }
 
+  case object MarkAllNotificationsViewed extends  UserCommand {
+    override def process(user: User): List[UserEvent] =
+      user.notifications.filterNot(_.viewed).map(notification => NotificationViewed(notification.id))
+  }
 }

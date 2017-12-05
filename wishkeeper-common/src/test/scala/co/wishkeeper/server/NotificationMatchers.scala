@@ -2,6 +2,7 @@ package co.wishkeeper.server
 
 import java.util.UUID
 
+import co.wishkeeper.server.Events.{NotificationViewed, UserEvent}
 import co.wishkeeper.server.NotificationsData.{FriendRequestAcceptedNotification, FriendRequestNotification, NotificationData}
 import org.specs2.matcher.{Matcher, MustThrownMatchers}
 
@@ -32,6 +33,10 @@ trait NotificationMatchers extends MustThrownMatchers {
   def aNotificationWith(matcher: Matcher[NotificationData]): Matcher[Notification] = (notification: Notification) =>
     matcher(createExpectable(notification.data))
 
+  def aNotificationViewedEvent(notificationId: UUID): Matcher[UserEvent] = (event:UserEvent) => event match {
+    case NotificationViewed(id) => (notificationId == id, s"$notificationId does not match $event")
+    case _ => (false, s"$event is not a NotificationViewed event")
+  }
 }
 
 object NotificationMatchers extends NotificationMatchers

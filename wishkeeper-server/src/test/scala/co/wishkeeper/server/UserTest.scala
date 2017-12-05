@@ -236,6 +236,13 @@ class UserTest extends Specification with MatcherMacros with JMock with Notifica
     user.applyEvent(asEventInstant(FriendRequestReceived(user.id, friendId))).friends.current must beEmpty
   }
 
+  "apply NotificationViewed" in new Context {
+    val notificationId: UUID = randomUUID()
+    user.withFriendRequestNotification(notificationId, requestId, friendId).
+      applyEvent(asEventInstant(NotificationViewed(notificationId))).
+      notifications.forall(_.viewed) must beTrue
+  }
+
   def haveCreationTime(time: DateTime): Matcher[Wish] = ===(time) ^^ {
     (_: Wish).creationTime
   }
