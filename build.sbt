@@ -10,6 +10,8 @@ lazy val integrationSettings = inConfig(IntegrationTest)(Defaults.itSettings) ++
   parallelExecution in IntegrationTest := false
 )
 
+lazy val artifactory = Some("Artifactory Realm" at "http://ci-artifacts.wishkeeper.co:8081/artifactory/sbt-release")
+
 lazy val commonSettings = Seq(
   organization := "co.wishkeeper",
   scalaVersion := scalaVer,
@@ -47,14 +49,15 @@ lazy val commonSettings = Seq(
   ).map(_ % logbackVersion),
   scalacOptions in Test ++= Seq("-Yrangepos"),
 
-  publishTo := Some("Artifactory Realm" at "http://ci-artifacts.wishkeeper.co:8081/artifactory/sbt-release")
+  publishTo := artifactory
 
 ) ++ integrationSettings
 
 lazy val wishkeeper = (project in file(".")).aggregate(server, testUtils, common).settings(
   scalaVersion := scalaVer,
   publish := {},
-  publishLocal := {}
+  publishLocal := {},
+  publishTo := artifactory
 )
 
 lazy val common = (project in file("wishkeeper-common")).
