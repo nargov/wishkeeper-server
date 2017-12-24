@@ -3,7 +3,7 @@ package co.wishkeeper.server.api
 import java.util.UUID
 import java.util.UUID.randomUUID
 
-import co.wishkeeper.server.Commands.ChangeFriendRequestStatus
+import co.wishkeeper.server.Commands.{ChangeFriendRequestStatus, RemoveFriend}
 import co.wishkeeper.server.Events.{FacebookFriendsListSeen, UserConnected}
 import co.wishkeeper.server.EventsTestHelper.EventsList
 import co.wishkeeper.server.FriendRequestStatus.{Approved, Ignored}
@@ -115,6 +115,13 @@ class DelegatingPublicApiTest extends Specification with JMock {
     }
 
     api.friendsListFor(sessionId, friendId) must beRight(UserFriends(List(otherFriend)))
+  }
+
+  "unfriend" in new LoggedInContext {
+    checking {
+      oneOf(commandProcessor).process(RemoveFriend(friendId), userId)
+    }
+    api.unfriend(sessionId, friendId)
   }
 
   def userWishesWith(wishId: UUID, wishName: String): Matcher[UserWishes] = contain(aWishWith(wishId, wishName)) ^^ {(_:UserWishes).wishes}

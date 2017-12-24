@@ -3,11 +3,12 @@ package co.wishkeeper.server.web
 import java.util.UUID
 
 import akka.actor.ActorSystem
+import akka.event.LoggingAdapter
 import akka.http.scaladsl.Http.ServerBinding
 import akka.http.scaladsl.model.{HttpRequest, StatusCodes}
 import akka.http.scaladsl.server.Directives.{as, complete, entity, get, headerValueByName, path, pathPrefix, post, _}
+import akka.http.scaladsl.server._
 import akka.http.scaladsl.server.directives.{DebuggingDirectives, LoggingMagnet}
-import akka.http.scaladsl.server.{AuthorizationFailedRejection, Route, RouteResult}
 import akka.http.scaladsl.{Http, HttpExt}
 import akka.stream.ActorMaterializer
 import akka.stream.scaladsl.StreamConverters
@@ -17,7 +18,7 @@ import co.wishkeeper.server.Commands._
 import co.wishkeeper.server.api.{ManagementApi, NotFriends, PublicApi}
 import co.wishkeeper.server.image.ImageMetadata
 import co.wishkeeper.server.web.WebApi.imageDimensionsHeader
-import de.heikoseeberger.akkahttpcirce.CirceSupport._
+import de.heikoseeberger.akkahttpcirce.FailFastCirceSupport._
 import io.circe.generic.extras.Configuration
 import io.circe.generic.extras.auto._
 
@@ -32,13 +33,13 @@ class WebApi(publicApi: PublicApi, managementApi: ManagementApi)
 
   private implicit val circeConfig = Configuration.default.withDefaults
 
-  val printer: HttpRequest => RouteResult => Unit = req => res => {
-    system.log.info(req.toString)
-    system.log.info(res.toString)
+  val printer: LoggingAdapter => HttpRequest => RouteResult => Unit = logging => req => res => {
+    logging.info(req.toString)
+    logging.info(res.toString)
   }
 
   val userRoute: Route =
-    DebuggingDirectives.logRequestResult(LoggingMagnet(_ => printer)) {
+    DebuggingDirectives.logRequestResult(LoggingMagnet(printer)) {
       pathPrefix("users") {
         path("connect" / "facebook") {
           post {
@@ -58,7 +59,15 @@ class WebApi(publicApi: PublicApi, managementApi: ManagementApi)
                   case Right(userFriends) => complete(userFriends)
                   case Left(reason) => complete(StatusCodes.ServerError -> reason)
                 }.get
-              }
+              } ~
+                delete {
+                  sessionUUID.map {
+                    publicApi.unfriend(_, userId) match {
+                      case Right(_) => complete(StatusCodes.OK)
+                      case Left(reason) => complete(StatusCodes.BadRequest -> reason)
+                    }
+                  }.get
+                }
             } ~
               pathPrefix("profile") {
                 path("facebook") {

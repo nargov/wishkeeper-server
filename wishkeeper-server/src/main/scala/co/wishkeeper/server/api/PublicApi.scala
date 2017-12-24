@@ -18,6 +18,8 @@ import scala.util.Try
 
 trait PublicApi {
 
+  def unfriend(sessionId: UUID, friendId: UUID): Either[ValidationError, Unit]
+
   def markAllNotificationsViewed(sessionId: UUID): Unit
 
   def friendsListFor(sessionId: UUID, friendId: UUID): Either[ValidationError, UserFriends]
@@ -53,6 +55,8 @@ trait PublicApi {
   def uploadImage(url: String, imageMetadata: ImageMetadata, wishId: UUID, sessionId: UUID): Try[Unit]
 
   def deleteWishImage(sessionId: UUID, wishId: UUID): Unit
+
+  def userIdForSession(sessionId: UUID): Option[UUID]
 }
 
 class DelegatingPublicApi(commandProcessor: CommandProcessor,
@@ -187,6 +191,13 @@ class DelegatingPublicApi(commandProcessor: CommandProcessor,
   override def markAllNotificationsViewed(sessionId: UUID): Unit = withValidSession(sessionId) {
     commandProcessor.process(MarkAllNotificationsViewed, _)
   }
+
+  override def unfriend(sessionId: UUID, friendId: UUID): Either[ValidationError, Unit] = withValidSession(sessionId) { userId =>
+    commandProcessor.process(RemoveFriend(friendId), userId)
+    Right(())
+  }
+
+  override def userIdForSession(sessionId: UUID): Option[UUID] = dataStore.userBySession(sessionId)
 }
 
 sealed trait ValidationError {

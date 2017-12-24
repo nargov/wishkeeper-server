@@ -67,6 +67,8 @@ case class User(id: UUID,
       val index = notifications.indexWhere(_.id == notificationId)
       val updatedNotification = notifications(index).copy(viewed = true)
       this.copy(notifications = notifications.updated(index, updatedNotification))
+
+    case UserEventInstant(FriendRemoved(_, friendId), _) => this.copy(friends = friends.copy(current = friends.current.filterNot(_ == friendId)))
     case _ => this
   }
 

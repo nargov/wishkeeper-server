@@ -15,7 +15,7 @@ import co.wishkeeper.server.image.ImageMetadata
 import co.wishkeeper.server.projections.{Friend, PotentialFriend, UserFriends}
 import co.wishkeeper.server.web.{ManagementRoute, WebApi}
 import com.wixpress.common.specs2.JMock
-import de.heikoseeberger.akkahttpcirce.CirceSupport._
+import de.heikoseeberger.akkahttpcirce.FailFastCirceSupport._
 import io.circe.generic.extras.Configuration
 import io.circe.generic.extras.auto._
 import io.circe.syntax._
@@ -322,6 +322,16 @@ class RouteTest extends Specification with Specs2RouteTest with JMock {
       }
 
       Post(s"/users/notifications/all/viewed").withHeaders(sessionIdHeader) ~> webApi.userRoute ~> check {
+        handled must beTrue
+      }
+    }
+
+    "unfriend" in new LoggedInUserContext {
+      checking{
+        oneOf(publicApi).unfriend(sessionId, friendId).willReturn(Right(()))
+      }
+
+      Delete(s"/users/${friendId.toString}").withHeaders(sessionIdHeader) ~> webApi.userRoute ~> check {
         handled must beTrue
       }
     }

@@ -76,16 +76,16 @@ lazy val server = (project in file("wishkeeper-server")).
     name := "wishkeeper-server",
     resolvers += Resolver.bintrayRepo("hseeberger", "maven"),
     libraryDependencies ++= Seq(
-      "com.typesafe.akka" %% "akka-http" % "10.0.5",
-      "com.typesafe.akka" %% "akka-http-testkit" % "10.0.5",
-      "de.heikoseeberger" %% "akka-http-circe" % "1.12.0",
+      "com.typesafe.akka" %% "akka-http" % "10.0.11",
+      "com.typesafe.akka" %% "akka-http-testkit" % "10.0.11",
+      "de.heikoseeberger" %% "akka-http-circe" % "1.18.1",
       "com.datastax.cassandra" % "cassandra-driver-core" % "3.2.0",
       "org.slf4j" % "slf4j-api" % "1.7.22",
       "commons-io" % "commons-io" % "2.5",
       "com.google.api-client" % "google-api-client" % "1.22.0"
         exclude("org.apache.httpcomponents", "httpclient")
         exclude("com.google.guava", "guava-jdk5"),
-      "com.google.cloud" % "google-cloud-storage" % "1.0.2"
+      "com.google.cloud" % "google-cloud-storage" % "1.14.0"
         exclude("org.apache.httpcomponents", "httpclient")
         exclude("com.google.guava", "guava-jdk5"),
       "com.sksamuel.scrimage" %% "scrimage-core" % "2.1.8"

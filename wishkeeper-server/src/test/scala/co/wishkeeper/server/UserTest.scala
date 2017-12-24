@@ -243,6 +243,10 @@ class UserTest extends Specification with MatcherMacros with JMock with Notifica
       notifications.forall(_.viewed) must beTrue
   }
 
+  "apply RemoveFriend" in new Context {
+    user.withFriend(friendId).applyEvent(asEventInstant(FriendRemoved(user.id, friendId))).friends.current must not(contain(friendId))
+  }
+
   def haveCreationTime(time: DateTime): Matcher[Wish] = ===(time) ^^ {
     (_: Wish).creationTime
   }

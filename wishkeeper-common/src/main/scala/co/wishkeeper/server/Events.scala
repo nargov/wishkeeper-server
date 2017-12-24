@@ -71,6 +71,8 @@ object Events {
   case class WishDeleted(wishId: UUID) extends UserEvent
 
   case class FacebookFriendsListSeen(seen: Boolean = true) extends UserEvent
+
+  case class FriendRemoved(userId: UUID, friendId: UUID) extends UserEvent
 }
 
 case class UserEventInstant(event: Events.UserEvent, time: DateTime)

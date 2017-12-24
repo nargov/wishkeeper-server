@@ -15,10 +15,10 @@ trait UserFriendsProjection {
   def friendsFor(friendId: UUID, userId: UUID): UserFriends
 }
 
-class SimpleUserFriendsProjection(facebookConnector: FacebookConnector,
-                                  userIdByFacebookId: UserIdByFacebookIdProjection,
-                                  dataStore: DataStore)
-                                 (implicit ex: ExecutionContext) extends UserFriendsProjection {
+class EventBasedUserFriendsProjection(facebookConnector: FacebookConnector,
+                                      userIdByFacebookId: UserIdByFacebookIdProjection,
+                                      dataStore: DataStore)
+                                     (implicit ex: ExecutionContext) extends UserFriendsProjection {
 
   override def potentialFacebookFriends(userId: UUID, accessToken: String): Future[List[PotentialFriend]] = {
     val user = User.replay(dataStore.userEvents(userId))
@@ -31,7 +31,7 @@ class SimpleUserFriendsProjection(facebookConnector: FacebookConnector,
     eventualFacebookFriends.map { facebookFriends =>
       val facebookIdsToUserIds = userIdByFacebookId.get(facebookFriends.map(_.id))
       facebookIdsToUserIds.filterNot(existingOrRequestedFriend).map {
-        case (fbId, id) => PotentialFriend(id, facebookFriends.find(_.id == fbId).get.name, s"https://graph.facebook.com/v2.9/$fbId/picture")
+        case (fbId, id) => PotentialFriend(id, facebookFriends.find(_.id == fbId).get.name, s"https://graph.facebook.com/v2.9/$fbId/picture") //TODO replace image
       }.toList
     }
   }

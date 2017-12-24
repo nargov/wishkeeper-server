@@ -15,7 +15,7 @@ import org.specs2.specification.Scope
 
 import scala.concurrent.Future
 
-class SimpleUserFriendsProjectionTest(implicit ee: ExecutionEnv) extends Specification with JMock {
+class EventBasedUserFriendsProjectionTest(implicit ee: ExecutionEnv) extends Specification with JMock {
 
   "return a list of potential friends that are wishkeeper users" in new Context {
     assumingExistingFacebookFriends()
@@ -121,7 +121,7 @@ class SimpleUserFriendsProjectionTest(implicit ee: ExecutionEnv) extends Specifi
     val facebookConnector = mock[FacebookConnector]
     val userIdByFacebookIdProjection = mock[UserIdByFacebookIdProjection]
     val dataStore = mock[DataStore]
-    val userFriendsProjection: UserFriendsProjection = new SimpleUserFriendsProjection(facebookConnector, userIdByFacebookIdProjection, dataStore)
+    val userFriendsProjection: UserFriendsProjection = new EventBasedUserFriendsProjection(facebookConnector, userIdByFacebookIdProjection, dataStore)
     val expectedUserName = "Expected Wishkeeper Friend"
     val facebookFriends = List(
       FacebookFriend(expectedUserName, "expected-friend-id"),
