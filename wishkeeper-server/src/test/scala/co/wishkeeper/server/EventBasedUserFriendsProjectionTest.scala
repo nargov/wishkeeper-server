@@ -14,6 +14,7 @@ import org.specs2.mutable.Specification
 import org.specs2.specification.Scope
 
 import scala.concurrent.Future
+import scala.concurrent.duration._
 
 class EventBasedUserFriendsProjectionTest(implicit ee: ExecutionEnv) extends Specification with JMock {
 
@@ -27,7 +28,7 @@ class EventBasedUserFriendsProjectionTest(implicit ee: ExecutionEnv) extends Spe
     }
 
     userFriendsProjection.potentialFacebookFriends(userId, accessToken) must contain(
-      aPotentialFriendWith(id = friendId, name = expectedUserName)).await
+      aPotentialFriendWith(id = friendId, name = expectedUserName)).await(10, 1.second)
   }
 
   "return a list of current friends" in new Context {
