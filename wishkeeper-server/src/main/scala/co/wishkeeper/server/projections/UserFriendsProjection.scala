@@ -2,7 +2,7 @@ package co.wishkeeper.server.projections
 
 import java.util.UUID
 
-import co.wishkeeper.server.{DataStore, FacebookConnector, User}
+import co.wishkeeper.server.{DataStore, FacebookConnector, FriendRequest, User}
 
 import scala.concurrent.{ExecutionContext, Future}
 
@@ -37,11 +37,20 @@ class EventBasedUserFriendsProjection(facebookConnector: FacebookConnector,
   }
 
   override def friendsFor(userId: UUID): UserFriends = {
-    UserFriends(User.replay(dataStore.userEvents(userId)).friends.current.map { friendId =>
-      val friend = User.replay(dataStore.userEvents(friendId))
-      Friend(friendId, friend.userProfile.name, friend.userProfile.picture, friend.userProfile.firstName)
-    })
+    val user = User.replay(dataStore.userEvents(userId))
+    val friends = user.friends.current.map(friendDetails)
+    val requested = user.friends.sentRequests.map(friendDetailsByFriendRequest)
+    UserFriends(friends, requested = requested)
   }
+
+  private val userIdFromFriendRequest: FriendRequest => UUID = _.userId
+
+  private val friendDetails: UUID => Friend = friendId => {
+    val friend = User.replay(dataStore.userEvents(friendId))
+    Friend(friendId, friend.userProfile.name, friend.userProfile.picture, friend.userProfile.firstName)
+  }
+
+  private val friendDetailsByFriendRequest = userIdFromFriendRequest andThen friendDetails
 
   override def friendsFor(friendId: UUID, userId: UUID) = {
     val userFriends = User.replay(dataStore.userEvents(userId)).friends

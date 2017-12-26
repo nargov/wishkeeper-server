@@ -109,6 +109,17 @@ class EventBasedUserFriendsProjectionTest(implicit ee: ExecutionEnv) extends Spe
     userFriendsProjection.friendsFor(friendId, userId) must beEqualTo(UserFriends(Nil, List(Friend(mutualFriendId)), Nil))
   }
 
+  "return friends for which friend request exists" in new Context {
+    checking {
+      allowing(dataStore).userEvents(userId).willReturn(EventsList(userId).withFriendRequest(friendId).list)
+      allowing(dataStore).userEvents(friendId).willReturn(EventsList(friendId).list)
+    }
+
+    userFriendsProjection.friendsFor(userId).requested must contain(aFriend(friendId))
+  }
+
+  def aFriend(id: UUID): Matcher[Friend] = ===(id) ^^ {(_:Friend).userId}
+
 
   trait Context extends Scope{
     val userFacebookId = "user-facebook-id"
