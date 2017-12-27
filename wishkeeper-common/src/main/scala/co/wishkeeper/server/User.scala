@@ -56,8 +56,8 @@ case class User(id: UUID,
           case _ => friends.current
         }),
       notifications = notifications.map {
-        case n@Notification(_, FriendRequestNotification(_, friendReqId, status, _), _, _) if friendReqId == reqId && status == Pending =>
-          n.copy(data = n.data.asInstanceOf[FriendRequestNotification].copy(status = toStatus))
+        case n @ Notification(_, notif @ FriendRequestNotification(_, friendReqId, status, _), _, _) if friendReqId == reqId && status == Pending =>
+          n.copy(data = notif.copy(status = toStatus))
         case n => n
       }
     )
