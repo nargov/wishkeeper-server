@@ -42,8 +42,6 @@ object Events {
 
   case class FriendRequestStatusChanged(userId: UUID, requestId: UUID, from: UUID, status: FriendRequestStatus) extends UserEvent
 
-  case class FriendRequestIgnored(userId: UUID, from: UUID) extends UserEvent
-
   case class FriendRequestNotificationCreated(id: UUID, userId: UUID, from: UUID, requestId: UUID) extends UserEvent
 
   case class FriendRequestAcceptedNotificationCreated(id: UUID, userId: UUID, by: UUID, requestId: UUID) extends UserEvent
