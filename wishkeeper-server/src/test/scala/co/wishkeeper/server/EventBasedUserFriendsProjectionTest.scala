@@ -43,7 +43,7 @@ class EventBasedUserFriendsProjectionTest(implicit ee: ExecutionEnv) extends Spe
     assumingExistingFacebookFriends()
     assumingExistingFriend()
 
-    userFriendsProjection.potentialFacebookFriends(userId, accessToken) must beEmpty[List[PotentialFriend]].await
+    userFriendsProjection.potentialFacebookFriends(userId, accessToken) must beEmpty[List[PotentialFriend]].await(10, 1.second)
   }
 
   "not return user as potential friend if friend request sent" in new Context {
@@ -69,7 +69,7 @@ class EventBasedUserFriendsProjectionTest(implicit ee: ExecutionEnv) extends Spe
       )))
     }
 
-    userFriendsProjection.potentialFacebookFriends(userId, accessToken) must beEmpty[List[PotentialFriend]].await
+    userFriendsProjection.potentialFacebookFriends(userId, accessToken) must beEmpty[List[PotentialFriend]].await(10, 1.second)
   }
 
   "return mutual friends" in new Context {
