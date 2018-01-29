@@ -3,8 +3,8 @@ package co.wishkeeper.server.api
 import java.util.UUID
 import java.util.UUID.randomUUID
 
-import co.wishkeeper.server.Commands.{ChangeFriendRequestStatus, RemoveFriend}
-import co.wishkeeper.server.Events.{FacebookFriendsListSeen, UserConnected}
+import co.wishkeeper.server.Commands.{ChangeFriendRequestStatus, GrantWish, RemoveFriend}
+import co.wishkeeper.server.Events.{FacebookFriendsListSeen, UserConnected, WishGranted}
 import co.wishkeeper.server.EventsTestHelper.EventsList
 import co.wishkeeper.server.FriendRequestStatus.{Approved, Ignored}
 import co.wishkeeper.server.NotificationsData.{FriendRequestNotification, NotificationData}
@@ -124,7 +124,17 @@ class DelegatingPublicApiTest extends Specification with JMock {
     api.unfriend(sessionId, friendId)
   }
 
-  def userWishesWith(wishId: UUID, wishName: String): Matcher[UserWishes] = contain(aWishWith(wishId, wishName)) ^^ {(_:UserWishes).wishes}
+  "grant wish" in new LoggedInContext {
+    val wishId = randomUUID()
+    checking {
+      oneOf(commandProcessor).process(GrantWish(wishId), userId)
+    }
+
+    api.grantWish(userId, wishId)
+  }
+
+  def userWishesWith(wishId: UUID, wishName: String): Matcher[UserWishes] = contain(aWishWith(wishId, wishName)) ^^ {(_: UserWishes).wishes}
+
   def aWishWith(id: UUID, name: String): Matcher[Wish] = (wish: Wish) =>
     (wish.id == id && wish.name.isDefined && wish.name.get == name, s"Wish $wish does not match name $name and id $id")
 
@@ -137,8 +147,7 @@ class DelegatingPublicApiTest extends Specification with JMock {
     val commandProcessor = mock[CommandProcessor]
     val userFriendsProjection: UserFriendsProjection = mock[UserFriendsProjection]
     val userProfileProjection: UserProfileProjection = new ReplayingUserProfileProjection(dataStore)
-    val api: PublicApi = new DelegatingPublicApi(
-      commandProcessor,
+    val api: PublicApi = new DelegatingPublicApi(commandProcessor,
       dataStore, null, null, userProfileProjection, userFriendsProjection, notificationsProjection, null)(null, null, null)
     val friendId: UUID = randomUUID()
     val friendRequestId = randomUUID()

@@ -4,6 +4,7 @@ import java.util.UUID
 
 import akka.actor.ActorSystem
 import akka.event.LoggingAdapter
+import akka.http.javadsl.server.Rejections
 import akka.http.scaladsl.Http.ServerBinding
 import akka.http.scaladsl.model.{HttpRequest, StatusCodes}
 import akka.http.scaladsl.server.Directives.{as, complete, entity, get, headerValueByName, path, pathPrefix, post, _}
@@ -21,10 +22,11 @@ import co.wishkeeper.server.web.WebApi.imageDimensionsHeader
 import de.heikoseeberger.akkahttpcirce.FailFastCirceSupport._
 import io.circe.generic.extras.Configuration
 import io.circe.generic.extras.auto._
+import cats.syntax.either._
 
 import scala.concurrent.duration._
 import scala.concurrent.{ExecutionContextExecutor, Future}
-import scala.util.{Failure, Success}
+import scala.util.{Failure, Success, Try}
 
 class WebApi(publicApi: PublicApi, managementApi: ManagementApi)
             (implicit system: ActorSystem, mat: ActorMaterializer, ec: ExecutionContextExecutor) {
@@ -37,6 +39,35 @@ class WebApi(publicApi: PublicApi, managementApi: ManagementApi)
     logging.info(req.toString)
     logging.info(res.toString)
   }
+
+  private val userIdFromSession: Directive1[UUID] = headerValueByName(WebApi.sessionIdHeader).flatMap {
+    sessionId =>
+      Try(UUID.fromString(sessionId)).toOption.
+        flatMap(publicApi.userIdForSession).
+        map(provide).
+        getOrElse(reject(Rejections.authorizationFailed))
+  }
+
+  private val grantWish: (UUID, UUID) => Route = (userId, wishId) =>
+    (post & pathPrefix("grant")) {
+      publicApi.grantWish(userId, wishId) match {
+        case Right(_) => complete(StatusCodes.OK)
+      }
+    }
+
+  private val wishes: UUID => Route = userId =>
+    pathPrefix("wishes") {
+      pathPrefix(JavaUUID) { wishId =>
+        grantWish(userId, wishId)
+      }
+    }
+
+  val newUserRoute: Route =
+    userIdFromSession { userId =>
+      pathPrefix("me") {
+        wishes(userId)
+      }
+    }
 
   val userRoute: Route =
     DebuggingDirectives.logRequestResult(LoggingMagnet(printer)) {
@@ -227,9 +258,9 @@ class WebApi(publicApi: PublicApi, managementApi: ManagementApi)
       } ~
         (path("uuid") & get) {
           complete(UUID.randomUUID())
-        }
+        } ~
+        newUserRoute
     }
-
 
   private var bindings: Seq[Future[ServerBinding]] = Seq.empty
 

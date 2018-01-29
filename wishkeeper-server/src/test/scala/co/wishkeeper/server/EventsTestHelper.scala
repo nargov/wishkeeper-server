@@ -9,9 +9,9 @@ import org.joda.time.DateTime
 object EventsTestHelper {
   def userConnectEvent(userId: UUID) = UserConnected(userId, DateTime.now(), UUID.randomUUID())
 
-  def asEventInstants(events: List[UserEvent]): List[UserEventInstant] = events.map(asEventInstant)
+  def asEventInstants(events: List[UserEvent]): List[UserEventInstant] = events.map(asEventInstant(_))
 
-  def asEventInstant(event: UserEvent) = UserEventInstant(event, DateTime.now().minusDays(1))
+  def asEventInstant(event: UserEvent, time: DateTime = DateTime.now().minusDays(1)) = UserEventInstant(event, time)
 
   def anEventsListFor(userId: UUID) = EventsList(userId)
 

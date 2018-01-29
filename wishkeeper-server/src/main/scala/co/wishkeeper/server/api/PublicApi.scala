@@ -18,6 +18,8 @@ import scala.util.Try
 
 trait PublicApi {
 
+  def grantWish(userId: UUID, wishId: UUID): Either[ValidationError, Unit]
+
   def unfriend(sessionId: UUID, friendId: UUID): Either[ValidationError, Unit]
 
   def markAllNotificationsViewed(sessionId: UUID): Unit
@@ -198,6 +200,11 @@ class DelegatingPublicApi(commandProcessor: CommandProcessor,
   }
 
   override def userIdForSession(sessionId: UUID): Option[UUID] = dataStore.userBySession(sessionId)
+
+  override def grantWish(userId: UUID, wishId: UUID): Either[ValidationError, Unit] = {
+    commandProcessor.process(GrantWish(wishId), userId)
+    Right(())
+  }
 }
 
 sealed trait ValidationError {

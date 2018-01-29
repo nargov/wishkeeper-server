@@ -17,8 +17,11 @@ import scala.concurrent.duration._
 import scala.concurrent.{Await, Future}
 import scala.util.Try
 
-class TestUsersHelper {
-  val usersEndpoint = s"http://localhost:12300/users"
+class TestUsersHelper(usersEndpoint: String = s"http://localhost:12300/users",
+                      appId: String,
+                      appSecret: String) {
+
+  println(s"Test Users Helper working on $usersEndpoint")
 
   private implicit val circeConfig = Configuration.default.withDefaults
   private implicit val system = ActorSystem()
@@ -36,13 +39,12 @@ class TestUsersHelper {
   }
 
   def createTestUsers(num: Int = 5): Unit = {
-    val testAppId = "1415281005229066"
-    val accessToken = testAppId + "|22ae61c929a8276caf39357bd787b90d"
+    val accessToken = appId + "|22ae61c929a8276caf39357bd787b90d"
     val sessionIdHeader = "wsid"
     val facebookAccessTokenHeader = "fbat"
-    val users: List[TestFacebookUser] = facebookTestHelper.createTestUsers(num, installApp = true, accessToken, testAppId)
+    val users: List[TestFacebookUser] = facebookTestHelper.createTestUsers(num, installApp = true, accessToken, appId)
 
-    val usersWithTokens: Future[List[TestFacebookUser]] = facebookTestHelper.addAccessTokens(users, testAppId, accessToken)
+    val usersWithTokens: Future[List[TestFacebookUser]] = facebookTestHelper.addAccessTokens(users, appId, accessToken)
     val usersWithSessionIds = usersWithTokens.map(_.map(_.copy(sessionId = Option(randomUUID()))))
     val futureFriends = usersWithSessionIds.map(makeFriends)
     val futureLogins = sendConnectRequests(usersWithSessionIds)
@@ -131,7 +133,9 @@ class TestUsersHelper {
 
 object TestUsersHelper {
   def main(args: Array[String]): Unit = {
-    val helper = new TestUsersHelper()
+    val params = args.toList.grouped(2).foldLeft(Map[String, String]())((m, l) => m + (l.head -> l(1)))
+    val helper = new TestUsersHelper(usersEndpoint = params("-server"), appId = params("-app-id"), appSecret = params("-app-secret"))
+
     Try {
       helper.createTestUsers()
     }.recover { case e: Exception => e.printStackTrace() }

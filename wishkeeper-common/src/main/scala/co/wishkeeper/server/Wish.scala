@@ -15,7 +15,8 @@ case class Wish(id: UUID,
                 creationTime: DateTime = DateTime.now(),
                 creator: Option[UUID] = None,
                 image: Option[ImageLinks] = None,
-                status: WishStatus = WishStatus.Active) {
+                status: WishStatus = WishStatus.Active,
+                statusLastUpdate: Option[DateTime] = None) {
 
   def withName(name: String): Wish = this.copy(name = Option(name))
   def withLink(link: String): Wish = this.copy(link = Option(link))
@@ -28,6 +29,7 @@ case class Wish(id: UUID,
   def withCreator(creator: UUID): Wish = this.copy(creator = Option(creator))
   def withImage(imageLinks: ImageLinks): Wish = this.copy(image = Option(imageLinks.copy(links = imageLinks.links.sortBy(_.width))))
   def withStatus(status: WishStatus): Wish = this.copy(status = status)
+  def withStatusLastUpdate(time: DateTime): Wish = this.copy(statusLastUpdate = Option(time))
 }
 
 case class UserWishes(wishes: List[Wish])
@@ -39,5 +41,6 @@ case class ImageLinks(links: List[ImageLink])
 object WishStatus {
   sealed trait WishStatus
   case object Active extends WishStatus
+  case object Granted extends WishStatus
   case object Deleted extends WishStatus
 }

@@ -335,6 +335,18 @@ class RouteTest extends Specification with Specs2RouteTest with JMock {
         handled must beTrue
       }
     }
+
+    "grant wish" in new LoggedInUserContext {
+      val wishId = randomUUID()
+      checking{
+        oneOf(publicApi).grantWish(userId, wishId).willReturn(Right(()))
+      }
+
+      Post(s"/me/wishes/${wishId.toString}/grant").withHeaders(sessionIdHeader) ~> webApi.newUserRoute ~> check {
+        handled must beTrue
+        status must beEqualTo(StatusCodes.OK)
+      }
+    }
   }
 
   trait BaseContext extends Scope {
@@ -350,6 +362,10 @@ class RouteTest extends Specification with Specs2RouteTest with JMock {
     val friendId = randomUUID()
     val requestId = randomUUID()
     val sessionIdHeader = RawHeader(WebApi.sessionIdHeader, sessionId.toString)
+
+    checking {
+      allowing(publicApi).userIdForSession(sessionId).willReturn(Some(userId))
+    }
   }
 
   trait NotLoggedInContext extends BaseContext {

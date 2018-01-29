@@ -112,4 +112,8 @@ object Commands {
   case class RemoveFriend(friendId: UUID) extends UserCommand {
     override def process(user: User): List[UserEvent] = FriendRemoved(user.id, friendId) :: Nil
   }
+
+  case class GrantWish(wishId: UUID) extends UserCommand {
+    override def process(user: User): List[UserEvent] = WishGranted(wishId) :: Nil
+  }
 }
