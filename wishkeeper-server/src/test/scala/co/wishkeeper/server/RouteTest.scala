@@ -148,8 +148,6 @@ class RouteTest extends Specification with Specs2RouteTest with JMock {
     }
 
     "Delete Wish" in new LoggedInUserContext {
-      val wishId = randomUUID()
-
       checking {
         oneOf(publicApi).deleteWish(sessionId, wishId)
       }
@@ -160,7 +158,6 @@ class RouteTest extends Specification with Specs2RouteTest with JMock {
     }
 
     "upload image through url" in new LoggedInUserContext {
-      val wishId = randomUUID()
       val imageMetadata = ImageMetadata("content-type", "filename", width = 1, height = 1)
       val url = "http://my.image.url"
 
@@ -176,7 +173,6 @@ class RouteTest extends Specification with Specs2RouteTest with JMock {
     }
 
     "print error on upload failure" in new LoggedInUserContext {
-      val wishId = randomUUID()
       val imageMetadata = ImageMetadata("content-type", "filename", width = 1, height = 1)
       val url = "http://my.image.url"
 
@@ -337,7 +333,6 @@ class RouteTest extends Specification with Specs2RouteTest with JMock {
     }
 
     "grant wish" in new LoggedInUserContext {
-      val wishId = randomUUID()
       checking{
         oneOf(publicApi).grantWish(userId, wishId).willReturn(Right(()))
       }
@@ -345,6 +340,23 @@ class RouteTest extends Specification with Specs2RouteTest with JMock {
       Post(s"/me/wishes/${wishId.toString}/grant").withHeaders(sessionIdHeader) ~> webApi.newUserRoute ~> check {
         handled must beTrue
         status must beEqualTo(StatusCodes.OK)
+      }
+    }
+
+    "reserve wish" in new LoggedInUserContext {
+      checking {
+        oneOf(publicApi).reserveWish(userId, friendId, wishId).willReturn(Right(()))
+      }
+
+      Post(s"/${friendId.toString}/wishes/${wishId.toString}/reserve").withHeaders(sessionIdHeader) ~> webApi.newUserRoute ~> check {
+        handled must beTrue
+        status must beEqualTo(StatusCodes.OK)
+      }
+    }
+
+    "return the user's id" in new LoggedInUserContext {
+      Get(s"/me/id").withHeaders(sessionIdHeader) ~> webApi.newUserRoute ~> check {
+        responseAs[UUID] must beEqualTo(userId)
       }
     }
   }
@@ -357,6 +369,7 @@ class RouteTest extends Specification with Specs2RouteTest with JMock {
   }
 
   trait LoggedInUserContext extends BaseContext {
+    val wishId = randomUUID()
     val sessionId = randomUUID()
     val userId = randomUUID()
     val friendId = randomUUID()

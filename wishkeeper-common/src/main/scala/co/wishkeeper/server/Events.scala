@@ -70,6 +70,8 @@ object Events {
 
   case class WishGranted(wishId: UUID) extends UserEvent
 
+  case class WishReserved(wishId: UUID, reserverId: UUID) extends UserEvent
+
   case class FacebookFriendsListSeen(seen: Boolean = true) extends UserEvent
 
   case class FriendRemoved(userId: UUID, friendId: UUID) extends UserEvent

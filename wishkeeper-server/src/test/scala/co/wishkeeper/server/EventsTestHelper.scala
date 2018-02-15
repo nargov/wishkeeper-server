@@ -25,13 +25,22 @@ object EventsTestHelper {
       this.copy(list = list :+ asEventInstant(FriendRequestSent(userId, friendId, Option(requestId))))
 
     def withName(name: String) = this.copy(list = list :+ asEventInstant(UserNameSet(userId, name)))
+
     def withWish(id: UUID, name: String) = this.copy(list = list ++ asEventInstants(List(
       WishCreated(id, userId, DateTime.now().minusDays(1)),
       WishNameSet(id, name)
     )))
+
+    def withReservedWish(id: UUID, name: String, reserver: UUID) = {
+      val listWithName = this.withWish(id, name)
+      listWithName.copy(list = listWithName.list :+ asEventInstant(WishReserved(id, reserver)))
+    }
+
     def withPic(link: String) = this.copy(list = list :+ asEventInstant(UserPictureSet(userId, link)))
   }
-  object EventsList{
+
+  object EventsList {
     def apply(userId: UUID): EventsList = EventsList(userId, asEventInstants(List(userConnectEvent(userId))))
   }
+
 }

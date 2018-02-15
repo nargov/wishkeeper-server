@@ -3,11 +3,12 @@ package co.wishkeeper.server.api
 import java.util.UUID
 import java.util.UUID.randomUUID
 
-import co.wishkeeper.server.Commands.{ChangeFriendRequestStatus, GrantWish, RemoveFriend}
-import co.wishkeeper.server.Events.{FacebookFriendsListSeen, UserConnected, WishGranted}
-import co.wishkeeper.server.EventsTestHelper.EventsList
+import co.wishkeeper.server.Commands.{ChangeFriendRequestStatus, GrantWish, RemoveFriend, ReserveWish}
+import co.wishkeeper.server.Events.{FacebookFriendsListSeen, UserConnected}
+import co.wishkeeper.server.EventsTestHelper.{EventsList, anEventsListFor}
 import co.wishkeeper.server.FriendRequestStatus.{Approved, Ignored}
 import co.wishkeeper.server.NotificationsData.{FriendRequestNotification, NotificationData}
+import co.wishkeeper.server.WishStatus.WishStatus
 import co.wishkeeper.server._
 import co.wishkeeper.server.projections._
 import com.wixpress.common.specs2.JMock
@@ -133,10 +134,41 @@ class DelegatingPublicApiTest extends Specification with JMock {
     api.grantWish(userId, wishId)
   }
 
+  "reserve wish" in new LoggedInContext {
+    val wishId = randomUUID()
+    checking {
+      oneOf(commandProcessor).process(ReserveWish(userId, wishId), friendId)
+    }
+
+    api.reserveWish(userId, friendId, wishId)
+  }
+
+  "return active and reserved friend wishes" in new LoggedInContext {
+    val activeWish = Wish(randomUUID(), Option("Active Wish"))
+    val reservedWish = Wish(randomUUID(), Option("Reserved Wish"), status = WishStatus.Reserved(by = userId))
+    val friendEvents = anEventsListFor(friendId).
+      withWish(activeWish.id, activeWish.name.get).
+      withReservedWish(reservedWish.id, reservedWish.name.get, userId).
+      list
+
+    checking {
+      allowing(dataStore).userEvents(userId).willReturn(anEventsListFor(userId).withFriend(friendId).list)
+      allowing(dataStore).userEvents(friendId).willReturn(friendEvents)
+    }
+
+    val result: Either[ValidationError, UserWishes] = api.wishListFor(sessionId, friendId)
+    result must beRight
+    result.right.get.wishes must contain(allOf(
+      aWishWith(activeWish.id, activeWish.name.get),
+      aWishWith(reservedWish.id, reservedWish.name.get) and aWishWithStatus(reservedWish.status)))
+  }
+
   def userWishesWith(wishId: UUID, wishName: String): Matcher[UserWishes] = contain(aWishWith(wishId, wishName)) ^^ {(_: UserWishes).wishes}
 
   def aWishWith(id: UUID, name: String): Matcher[Wish] = (wish: Wish) =>
     (wish.id == id && wish.name.isDefined && wish.name.get == name, s"Wish $wish does not match name $name and id $id")
+
+  def aWishWithStatus(status: WishStatus): Matcher[Wish] = (wish: Wish) => (wish.status == status, s"Wish $wish status is not $status")
 
 
   trait Context extends Scope {

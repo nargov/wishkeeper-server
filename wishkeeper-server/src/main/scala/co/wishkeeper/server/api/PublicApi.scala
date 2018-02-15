@@ -9,6 +9,7 @@ import akka.actor.ActorSystem
 import akka.stream.ActorMaterializer
 import co.wishkeeper.server.Commands._
 import co.wishkeeper.server.FriendRequestStatus.{Approved, Ignored}
+import co.wishkeeper.server.WishStatus.{Active, Reserved, WishStatus}
 import co.wishkeeper.server._
 import co.wishkeeper.server.image._
 import co.wishkeeper.server.projections._
@@ -17,6 +18,8 @@ import scala.concurrent.{ExecutionContext, Future}
 import scala.util.Try
 
 trait PublicApi {
+
+  def reserveWish(userId: UUID, friendId: UUID, wishId: UUID): Either[ValidationError, Unit]
 
   def grantWish(userId: UUID, wishId: UUID): Either[ValidationError, Unit]
 
@@ -106,10 +109,15 @@ class DelegatingPublicApi(commandProcessor: CommandProcessor,
     }
   }
 
+  private val isShownInWishlist: WishStatus => Boolean = {
+    case Active | Reserved(_) => true
+    case _ => false
+  }
+
   private def activeWishesByDate(user: User) = {
     val wishList = user.wishes.values.toList
     wishList.
-      filter(_.status == WishStatus.Active).
+      filter(w => isShownInWishlist(w.status)).
       sortBy(_.creationTime.getMillis).
       reverse
   }
@@ -203,6 +211,11 @@ class DelegatingPublicApi(commandProcessor: CommandProcessor,
 
   override def grantWish(userId: UUID, wishId: UUID): Either[ValidationError, Unit] = {
     commandProcessor.process(GrantWish(wishId), userId)
+    Right(())
+  }
+
+  override def reserveWish(userId: UUID, friendId: UUID, wishId: UUID): Either[ValidationError, Unit] = {
+    commandProcessor.process(ReserveWish(userId, wishId), friendId)
     Right(())
   }
 }

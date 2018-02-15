@@ -8,7 +8,7 @@ import co.wishkeeper.server.EventsTestHelper.asEventInstant
 import co.wishkeeper.server.FriendRequestStatus.Approved
 import co.wishkeeper.server.NotificationsData.FriendRequestNotification
 import co.wishkeeper.server.UserTestHelper._
-import co.wishkeeper.server.WishStatus.{Granted, WishStatus}
+import co.wishkeeper.server.WishStatus.WishStatus
 import co.wishkeeper.test.utils.WishMatchers._
 import com.wixpress.common.specs2.JMock
 import org.joda.time.DateTime
@@ -249,9 +249,15 @@ class UserTest extends Specification with MatcherMacros with JMock with Notifica
   }
 
   "apply WishGranted" in new Context {
-    private val wishId: UUID = randomUUID()
-    private val updatedWish = user.withWish(wishId).applyEvent(asEventInstant(WishGranted(wishId), now)).wishes(wishId)
+    val wishId: UUID = randomUUID()
+    val updatedWish = user.withWish(wishId).applyEvent(asEventInstant(WishGranted(wishId), now)).wishes(wishId)
     updatedWish must haveStatus(WishStatus.Granted) and haveStatusLastUpdate(now)
+  }
+
+  "apply WishReserved" in new Context {
+    val wishId: UUID = randomUUID()
+    val updatedWish = user.withWish(wishId).applyEvent(asEventInstant(WishReserved(wishId, friendId), now)).wishes(wishId)
+    updatedWish must haveStatus(WishStatus.Reserved(friendId)) and haveStatusLastUpdate(now)
   }
 
   def haveStatusLastUpdate(time: DateTime): Matcher[Wish] = beSome(time) ^^ {(_: Wish).statusLastUpdate}

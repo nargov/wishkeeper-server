@@ -28,8 +28,7 @@ case class Wish(id: UUID,
   def withCreationTime(time: DateTime): Wish = this.copy(creationTime = time)
   def withCreator(creator: UUID): Wish = this.copy(creator = Option(creator))
   def withImage(imageLinks: ImageLinks): Wish = this.copy(image = Option(imageLinks.copy(links = imageLinks.links.sortBy(_.width))))
-  def withStatus(status: WishStatus): Wish = this.copy(status = status)
-  def withStatusLastUpdate(time: DateTime): Wish = this.copy(statusLastUpdate = Option(time))
+  def withStatus(status: WishStatus, time: DateTime): Wish = this.copy(status = status, statusLastUpdate = Option(time))
 }
 
 case class UserWishes(wishes: List[Wish])
@@ -43,4 +42,5 @@ object WishStatus {
   case object Active extends WishStatus
   case object Granted extends WishStatus
   case object Deleted extends WishStatus
+  case class Reserved(by: UUID) extends WishStatus
 }

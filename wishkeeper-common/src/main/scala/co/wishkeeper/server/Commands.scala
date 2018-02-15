@@ -116,4 +116,8 @@ object Commands {
   case class GrantWish(wishId: UUID) extends UserCommand {
     override def process(user: User): List[UserEvent] = WishGranted(wishId) :: Nil
   }
+
+  case class ReserveWish(reserverId: UUID, wishId: UUID) extends UserCommand {
+    override def process(user: User): List[UserEvent] = WishReserved(wishId, reserverId) :: Nil
+  }
 }

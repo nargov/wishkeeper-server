@@ -22,7 +22,6 @@ import co.wishkeeper.server.web.WebApi.imageDimensionsHeader
 import de.heikoseeberger.akkahttpcirce.FailFastCirceSupport._
 import io.circe.generic.extras.Configuration
 import io.circe.generic.extras.auto._
-import cats.syntax.either._
 
 import scala.concurrent.duration._
 import scala.concurrent.{ExecutionContextExecutor, Future}
@@ -40,7 +39,7 @@ class WebApi(publicApi: PublicApi, managementApi: ManagementApi)
     logging.info(res.toString)
   }
 
-  private val userIdFromSession: Directive1[UUID] = headerValueByName(WebApi.sessionIdHeader).flatMap {
+  val userIdFromSession: Directive1[UUID] = headerValueByName(WebApi.sessionIdHeader).flatMap {
     sessionId =>
       Try(UUID.fromString(sessionId)).toOption.
         flatMap(publicApi.userIdForSession).
@@ -48,25 +47,47 @@ class WebApi(publicApi: PublicApi, managementApi: ManagementApi)
         getOrElse(reject(Rejections.authorizationFailed))
   }
 
-  private val grantWish: (UUID, UUID) => Route = (userId, wishId) =>
+  val grantWish: (UUID, UUID) => Route = (userId, wishId) =>
     (post & pathPrefix("grant")) {
       publicApi.grantWish(userId, wishId) match {
         case Right(_) => complete(StatusCodes.OK)
       }
     }
 
-  private val wishes: UUID => Route = userId =>
+  val reserveWish: (UUID, UUID, UUID) => Route = (userId, friendId, wishId) =>
+    (post & pathPrefix("reserve")) {
+      publicApi.reserveWish(userId, friendId, wishId) match {
+        case Right(_) => complete(StatusCodes.OK)
+      }
+    }
+
+  val wishes: UUID => Route = userId =>
     pathPrefix("wishes") {
       pathPrefix(JavaUUID) { wishId =>
         grantWish(userId, wishId)
       }
     }
 
+  val friendWishes: (UUID, UUID) => Route = (userId, friendId) =>
+    pathPrefix("wishes") {
+      pathPrefix(JavaUUID) { wishId =>
+        reserveWish(userId, friendId, wishId)
+      }
+    }
+
+  val myId: UUID => Route = id => (get & path("id")) {
+    complete(id)
+  }
+
   val newUserRoute: Route =
     userIdFromSession { userId =>
       pathPrefix("me") {
-        wishes(userId)
-      }
+        wishes(userId) ~
+          myId(userId)
+      } ~
+        pathPrefix(JavaUUID) { friendId =>
+          friendWishes(userId, friendId)
+        }
     }
 
   val userRoute: Route =
