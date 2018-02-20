@@ -40,7 +40,7 @@ case class ImageLinks(links: List[ImageLink])
 object WishStatus {
   sealed trait WishStatus
   case object Active extends WishStatus
-  case object Granted extends WishStatus
+  case class Granted (by: Option[UUID] = None) extends WishStatus
   case object Deleted extends WishStatus
   case class Reserved(by: UUID) extends WishStatus
 }

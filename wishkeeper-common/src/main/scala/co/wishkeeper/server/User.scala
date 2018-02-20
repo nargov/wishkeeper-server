@@ -44,7 +44,13 @@ case class User(id: UUID,
     case UserEventInstant(WishImageSet(wishId, imageLinks), _) => updateWishProperty(wishId, _.withImage(imageLinks))
     case UserEventInstant(WishImageDeleted(wishId), _) => updateWishProperty(wishId, _.withoutImage)
     case UserEventInstant(WishDeleted(wishId), time) => updateWishProperty(wishId, _.withStatus(WishStatus.Deleted, time))
-    case UserEventInstant(WishGranted(wishId), time) => updateWishProperty(wishId, _.withStatus(WishStatus.Granted, time))
+    case UserEventInstant(WishGranted(wishId), time) => {
+      val granter = wishes(wishId).status match {
+        case WishStatus.Reserved(reserver) => Option(reserver)
+        case _ => None
+      }
+      updateWishProperty(wishId, _.withStatus(WishStatus.Granted(granter), time))
+    }
     case UserEventInstant(WishReserved(wishId, reserver), time) => updateWishProperty(wishId, _.withStatus(WishStatus.Reserved(reserver), time))
     case UserEventInstant(FacebookFriendsListSeen(seen), _) => this.copy(flags = flags.copy(seenFacebookFriendsList = seen))
     case UserEventInstant(FriendRequestNotificationCreated(notificationId, _, from, reqId), time) => this.copy(
