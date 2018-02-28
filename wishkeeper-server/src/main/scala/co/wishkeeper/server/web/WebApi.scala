@@ -55,10 +55,23 @@ class WebApi(publicApi: PublicApi, managementApi: ManagementApi)
     }
 
   val reserveWish: (UUID, UUID, UUID) => Route = (userId, friendId, wishId) =>
-    (post & pathPrefix("reserve")) {
+    post {
       publicApi.reserveWish(userId, friendId, wishId) match {
         case Right(_) => complete(StatusCodes.OK)
       }
+    }
+
+  val unreserveWish: (UUID, UUID, UUID) => Route = (userId, friendId, wishId) =>
+    delete {
+      publicApi.unreserveWish(userId, friendId, wishId) match {
+        case Right(_) => complete(StatusCodes.OK)
+      }
+    }
+
+  val wishReservation: (UUID, UUID, UUID) => Route = (userId, friendId, wishId) =>
+    pathPrefix("reserve"){
+      reserveWish(userId, friendId, wishId) ~
+      unreserveWish(userId, friendId, wishId)
     }
 
   val wishes: UUID => Route = userId =>
@@ -71,7 +84,7 @@ class WebApi(publicApi: PublicApi, managementApi: ManagementApi)
   val friendWishes: (UUID, UUID) => Route = (userId, friendId) =>
     pathPrefix("wishes") {
       pathPrefix(JavaUUID) { wishId =>
-        reserveWish(userId, friendId, wishId)
+        wishReservation(userId, friendId, wishId)
       }
     }
 

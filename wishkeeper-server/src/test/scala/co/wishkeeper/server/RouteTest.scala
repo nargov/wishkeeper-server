@@ -359,6 +359,16 @@ class RouteTest extends Specification with Specs2RouteTest with JMock {
         responseAs[UUID] must beEqualTo(userId)
       }
     }
+
+    "unreserve wish" in new LoggedInUserContext {
+      checking {
+        oneOf(publicApi).unreserveWish(userId, friendId, wishId).willReturn(Right(()))
+      }
+
+      Delete(s"/${friendId.toString}/wishes/${wishId.toString}/reserve").withHeaders(sessionIdHeader) ~> webApi.newUserRoute ~> check {
+        status must beEqualTo(StatusCodes.OK)
+      }
+    }
   }
 
   trait BaseContext extends Scope {

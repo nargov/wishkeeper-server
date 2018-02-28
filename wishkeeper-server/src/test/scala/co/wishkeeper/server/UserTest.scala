@@ -267,6 +267,12 @@ class UserTest extends Specification with MatcherMacros with JMock with Notifica
     userWithGrantedWIsh.wishes.values must contain(aGrantedWish(wishId, reserver))
   }
 
+  "apply WishUnreserved" in new Context {
+    val wishId: UUID = randomUUID()
+    val updatedWish = user.withReservedWish(wishId, friendId).applyEvent(asEventInstant(WishUnreserved(wishId), now)).wishes(wishId)
+    updatedWish must haveStatus(WishStatus.Active) and haveStatusLastUpdate(now)
+  }
+
   def haveStatusLastUpdate(time: DateTime): Matcher[Wish] = beSome(time) ^^ {(_: Wish).statusLastUpdate}
 
   def haveStatus(status: WishStatus): Matcher[Wish] = ===(status) ^^ {(_: Wish).status}

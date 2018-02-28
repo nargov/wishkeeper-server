@@ -3,7 +3,7 @@ package co.wishkeeper.server.api
 import java.util.UUID
 import java.util.UUID.randomUUID
 
-import co.wishkeeper.server.Commands.{ChangeFriendRequestStatus, GrantWish, RemoveFriend, ReserveWish}
+import co.wishkeeper.server.Commands._
 import co.wishkeeper.server.Events.{FacebookFriendsListSeen, UserConnected}
 import co.wishkeeper.server.EventsTestHelper.{EventsList, anEventsListFor}
 import co.wishkeeper.server.FriendRequestStatus.{Approved, Ignored}
@@ -161,6 +161,15 @@ class DelegatingPublicApiTest extends Specification with JMock {
     result.right.get.wishes must contain(allOf(
       aWishWith(activeWish.id, activeWish.name.get),
       aWishWith(reservedWish.id, reservedWish.name.get) and aWishWithStatus(reservedWish.status)))
+  }
+
+  "unreserve wish" in new LoggedInContext {
+    val wishId = randomUUID()
+    checking {
+      oneOf(commandProcessor).process(UnreserveWish(wishId), friendId)
+    }
+
+    api.unreserveWish(userId, friendId, wishId)
   }
 
   def userWishesWith(wishId: UUID, wishName: String): Matcher[UserWishes] = contain(aWishWith(wishId, wishName)) ^^ {(_: UserWishes).wishes}
