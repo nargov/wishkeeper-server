@@ -60,8 +60,8 @@ class TestUsersHelper(server: String = s"http://localhost:12300/users",
 
     println("######################################################")
     println("####################    Test Users    ################\n")
-    users.foreach(println)
-    println("Done")
+    users.
+      map(u => s"${u.email} ${u.password} ${u.userProfile.flatMap(_.name).getOrElse("")}").foreach(println)
     System.exit(0)
   }
 
