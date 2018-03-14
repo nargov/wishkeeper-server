@@ -116,7 +116,7 @@ class TestUsersHelper(server: String = s"http://localhost:12300/users",
 
     def retryFuture[T](f: => Future[T], retries: Int = 10, delay: Duration = 100.millis): Future[T] = {
       val result = f
-      result.onFailure {
+      result.failed.foreach {
         case e: Exception =>
           println(e.getMessage)
           println(s"retrying in $delay")

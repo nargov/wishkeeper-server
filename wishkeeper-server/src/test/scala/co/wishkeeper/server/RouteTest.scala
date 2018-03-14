@@ -216,6 +216,7 @@ class RouteTest extends Specification with Specs2RouteTest with JMock {
       Get(s"/users/notifications").withHeaders(sessionIdHeader) ~> webApi.userRoute ~> check {
         responseAs[UserNotifications].list match {
           case x :: xs => x.data must beEqualTo(notificationData)
+          case _ =>
         }
       }
     }

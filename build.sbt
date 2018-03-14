@@ -3,7 +3,7 @@ val dockerTestKitVersion = "0.9.0"
 val logbackVersion = "1.2.1"
 val specs2Version = "3.9.5"
 
-val scalaVer = "2.11.11"
+val scalaVer = "2.12.4"
 
 lazy val integrationSettings = inConfig(IntegrationTest)(Defaults.itSettings) ++ Seq(
   fork in IntegrationTest := false,
@@ -31,7 +31,7 @@ lazy val commonSettings = Seq(
     "org.jmock" % "jmock-legacy" % "2.8.2" % Test,
     "org.specs2" %% "specs2-core" % specs2Version % "test, it",
     "org.specs2" %% "specs2-matcher-extra" % specs2Version % "test, it",
-    "com.wix" %% "specs2-jmock" % "1.0.0" % Test
+    "com.wix" %% "specs2-jmock" % "1.2.0" % Test
   ),
 
   libraryDependencies += "org.typelevel" %% "cats" % "0.9.0",

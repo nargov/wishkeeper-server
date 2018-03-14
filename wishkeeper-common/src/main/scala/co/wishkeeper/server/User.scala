@@ -61,11 +61,11 @@ case class User(id: UUID,
         receivedRequests = if (from != id) friends.receivedRequests.filterNot(_.id == reqId) else friends.receivedRequests,
         sentRequests = if (from == id) friends.sentRequests.filterNot(_.id == reqId) else friends.sentRequests,
         current = toStatus match {
-          case Approved => friends.current :+ (if(from == id) friends.sentRequests.find(_.id == reqId).map(_.userId).get else from)
+          case Approved => friends.current :+ (if (from == id) friends.sentRequests.find(_.id == reqId).map(_.userId).get else from)
           case _ => friends.current
         }),
       notifications = notifications.map {
-        case n @ Notification(_, notif @ FriendRequestNotification(_, friendReqId, status, _), _, _) if friendReqId == reqId && status == Pending =>
+        case n@Notification(_, notif@FriendRequestNotification(_, friendReqId, status, _), _, _) if friendReqId == reqId && status == Pending =>
           n.copy(data = notif.copy(status = toStatus))
         case n => n
       }
@@ -97,6 +97,7 @@ case class User(id: UUID,
 
 object User {
   def replay(events: List[UserEventInstant]): User = {
+
     events.headOption.map {
       case UserEventInstant(UserConnected(userId, _, _), _) =>
         events.foldLeft(User(userId))((user, instant) => user.applyEvent(instant))

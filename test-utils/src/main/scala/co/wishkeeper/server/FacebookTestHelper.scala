@@ -2,7 +2,6 @@ package co.wishkeeper.server
 
 import java.util.UUID
 import java.util.concurrent.atomic.AtomicReference
-import java.util.function.UnaryOperator
 
 import akka.actor.ActorSystem
 import akka.http.scaladsl.Http
@@ -96,13 +95,8 @@ class FacebookTestHelper(implicit ec: ExecutionContext, actorSystem: ActorSystem
         case Right(user) => user
         case Left(err) => throw err
       }
-      eventualUser.map { user =>
-        testFbUsers.updateAndGet(new UnaryOperator[Map[String, TestFacebookUser]] {
-          override def apply(t: Map[String, TestFacebookUser]): Map[String, TestFacebookUser] = t + (user.id -> user)
-        })
-
-        user
-      }
+      eventualUser.foreach(user => testFbUsers.updateAndGet(x => x + (user.id -> user)))
+      eventualUser
     })
     val users: List[TestFacebookUser] = Await.result(eventualUsers, 10.seconds * numUsers)
 
@@ -134,10 +128,7 @@ class FacebookTestHelper(implicit ec: ExecutionContext, actorSystem: ActorSystem
         HttpRequest().withMethod(HttpMethods.DELETE).withUri(s"https://graph.facebook.com/v2.9/${user.id}").
           withEntity(s"access_token=$access_token")
       ).andThen {
-        case Success(res) if res.status == StatusCodes.OK =>
-          testFbUsers.getAndUpdate(new UnaryOperator[Map[String, TestFacebookUser]] {
-            override def apply(t: Map[String, TestFacebookUser]): Map[String, TestFacebookUser] = t - user.id
-          })
+        case Success(res) if res.status == StatusCodes.OK => testFbUsers.getAndUpdate(_ - user.id)
       }
     }
     Await.ready(Future.sequence(requests), 10.seconds * testFbUsers.get().size)
@@ -146,8 +137,8 @@ class FacebookTestHelper(implicit ec: ExecutionContext, actorSystem: ActorSystem
 }
 
 object FacebookTestHelper {
-  val testAppId = "1376924702342472"
-  val testAppSecret = "3f5ee9ef27bd152217246ab02bed5725"
+  val testAppId = "1415281005229066"
+  val testAppSecret = "22ae61c929a8276caf39357bd787b90d"
   val access_token = s"$testAppId|$testAppSecret"
 }
 
