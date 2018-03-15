@@ -60,7 +60,7 @@ class WishkeeperE2E extends AsyncFlatSpec with Matchers with BeforeAndAfterAll w
     driver.findElementByXPath("""//android.widget.EditText[@password="false"]""").setValue(testUser.email)
     driver.findElementByXPath("""//android.widget.EditText[@password="true"]""").setValue(testUser.password)
     driver.findElementByXPath("//android.widget.Button").click()
-    driver.findElementByXPath("""//android.view.View[contains(@content-desc, 'Wishkeeper')]""")
+    driver.findElementByXPath("""//android.view.View[contains(@content-desc, 'wishkeeper')]""")
     driver.findElementByXPath("""//android.widget.Button[@instance="1"]""").click()
 
     val userId = eventually {
