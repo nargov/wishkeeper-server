@@ -38,7 +38,7 @@ trait DataStore {
 
   def userEventsFor(userId: UUID): List[UserEvent]
 
-  def userEvents(userId: UUID): List[UserEventInstant]
+  def userEvents(userId: UUID): List[UserEventInstant[_ <: UserEvent]]
 
   def connect(): Unit
 
@@ -106,12 +106,12 @@ class CassandraDataStore(dataStoreConfig: DataStoreConfig) extends DataStore {
 
   override def userEventsFor(userId: UUID): List[UserEvent] = userEvents(userId).map(_.event)
 
-  override def userEvents(userId: UUID): List[UserEventInstant] = {
+  override def userEvents(userId: UUID): List[UserEventInstant[_ <: UserEvent]] = {
     val resultSet: ResultSet = session.execute(selectUserEvents.bind().setUUID("userId", userId))
     resultSet.asScala.map(rowToEventInstant).toList
   }
 
-  private val rowToEventInstant: Row => UserEventInstant = row => {
+  private val rowToEventInstant: Row => UserEventInstant[_ <: UserEvent] = row => {
     val json = new String(row.getBytes("event").array())
     val time = new DateTime(row.getTimestamp("time"))
     val eventOrError = decode[UserEvent](json)

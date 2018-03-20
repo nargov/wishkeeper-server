@@ -37,6 +37,8 @@ trait NotificationMatchers extends MustThrownMatchers {
     case NotificationViewed(id) => (notificationId == id, s"$notificationId does not match $event")
     case _ => (false, s"$event is not a NotificationViewed event")
   }
+
+  def aNotificationWithId(id: UUID) = ===(id) ^^ {(_:Notification).id}
 }
 
 object NotificationMatchers extends NotificationMatchers

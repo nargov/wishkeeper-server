@@ -9,13 +9,13 @@ import org.joda.time.DateTime
 object EventsTestHelper {
   def userConnectEvent(userId: UUID) = UserConnected(userId, DateTime.now(), UUID.randomUUID())
 
-  def asEventInstants(events: List[UserEvent]): List[UserEventInstant] = events.map(asEventInstant(_))
+  def asEventInstants(events: List[UserEvent]): List[UserEventInstant[_ <: UserEvent]] = events.map(asEventInstant(_))
 
   def asEventInstant(event: UserEvent, time: DateTime = DateTime.now().minusDays(1)) = UserEventInstant(event, time)
 
   def anEventsListFor(userId: UUID) = EventsList(userId)
 
-  case class EventsList(userId: UUID, list: List[UserEventInstant]) {
+  case class EventsList(userId: UUID, list: List[UserEventInstant[_ <: UserEvent]]) {
     def withFriend(friendId: UUID, requestId: UUID = UUID.randomUUID()) = this.copy(list = list ++ asEventInstants(List(
       FriendRequestSent(userId, friendId, Option(requestId)),
       FriendRequestStatusChanged(userId, requestId, userId, Approved)

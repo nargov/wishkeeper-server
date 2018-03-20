@@ -104,7 +104,7 @@ object Commands {
     }
   }
 
-  case object MarkAllNotificationsViewed extends  UserCommand {
+  case object MarkAllNotificationsViewed extends UserCommand {
     override def process(user: User): List[UserEvent] =
       user.notifications.filterNot(_.viewed).map(notification => NotificationViewed(notification.id))
   }
@@ -118,10 +118,13 @@ object Commands {
   }
 
   case class ReserveWish(reserverId: UUID, wishId: UUID) extends UserCommand {
-    override def process(user: User): List[UserEvent] = WishReserved(wishId, reserverId) :: Nil
+    override def process(user: User): List[UserEvent] = List(
+      WishReserved(wishId, reserverId),
+      WishReservedNotificationCreated(UUID.randomUUID(), wishId, reserverId))
   }
 
   case class UnreserveWish(wishId: UUID) extends UserCommand {
     override def process(user: User): List[UserEvent] = WishUnreserved(wishId) :: Nil
   }
+
 }

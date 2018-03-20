@@ -3,7 +3,7 @@ val dockerTestKitVersion = "0.9.0"
 val logbackVersion = "1.2.1"
 val specs2Version = "3.9.5"
 
-val scalaVer = "2.12.4"
+val scalaVer = "2.12.5"
 
 lazy val integrationSettings = inConfig(IntegrationTest)(Defaults.itSettings) ++ Seq(
   fork in IntegrationTest := false,

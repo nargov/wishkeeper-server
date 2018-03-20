@@ -20,7 +20,7 @@ object UserTestHelper {
       user.applyEvent(UserEventInstant(WishCreated(id, user.id, now), now))
 
     def withReservedWish(id: UUID = UUID.randomUUID(), reserver: UUID): User = {
-      val events: List[UserEventInstant] = EventsList(user.id).withReservedWish(id, "reserved wish", reserver).list
+      val events: List[UserEventInstant[_ <: UserEvent]] = EventsList(user.id).withReservedWish(id, "reserved wish", reserver).list
       events.foldLeft(user)(_.applyEvent(_))
     }
 
@@ -37,8 +37,7 @@ object UserTestHelper {
         applyEvent(asEventInstant(FriendRequestStatusChanged(user.id, reqId, friendId, Approved)))
 
     def withSentFriendRequest(reqId: UUID, friend: UUID): User =
-      user.
-        applyEvent(asEventInstant(FriendRequestSent(user.id, friend, Option(reqId))))
+      user.applyEvent(asEventInstant(FriendRequestSent(user.id, friend, Option(reqId))))
 
     def withSentFriendRequestAccepted(reqId: UUID, friend: UUID): User =
       user.withSentFriendRequest(reqId, friend).

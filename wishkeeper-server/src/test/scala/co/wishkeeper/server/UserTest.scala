@@ -6,7 +6,7 @@ import java.util.UUID.randomUUID
 import co.wishkeeper.server.Events._
 import co.wishkeeper.server.EventsTestHelper.asEventInstant
 import co.wishkeeper.server.FriendRequestStatus.Approved
-import co.wishkeeper.server.NotificationsData.FriendRequestNotification
+import co.wishkeeper.server.NotificationsData.{FriendRequestNotification, WishReservedNotification, WishUnreservedNotification}
 import co.wishkeeper.server.UserTestHelper._
 import co.wishkeeper.server.WishStatus.WishStatus
 import co.wishkeeper.test.utils.WishMatchers._
@@ -19,20 +19,6 @@ import org.specs2.specification.Scope
 import scala.language.experimental.macros
 
 class UserTest extends Specification with MatcherMacros with JMock with NotificationMatchers {
-
-  trait Context extends Scope {
-    val user: User = User.createNew()
-    val wish: Wish = Wish(randomUUID())
-    val requestId: UUID = randomUUID()
-    val friendId: UUID = randomUUID()
-
-    def appliedEventCreatesExpectedWish(event: UserEvent, expectedWish: Wish): Any = {
-      user.applyEvent(UserEventInstant(event, DateTime.now())).wishes(expectedWish.id) must beEqualToIgnoringDates(expectedWish)
-    }
-
-    val now: DateTime = DateTime.now()
-  }
-
 
   "create a new user" in new Context {
     user must matchA[User].id(beAnInstanceOf[UUID])
@@ -115,31 +101,31 @@ class UserTest extends Specification with MatcherMacros with JMock with Notifica
 
   "apply WishNameSet" in new Context {
     private val name = "name"
-    appliedEventCreatesExpectedWish(WishNameSet(wish.id, name), wish.withName(name))
+    appliedEventCreatesExpectedWish(WishNameSet(wishId, name), wish.withName(name))
 
   }
 
   "apply WishLinkSet" in new Context {
     private val link = "link"
-    appliedEventCreatesExpectedWish(WishLinkSet(wish.id, link), wish.withLink(link))
+    appliedEventCreatesExpectedWish(WishLinkSet(wishId, link), wish.withLink(link))
   }
 
   "apply WishStoreSet" in new Context {
     private val store = "store"
-    appliedEventCreatesExpectedWish(WishStoreSet(wish.id, store), wish.withStore(store))
+    appliedEventCreatesExpectedWish(WishStoreSet(wishId, store), wish.withStore(store))
   }
 
   "apply WishOtherInfoSet" in new Context {
     private val otherInfo = "other info"
-    appliedEventCreatesExpectedWish(WishOtherInfoSet(wish.id, otherInfo), wish.withOtherInfo(otherInfo))
+    appliedEventCreatesExpectedWish(WishOtherInfoSet(wishId, otherInfo), wish.withOtherInfo(otherInfo))
   }
 
   "apply WishImageDeleted" in new Context {
     private val imageLinks = ImageLinks(ImageLink("", 0, 0, "") :: Nil)
     user
-      .applyEvent(UserEventInstant(WishImageSet(wish.id, imageLinks), now))
-      .applyEvent(UserEventInstant(WishImageDeleted(wish.id), now))
-      .wishes(wish.id).image must beNone
+      .applyEvent(UserEventInstant(WishImageSet(wishId, imageLinks), now))
+      .applyEvent(UserEventInstant(WishImageDeleted(wishId), now))
+      .wishes(wishId).image must beNone
   }
 
   "apply UserPictureSet" in new Context {
@@ -149,23 +135,23 @@ class UserTest extends Specification with MatcherMacros with JMock with Notifica
 
   "apply WishCreated" in new Context {
     val creationTime: DateTime = DateTime.now()
-    private val wishCreated = UserEventInstant(WishCreated(wish.id, user.id, creationTime), now)
-    user.applyEvent(wishCreated).wishes(wish.id) must haveCreationTime(creationTime)
+    private val wishCreated = UserEventInstant(WishCreated(wishId, user.id, creationTime), now)
+    user.applyEvent(wishCreated).wishes(wishId) must haveCreationTime(creationTime)
   }
 
   "apply WishImageSet" in new Context {
     private val imageLinks = ImageLinks(ImageLink("url", 10, 20, "image/jpeg") :: Nil)
-    appliedEventCreatesExpectedWish(WishImageSet(wish.id, imageLinks), wish.withImage(imageLinks))
+    appliedEventCreatesExpectedWish(WishImageSet(wishId, imageLinks), wish.withImage(imageLinks))
   }
 
   "apply WishPriceSet" in new Context {
     val price = "12.34"
-    appliedEventCreatesExpectedWish(WishPriceSet(wish.id, price), wish.withPrice(price))
+    appliedEventCreatesExpectedWish(WishPriceSet(wishId, price), wish.withPrice(price))
   }
 
   "apply WishCurrencySet" in new Context {
     val currency = "GBP"
-    appliedEventCreatesExpectedWish(WishCurrencySet(wish.id, currency), wish.withCurrency(currency))
+    appliedEventCreatesExpectedWish(WishCurrencySet(wishId, currency), wish.withCurrency(currency))
   }
 
   "apply wish links ordered by width" in new Context {
@@ -180,14 +166,14 @@ class UserTest extends Specification with MatcherMacros with JMock with Notifica
         ImageLink("url", 30, 20, "image/jpeg") ::
         Nil
     )
-    user.applyEvent(UserEventInstant(WishImageSet(wish.id, imageLinks), now)).wishes(wish.id).image must beSome(sortedImageLinks)
+    user.applyEvent(UserEventInstant(WishImageSet(wishId, imageLinks), now)).wishes(wishId).image must beSome(sortedImageLinks)
   }
 
   "apply wish deleted" in new Context {
     user
-      .applyEvent(UserEventInstant(WishCreated(wish.id, randomUUID(), DateTime.now()), now))
-      .applyEvent(UserEventInstant(WishDeleted(wish.id), now))
-      .wishes(wish.id).status must beEqualTo(WishStatus.Deleted)
+      .applyEvent(UserEventInstant(WishCreated(wishId, randomUUID(), DateTime.now()), now))
+      .applyEvent(UserEventInstant(WishDeleted(wishId), now))
+      .wishes(wishId).status must beEqualTo(WishStatus.Deleted)
   }
 
   "apply facebook friends list seen" in new Context {
@@ -199,7 +185,6 @@ class UserTest extends Specification with MatcherMacros with JMock with Notifica
   }
 
   "apply FriendRequestNotificationCreated" in new Context {
-    private val notificationId: UUID = randomUUID()
     user.
       applyEvent(UserEventInstant(FriendRequestNotificationCreated(notificationId, user.id, friendId, requestId), now)).
       notifications.head must beEqualTo(Notification(notificationId, FriendRequestNotification(friendId, requestId), time = now)
@@ -238,7 +223,6 @@ class UserTest extends Specification with MatcherMacros with JMock with Notifica
   }
 
   "apply NotificationViewed" in new Context {
-    val notificationId: UUID = randomUUID()
     user.withFriendRequestNotification(notificationId, requestId, friendId).
       applyEvent(asEventInstant(NotificationViewed(notificationId))).
       notifications.forall(_.viewed) must beTrue
@@ -249,35 +233,119 @@ class UserTest extends Specification with MatcherMacros with JMock with Notifica
   }
 
   "apply WishGranted" in new Context {
-    val wishId: UUID = randomUUID()
     val updatedWish = user.withWish(wishId).applyEvent(asEventInstant(WishGranted(wishId), now)).wishes(wishId)
     updatedWish must haveStatus(WishStatus.Granted()) and haveStatusLastUpdate(now)
   }
 
   "apply WishReserved" in new Context {
-    val wishId: UUID = randomUUID()
     val updatedWish = user.withWish(wishId).applyEvent(asEventInstant(WishReserved(wishId, friendId), now)).wishes(wishId)
     updatedWish must haveStatus(WishStatus.Reserved(friendId)) and haveStatusLastUpdate(now)
   }
 
   "denote granted wish with the reserver" in new Context {
-    val wishId: UUID = randomUUID()
-    val reserver: UUID = randomUUID()
-    val userWithGrantedWIsh: User = user.withReservedWish(wishId, reserver).applyEvent(asEventInstant(WishGranted(wishId)))
-    userWithGrantedWIsh.wishes.values must contain(aGrantedWish(wishId, reserver))
+    val userWithGrantedWIsh: User = user.withReservedWish(wishId, friendId).applyEvent(asEventInstant(WishGranted(wishId)))
+    userWithGrantedWIsh.wishes.values must contain(aGrantedWish(wishId, friendId))
   }
 
   "apply WishUnreserved" in new Context {
-    val wishId: UUID = randomUUID()
     val updatedWish = user.withReservedWish(wishId, friendId).applyEvent(asEventInstant(WishUnreserved(wishId), now)).wishes(wishId)
     updatedWish must haveStatus(WishStatus.Active) and haveStatusLastUpdate(now)
   }
 
-  def haveStatusLastUpdate(time: DateTime): Matcher[Wish] = beSome(time) ^^ {(_: Wish).statusLastUpdate}
+  "create WishReservedNotification after the time delay" in new Context {
+    val notifications = user.withReservedWish(wishId, friendId).
+      applyEvent(asEventInstant(WishReservedNotificationCreated(notificationId, wishId, friendId), DateTime.now().minusMinutes(6))).notifications
+    notifications must contain(aNotificationWith(===(WishReservedNotification(wishId, friendId))))
+  }
 
-  def haveStatus(status: WishStatus): Matcher[Wish] = ===(status) ^^ {(_: Wish).status}
+  "not create a WishReserveNotification when minimum time is below threshold" in new Context {
+    val notifications = user.withReservedWish(wishId, friendId).
+      applyEvent(asEventInstant(WishReservedNotificationCreated(notificationId, wishId, friendId))).notifications
+    notifications must not(contain(aNotificationType[WishReservedNotificationCreated]))
+  }
 
-  def haveCreationTime(time: DateTime): Matcher[Wish] = ===(time) ^^ {(_: Wish).creationTime}
+  "not create a WishReservedNotification when wish was unreserved before time threshold" in new Context {
+    val notifications = user.withReservedWish(wishId, friendId).
+      applyEvent(asEventInstant(WishReservedNotificationCreated(notificationId, wishId, friendId))).notifications
+    notifications must not(contain(aNotificationType[WishReservedNotificationCreated]))
+  }
+
+  "create WishUnreservedNotification after time delay" in new Context {
+    val notifications = user.withReservedWish(wishId, friendId).
+      applyEvent(asEventInstant(WishReservedNotificationCreated(notificationId, wishId, friendId), DateTime.now().minusMinutes(12))).
+      applyEvent(asEventInstant(WishUnreserved(wishId), DateTime.now().minusMinutes(6))).
+      applyEvent(asEventInstant(WishUnreservedNotificationCreated(notificationId, wishId, friendId), DateTime.now().minusMinutes(6))).
+      notifications
+    notifications must contain(aNotificationWith(===(WishUnreservedNotification(wishId, friendId))))
+  }
+
+  "not create WishUnreservedNotification when time delay below threshold" in new Context {
+    val notifications = user.withReservedWish(wishId, friendId).
+      applyEvent(asEventInstant(WishUnreserved(wishId), DateTime.now().minusMinutes(4))).
+      applyEvent(asEventInstant(WishUnreservedNotificationCreated(notificationId, wishId, friendId), DateTime.now().minusMinutes(4))).
+      notifications
+    notifications must not(contain(aNotificationType[WishUnreservedNotification]))
+  }
+
+  "not create WishReservedNotification and WishUnreservedNotification if time between is below threshold" in new Context {
+    val notifications = user.withReservedWish(wishId, friendId).
+      applyEvent(asEventInstant(WishReservedNotificationCreated(notificationId, wishId, friendId), DateTime.now().minusMinutes(10))).
+      applyEvent(asEventInstant(WishUnreserved(wishId), DateTime.now().minusMinutes(8))).
+      applyEvent(asEventInstant(WishUnreservedNotificationCreated(notificationId, wishId, friendId), DateTime.now().minusMinutes(8))).
+      notifications
+    notifications must not(contain(aNotificationType[WishReservedNotification])) and not(contain(aNotificationType[WishUnreservedNotification]))
+  }
+
+  "create WishReservedNotification and WishUnreservedNotification only beyond threshold" in new Context {
+    val firstReserveTime: DateTime = DateTime.now().minusMinutes(20)
+    val firstUnreserveTime: DateTime = firstReserveTime.plusMinutes(6)
+    val secondReserveTime: DateTime = firstUnreserveTime.plusMinutes(1)
+    val secondUnreserveTime: DateTime = secondReserveTime.plusMinutes(1)
+    val notifId1 = randomUUID()
+    val notifId2 = randomUUID()
+    val notifId3 = randomUUID()
+    val notifId4 = randomUUID()
+    val notifications = user.
+      applyEvent(asEventInstant(WishReservedNotificationCreated(notifId1, wishId, friendId), firstReserveTime)).
+      applyEvent(asEventInstant(WishUnreservedNotificationCreated(notifId2, wishId, friendId), firstUnreserveTime)).
+      applyEvent(asEventInstant(WishReservedNotificationCreated(notifId3, wishId, friendId), secondReserveTime)).
+      applyEvent(asEventInstant(WishUnreservedNotificationCreated(notifId4, wishId, friendId), secondUnreserveTime)).
+      notifications
+
+    notifications must
+      have size 2 and
+      contain(aNotificationWithId(notifId1)) and
+      contain(aNotificationWithId(notifId2)) and
+      not(contain(aNotificationWithId(notifId3))) and
+      not(contain(aNotificationWithId(notifId4)))
+  }
+
+  trait Context extends Scope {
+    val user: User = User.createNew()
+    val wish: Wish = Wish(randomUUID())
+    val wishId = wish.id
+    val requestId: UUID = randomUUID()
+    val friendId: UUID = randomUUID()
+    val notificationId = randomUUID()
+
+    def appliedEventCreatesExpectedWish(event: UserEvent, expectedWish: Wish): Any = {
+      user.applyEvent(UserEventInstant(event, DateTime.now())).wishes(expectedWish.id) must beEqualToIgnoringDates(expectedWish)
+    }
+
+    val now: DateTime = DateTime.now()
+  }
+
+  def haveStatusLastUpdate(time: DateTime): Matcher[Wish] = beSome(time) ^^ {
+    (_: Wish).statusLastUpdate
+  }
+
+  def haveStatus(status: WishStatus): Matcher[Wish] = ===(status) ^^ {
+    (_: Wish).status
+  }
+
+  def haveCreationTime(time: DateTime): Matcher[Wish] = ===(time) ^^ {
+    (_: Wish).creationTime
+  }
 }
 
 

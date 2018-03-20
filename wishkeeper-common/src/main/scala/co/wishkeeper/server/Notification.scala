@@ -23,6 +23,15 @@ object NotificationsData {
     def withProfile(profile: UserProfile): FriendRequestAcceptedNotification = this.copy(profile = Option(profile))
   }
 
+  case class WishReservedNotification(wishId: UUID,
+                                      reserver: UUID,
+                                      reserverProfile: Option[UserProfile] = None,
+                                      wishName: Option[String] = None) extends NotificationData
+
+  case class WishUnreservedNotification(wishId: UUID,
+                                        reserver: UUID,
+                                        reserverProfile: Option[UserProfile] = None,
+                                        wishName: Option[String] = None) extends NotificationData
 }
 
 case class Notification(id: UUID, data: NotificationData, viewed: Boolean = false, time: DateTime = DateTime.now())

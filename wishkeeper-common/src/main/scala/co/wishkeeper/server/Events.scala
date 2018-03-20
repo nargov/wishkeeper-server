@@ -2,6 +2,7 @@ package co.wishkeeper.server
 
 import java.util.UUID
 
+import co.wishkeeper.server.Events.UserEvent
 import org.joda.time.DateTime
 
 object Events {
@@ -72,11 +73,15 @@ object Events {
 
   case class WishReserved(wishId: UUID, reserverId: UUID) extends UserEvent
 
+  case class WishReservedNotificationCreated(id: UUID, wishId: UUID, reserverId: UUID) extends UserEvent
+
   case class WishUnreserved(wishId: UUID) extends UserEvent
+
+  case class WishUnreservedNotificationCreated(id: UUID, wishId: UUID, reserverId: UUID) extends UserEvent
 
   case class FacebookFriendsListSeen(seen: Boolean = true) extends UserEvent
 
   case class FriendRemoved(userId: UUID, friendId: UUID) extends UserEvent
 }
 
-case class UserEventInstant(event: Events.UserEvent, time: DateTime)
+case class UserEventInstant[E <: UserEvent](event: E, time: DateTime)

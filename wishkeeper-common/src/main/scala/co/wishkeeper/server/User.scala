@@ -4,7 +4,11 @@ import java.util.UUID
 
 import co.wishkeeper.server.Events._
 import co.wishkeeper.server.FriendRequestStatus.{Approved, Pending}
-import co.wishkeeper.server.NotificationsData.{FriendRequestAcceptedNotification, FriendRequestNotification}
+import co.wishkeeper.server.NotificationsData.{FriendRequestAcceptedNotification, FriendRequestNotification, WishReservedNotification}
+import co.wishkeeper.server.user.events.NotificationEventHandlers._
+import co.wishkeeper.server.user.events.UserEventHandler
+import org.joda.time.DateTime
+
 
 case class User(id: UUID,
                 userProfile: UserProfile = UserProfile(),
@@ -13,7 +17,7 @@ case class User(id: UUID,
                 flags: Flags = Flags(),
                 notifications: List[Notification] = Nil) {
 
-  def applyEvent(event: UserEventInstant): User = event match {
+  def applyEvent[E <: UserEvent](event: UserEventInstant[E]): User = event match {
     case UserEventInstant(UserFirstNameSet(_, value), _) => this.copy(userProfile = this.userProfile.copy(firstName = Option(value)))
     case UserEventInstant(UserLastNameSet(_, value), _) => this.copy(userProfile = this.userProfile.copy(lastName = Option(value)))
     case UserEventInstant(UserNameSet(_, value), _) => this.copy(userProfile = this.userProfile.copy(name = Option(value)))
@@ -44,15 +48,16 @@ case class User(id: UUID,
     case UserEventInstant(WishImageSet(wishId, imageLinks), _) => updateWishProperty(wishId, _.withImage(imageLinks))
     case UserEventInstant(WishImageDeleted(wishId), _) => updateWishProperty(wishId, _.withoutImage)
     case UserEventInstant(WishDeleted(wishId), time) => updateWishProperty(wishId, _.withStatus(WishStatus.Deleted, time))
-    case UserEventInstant(WishGranted(wishId), time) => {
+    case UserEventInstant(WishGranted(wishId), time) =>
       val granter = wishes(wishId).status match {
         case WishStatus.Reserved(reserver) => Option(reserver)
         case _ => None
       }
       updateWishProperty(wishId, _.withStatus(WishStatus.Granted(granter), time))
-    }
     case UserEventInstant(WishReserved(wishId, reserver), time) => updateWishProperty(wishId, _.withStatus(WishStatus.Reserved(reserver), time))
     case UserEventInstant(WishUnreserved(wishId), time) => updateWishProperty(wishId, _.withStatus(WishStatus.Active, time))
+    case UserEventInstant(WishReservedNotificationCreated(notifId, wishId, reserver), time) if overDelayThreshold(time) =>
+      this.copy(notifications = Notification(notifId, WishReservedNotification(wishId, reserver), time = time) :: notifications)
     case UserEventInstant(FacebookFriendsListSeen(seen), _) => this.copy(flags = flags.copy(seenFacebookFriendsList = seen))
     case UserEventInstant(FriendRequestNotificationCreated(notificationId, _, from, reqId), time) => this.copy(
       notifications = Notification(notificationId, FriendRequestNotification(from, reqId), time = time) :: notifications)
@@ -78,8 +83,12 @@ case class User(id: UUID,
       this.copy(notifications = notifications.updated(index, updatedNotification))
 
     case UserEventInstant(FriendRemoved(_, friendId), _) => this.copy(friends = friends.copy(current = friends.current.filterNot(_ == friendId)))
+    case UserEventInstant(e@WishUnreservedNotificationCreated(_, _, _), time) => handleEventWithHandler(e, time)
     case _ => this
   }
+
+  private def handleEventWithHandler[E <: UserEvent](event: E, time: DateTime)(implicit handler: UserEventHandler[E]): User =
+    handler(this, event, time)
 
   def seenFacebookFriends: Boolean = flags.seenFacebookFriendsList
 
@@ -96,8 +105,7 @@ case class User(id: UUID,
 }
 
 object User {
-  def replay(events: List[UserEventInstant]): User = {
-
+  def replay(events: List[UserEventInstant[_ <: UserEvent]]): User = {
     events.headOption.map {
       case UserEventInstant(UserConnected(userId, _, _), _) =>
         events.foldLeft(User(userId))((user, instant) => user.applyEvent(instant))
