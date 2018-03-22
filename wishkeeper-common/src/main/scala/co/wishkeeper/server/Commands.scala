@@ -124,7 +124,8 @@ object Commands {
   }
 
   case class UnreserveWish(wishId: UUID) extends UserCommand {
-    override def process(user: User): List[UserEvent] = WishUnreserved(wishId) :: Nil
+    override def process(user: User): List[UserEvent] = List(
+      WishUnreserved(wishId),
+      WishUnreservedNotificationCreated(UUID.randomUUID(), wishId))
   }
-
 }

@@ -6,7 +6,7 @@ import java.util.UUID.randomUUID
 import co.wishkeeper.server.CommandProcessor.retry
 import co.wishkeeper.server.Events._
 import co.wishkeeper.server.FriendRequestStatus.Approved
-import co.wishkeeper.server.NotificationsData.{FriendRequestAcceptedNotification, FriendRequestNotification}
+import co.wishkeeper.server.NotificationsData.{FriendRequestAcceptedNotification, FriendRequestNotification, WishReservedNotification, WishUnreservedNotification}
 import co.wishkeeper.server._
 import org.joda.time.DateTime
 
@@ -35,7 +35,8 @@ class DataStoreNotificationsProjection(dataStore: DataStore) extends Notificatio
   }
 
   def notificationsFor(userId: UUID): List[Notification] = {
-    val notifications = User.replay(dataStore.userEvents(userId)).notifications
+    val user = User.replay(dataStore.userEvents(userId))
+    val notifications = user.notifications
     notifications.map(notification => notification.copy(data = notification.data match {
       case friendReq: FriendRequestNotification =>
         val sender = User.replay(dataStore.userEvents(friendReq.from))
@@ -43,6 +44,8 @@ class DataStoreNotificationsProjection(dataStore: DataStore) extends Notificatio
       case accepted: FriendRequestAcceptedNotification =>
         val friend = User.replay(dataStore.userEvents(accepted.friendId))
         accepted.withProfile(friend.userProfile)
+      case reserved: WishReservedNotification => reserved.copy(wishName = user.wishes(reserved.wishId).name)
+      case unreserved: WishUnreservedNotification => unreserved.copy(wishName = user.wishes(unreserved.wishId).name)
       case x => x
     }))
   }

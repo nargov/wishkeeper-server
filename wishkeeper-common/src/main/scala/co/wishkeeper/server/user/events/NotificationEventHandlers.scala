@@ -23,19 +23,27 @@ object NotificationEventHandlers {
   implicit val wishUnReservedNotificationHandler = new UserEventHandler[WishUnreservedNotificationCreated] {
     override def apply(user: User, event: WishUnreservedNotificationCreated, time: DateTime): User = {
       if (overDelayThreshold(time)) {
-        if (timeSinceReserveOverThreshold(user, time, event.wishId)) {
-          user.copy(notifications = Notification(
-            event.id,
-            WishUnreservedNotification(event.wishId, event.reserverId),
-            time = time) :: user.notifications)
+        val maybeReserver: Option[UUID] = user.notifications.find {
+          case Notification(_, WishReservedNotification(id, _, _, _), _, _) if id == event.wishId => true
+          case _ => false
+        }.map{
+          case Notification(_, WishReservedNotification(_, reserverId, _, _), _, _) => reserverId
         }
-        else {
-          val lastReserveIndex = user.notifications.indexWhere {
-            case Notification(_, WishReservedNotification(wishId, _, _, _), _, _) if wishId == event.wishId => true
-            case _ => false
+        maybeReserver.map{ reserver =>
+          if (timeSinceReserveOverThreshold(user, time, event.wishId)) {
+            user.copy(notifications = Notification(
+              event.id,
+              WishUnreservedNotification(event.wishId, reserver),
+              time = time) :: user.notifications)
           }
-          user.copy(notifications = user.notifications.patch(lastReserveIndex, Nil, 1))
-        }
+          else {
+            val lastReserveIndex = user.notifications.indexWhere {
+              case Notification(_, WishReservedNotification(wishId, _, _, _), _, _) if wishId == event.wishId => true
+              case _ => false
+            }
+            user.copy(notifications = user.notifications.patch(lastReserveIndex, Nil, 1))
+          }
+        }.getOrElse(user)
       }
       else user
     }

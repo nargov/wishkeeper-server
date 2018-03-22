@@ -274,7 +274,7 @@ class UserTest extends Specification with MatcherMacros with JMock with Notifica
     val notifications = user.withReservedWish(wishId, friendId).
       applyEvent(asEventInstant(WishReservedNotificationCreated(notificationId, wishId, friendId), DateTime.now().minusMinutes(12))).
       applyEvent(asEventInstant(WishUnreserved(wishId), DateTime.now().minusMinutes(6))).
-      applyEvent(asEventInstant(WishUnreservedNotificationCreated(notificationId, wishId, friendId), DateTime.now().minusMinutes(6))).
+      applyEvent(asEventInstant(WishUnreservedNotificationCreated(notificationId, wishId), DateTime.now().minusMinutes(6))).
       notifications
     notifications must contain(aNotificationWith(===(WishUnreservedNotification(wishId, friendId))))
   }
@@ -282,7 +282,7 @@ class UserTest extends Specification with MatcherMacros with JMock with Notifica
   "not create WishUnreservedNotification when time delay below threshold" in new Context {
     val notifications = user.withReservedWish(wishId, friendId).
       applyEvent(asEventInstant(WishUnreserved(wishId), DateTime.now().minusMinutes(4))).
-      applyEvent(asEventInstant(WishUnreservedNotificationCreated(notificationId, wishId, friendId), DateTime.now().minusMinutes(4))).
+      applyEvent(asEventInstant(WishUnreservedNotificationCreated(notificationId, wishId), DateTime.now().minusMinutes(4))).
       notifications
     notifications must not(contain(aNotificationType[WishUnreservedNotification]))
   }
@@ -291,7 +291,7 @@ class UserTest extends Specification with MatcherMacros with JMock with Notifica
     val notifications = user.withReservedWish(wishId, friendId).
       applyEvent(asEventInstant(WishReservedNotificationCreated(notificationId, wishId, friendId), DateTime.now().minusMinutes(10))).
       applyEvent(asEventInstant(WishUnreserved(wishId), DateTime.now().minusMinutes(8))).
-      applyEvent(asEventInstant(WishUnreservedNotificationCreated(notificationId, wishId, friendId), DateTime.now().minusMinutes(8))).
+      applyEvent(asEventInstant(WishUnreservedNotificationCreated(notificationId, wishId), DateTime.now().minusMinutes(8))).
       notifications
     notifications must not(contain(aNotificationType[WishReservedNotification])) and not(contain(aNotificationType[WishUnreservedNotification]))
   }
@@ -307,9 +307,9 @@ class UserTest extends Specification with MatcherMacros with JMock with Notifica
     val notifId4 = randomUUID()
     val notifications = user.
       applyEvent(asEventInstant(WishReservedNotificationCreated(notifId1, wishId, friendId), firstReserveTime)).
-      applyEvent(asEventInstant(WishUnreservedNotificationCreated(notifId2, wishId, friendId), firstUnreserveTime)).
+      applyEvent(asEventInstant(WishUnreservedNotificationCreated(notifId2, wishId), firstUnreserveTime)).
       applyEvent(asEventInstant(WishReservedNotificationCreated(notifId3, wishId, friendId), secondReserveTime)).
-      applyEvent(asEventInstant(WishUnreservedNotificationCreated(notifId4, wishId, friendId), secondUnreserveTime)).
+      applyEvent(asEventInstant(WishUnreservedNotificationCreated(notifId4, wishId), secondUnreserveTime)).
       notifications
 
     notifications must

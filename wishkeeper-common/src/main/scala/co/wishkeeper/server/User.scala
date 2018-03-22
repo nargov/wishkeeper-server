@@ -83,7 +83,7 @@ case class User(id: UUID,
       this.copy(notifications = notifications.updated(index, updatedNotification))
 
     case UserEventInstant(FriendRemoved(_, friendId), _) => this.copy(friends = friends.copy(current = friends.current.filterNot(_ == friendId)))
-    case UserEventInstant(e@WishUnreservedNotificationCreated(_, _, _), time) => handleEventWithHandler(e, time)
+    case UserEventInstant(e@WishUnreservedNotificationCreated(_, _), time) => handleEventWithHandler(e, time)
     case _ => this
   }
 

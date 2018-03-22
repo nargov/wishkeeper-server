@@ -77,7 +77,7 @@ object Events {
 
   case class WishUnreserved(wishId: UUID) extends UserEvent
 
-  case class WishUnreservedNotificationCreated(id: UUID, wishId: UUID, reserverId: UUID) extends UserEvent
+  case class WishUnreservedNotificationCreated(id: UUID, wishId: UUID) extends UserEvent
 
   case class FacebookFriendsListSeen(seen: Boolean = true) extends UserEvent
 
