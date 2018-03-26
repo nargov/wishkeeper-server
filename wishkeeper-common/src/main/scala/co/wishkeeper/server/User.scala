@@ -79,8 +79,11 @@ case class User(id: UUID,
       notifications = Notification(notificationId, FriendRequestAcceptedNotification(by, requestId), time = time) :: notifications)
     case UserEventInstant(NotificationViewed(notificationId), _) =>
       val index = notifications.indexWhere(_.id == notificationId)
-      val updatedNotification = notifications(index).copy(viewed = true)
-      this.copy(notifications = notifications.updated(index, updatedNotification))
+      if(index >= 0) {
+        val updatedNotification = notifications(index).copy(viewed = true)
+        this.copy(notifications = notifications.updated(index, updatedNotification))
+      }
+      else this
 
     case UserEventInstant(FriendRemoved(_, friendId), _) => this.copy(friends = friends.copy(current = friends.current.filterNot(_ == friendId)))
     case UserEventInstant(e@WishUnreservedNotificationCreated(_, _), time) => handleEventWithHandler(e, time)

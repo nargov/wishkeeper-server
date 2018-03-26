@@ -320,6 +320,10 @@ class UserTest extends Specification with MatcherMacros with JMock with Notifica
       not(contain(aNotificationWithId(notifId4)))
   }
 
+  "ignore notification-viewed event if notification was discarded" in new Context {
+    user.applyEvent(asEventInstant(NotificationViewed(notificationId))).notifications must beEmpty
+  }
+
   trait Context extends Scope {
     val user: User = User.createNew()
     val wish: Wish = Wish(randomUUID())
