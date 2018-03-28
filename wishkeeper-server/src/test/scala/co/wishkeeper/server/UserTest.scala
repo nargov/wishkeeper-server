@@ -324,6 +324,20 @@ class UserTest extends Specification with MatcherMacros with JMock with Notifica
     user.applyEvent(asEventInstant(NotificationViewed(notificationId))).notifications must beEmpty
   }
 
+  "discard WishReservedNotification if WishUnreservedNotification exists within threshold" in new Context {
+    val reserveTime = DateTime.now().minusMinutes(6)
+    val unreserveTime = reserveTime.plusMinutes(3)
+    val notifId1 = randomUUID()
+    val notifId2 = randomUUID()
+
+    val notifications = user.
+      applyEvent(asEventInstant(WishReservedNotificationCreated(notifId1, wishId, friendId), reserveTime)).
+      applyEvent(asEventInstant(WishUnreservedNotificationCreated(notifId2, wishId), unreserveTime)).
+      notifications
+
+    notifications must beEmpty
+  }
+
   trait Context extends Scope {
     val user: User = User.createNew()
     val wish: Wish = Wish(randomUUID())
