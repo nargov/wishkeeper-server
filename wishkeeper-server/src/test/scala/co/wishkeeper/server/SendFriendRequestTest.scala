@@ -3,7 +3,7 @@ package co.wishkeeper.server
 import java.util.UUID
 import java.util.UUID.randomUUID
 
-import co.wishkeeper.server.Commands.SendFriendRequest
+import co.wishkeeper.server.user.commands.SendFriendRequest
 import co.wishkeeper.server.Events.{FriendRequestSent, UserEvent}
 import org.specs2.matcher.Matcher
 import org.specs2.mutable.Specification

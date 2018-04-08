@@ -3,7 +3,7 @@ package co.wishkeeper.server
 import java.util.UUID
 import java.util.UUID.randomUUID
 
-import co.wishkeeper.server.Commands.ChangeFriendRequestStatus
+import co.wishkeeper.server.user.commands.ChangeFriendRequestStatus
 import co.wishkeeper.server.Events.{FriendRequestAcceptedNotificationCreated, FriendRequestStatusChanged, UserEvent}
 import co.wishkeeper.server.FriendRequestStatus.Approved
 import co.wishkeeper.server.UserTestHelper._

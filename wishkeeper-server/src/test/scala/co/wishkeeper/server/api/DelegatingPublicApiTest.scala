@@ -3,7 +3,7 @@ package co.wishkeeper.server.api
 import java.util.UUID
 import java.util.UUID.randomUUID
 
-import co.wishkeeper.server.Commands._
+import co.wishkeeper.server.user.commands._
 import co.wishkeeper.server.Events.{FacebookFriendsListSeen, UserConnected}
 import co.wishkeeper.server.EventsTestHelper.{EventsList, anEventsListFor}
 import co.wishkeeper.server.FriendRequestStatus.{Approved, Ignored}
@@ -11,6 +11,7 @@ import co.wishkeeper.server.NotificationsData.{FriendRequestNotification, Notifi
 import co.wishkeeper.server.WishStatus.WishStatus
 import co.wishkeeper.server._
 import co.wishkeeper.server.projections._
+import co.wishkeeper.server.user.{NotFriends, ValidationError}
 import com.wixpress.common.specs2.JMock
 import org.joda.time.DateTime
 import org.specs2.matcher.Matcher
@@ -166,7 +167,7 @@ class DelegatingPublicApiTest extends Specification with JMock {
   "unreserve wish" in new LoggedInContext {
     val wishId = randomUUID()
     checking {
-      oneOf(commandProcessor).process(UnreserveWish(wishId), friendId)
+      oneOf(commandProcessor).validatedProcess(UnreserveWish(wishId), friendId)
     }
 
     api.unreserveWish(userId, friendId, wishId)

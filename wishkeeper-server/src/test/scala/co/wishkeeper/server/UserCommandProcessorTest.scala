@@ -2,7 +2,7 @@ package co.wishkeeper.server
 
 import java.util.UUID
 
-import co.wishkeeper.server.Commands.{ConnectFacebookUser, SetFacebookUserInfo}
+import co.wishkeeper.server.user.commands.{ConnectFacebookUser, SetFacebookUserInfo}
 import co.wishkeeper.server.Events.{Event, UserConnected, UserEvent, UserFacebookIdSet}
 import co.wishkeeper.server.EventsTestHelper.{asEventInstants, userConnectEvent}
 import com.wixpress.common.specs2.JMock

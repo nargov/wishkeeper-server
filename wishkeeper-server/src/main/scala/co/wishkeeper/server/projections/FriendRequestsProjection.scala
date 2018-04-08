@@ -4,7 +4,7 @@ import java.util.UUID
 
 import co.wishkeeper.server.CommandProcessor.retry
 import co.wishkeeper.server.Events.{Event, FriendRemoved, FriendRequestStatusChanged, UserEvent}
-import co.wishkeeper.server.{DataStore, EventProcessor}
+import co.wishkeeper.server.{DataStore, DbErrorEventsNotSaved, EventProcessor}
 import org.joda.time.DateTime
 
 
@@ -20,6 +20,6 @@ class DataStoreFriendRequestsProjection(dataStore: DataStore) extends FriendRequ
   }
 
   private def saveEventFor(userId: UUID, event: UserEvent) = retry {
-    dataStore.saveUserEvents(userId, dataStore.lastSequenceNum(userId), DateTime.now(), List(event))
+    Either.cond(dataStore.saveUserEvents(userId, dataStore.lastSequenceNum(userId), DateTime.now(), List(event)), (), DbErrorEventsNotSaved)
   }
 }

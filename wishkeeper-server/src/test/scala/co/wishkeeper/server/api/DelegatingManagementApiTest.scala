@@ -4,7 +4,7 @@ import java.util.UUID
 import java.util.UUID.randomUUID
 
 import co.wishkeeper.server.CommandProcessor
-import co.wishkeeper.server.Commands.SetFlagFacebookFriendsListSeen
+import co.wishkeeper.server.user.commands.SetFlagFacebookFriendsListSeen
 import com.wixpress.common.specs2.JMock
 import org.specs2.mutable.Specification
 

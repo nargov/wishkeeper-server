@@ -2,7 +2,7 @@ package co.wishkeeper.server.api
 
 import java.util.UUID
 
-import co.wishkeeper.server.Commands.SetFlagFacebookFriendsListSeen
+import co.wishkeeper.server.user.commands.SetFlagFacebookFriendsListSeen
 import co.wishkeeper.server._
 import co.wishkeeper.server.projections.{UserIdByFacebookIdProjection, UserProfileProjection}
 

@@ -3,7 +3,7 @@ package co.wishkeeper.server
 import java.util.UUID
 
 import co.wishkeeper.server.CommandProcessor.retry
-import co.wishkeeper.server.Commands.{ConnectFacebookUser, UserCommand}
+import co.wishkeeper.server.user.commands.{ConnectFacebookUser, UserCommand, UserCommandValidator}
 import co.wishkeeper.server.Events._
 import org.joda.time.DateTime
 
@@ -12,7 +12,9 @@ import scala.annotation.tailrec
 trait CommandProcessor {
   def process(command: UserCommand, sessionId: Option[UUID] = None): Boolean
 
-  def process(command: UserCommand, userId: UUID): Boolean
+  def process(command: UserCommand, userId: UUID): Either[Error, Unit]
+
+  def validatedProcess[C <: UserCommand](command: C, userId: UUID)(implicit validator: UserCommandValidator[C]): Either[Error, Unit]
 }
 
 class UserCommandProcessor(dataStore: DataStore, eventProcessors: List[EventProcessor] = Nil) extends CommandProcessor {
@@ -38,10 +40,11 @@ class UserCommandProcessor(dataStore: DataStore, eventProcessors: List[EventProc
       case _ =>
         val userId = sessionId.flatMap(dataStore.userBySession).getOrElse(throw new SessionNotFoundException(sessionId))
         process(command, userId)
+        true
     }
   }
 
-  override def process(command: UserCommand, userId: UUID): Boolean = {
+  override def process(command: UserCommand, userId: UUID): Either[Error, Unit] = {
     retry {
       val lastSeqNum = dataStore.lastSequenceNum(userId)
       val user = User.replay(dataStore.userEvents(userId))
@@ -49,16 +52,19 @@ class UserCommandProcessor(dataStore: DataStore, eventProcessors: List[EventProc
       val success = dataStore.saveUserEvents(userId, lastSeqNum, DateTime.now(), events)
       if (success)
         events.foreach(event => eventProcessors.foreach(_.process(event)))
-      success
+      Either.cond(success, (), DbErrorEventsNotSaved)
     }
   }
 
+  override def validatedProcess[C <: UserCommand](command: C, userId: UUID)(implicit validator: UserCommandValidator[C]): Either[Error, Unit] =
+    process(command, userId)
 }
+
 object CommandProcessor {
   @tailrec
-  def retry(f: => Boolean, retries: Int = 50): Boolean = {
-    val successful = f
-    if (successful || retries == 0) successful else retry(f, retries - 1)
+  def retry(f: => Either[Error, Unit], retries: Int = 50): Either[Error, Unit] = {
+    val result = f
+    if (result.isRight || retries == 0) result else retry(f, retries - 1)
   }
 }
 

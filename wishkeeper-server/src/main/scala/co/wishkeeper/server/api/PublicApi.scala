@@ -2,17 +2,18 @@ package co.wishkeeper.server.api
 
 import java.io.InputStream
 import java.net.URL
-import java.nio.file.{Files, Paths}
+import java.nio.file.{Files, Path, Paths}
 import java.util.UUID
 
 import akka.actor.ActorSystem
 import akka.stream.ActorMaterializer
-import co.wishkeeper.server.Commands._
+import co.wishkeeper.server.user.commands._
 import co.wishkeeper.server.FriendRequestStatus.{Approved, Ignored}
 import co.wishkeeper.server.WishStatus.{Active, Reserved, WishStatus}
 import co.wishkeeper.server._
 import co.wishkeeper.server.image._
 import co.wishkeeper.server.projections._
+import co.wishkeeper.server.user.{NotFriends, ValidationError}
 
 import scala.concurrent.{ExecutionContext, Future}
 import scala.util.Try
@@ -78,20 +79,23 @@ class DelegatingPublicApi(commandProcessor: CommandProcessor,
 
   private val wishImages = new WishImages(imageStore, new ScrimageImageProcessor)
 
-  override def deleteWish(sessionId: UUID, wishId: UUID): Unit = commandProcessor.process(DeleteWish(wishId), Option(sessionId))
+  override def deleteWish(sessionId: UUID, wishId: UUID): Unit = withValidSession(sessionId)(commandProcessor.process(DeleteWish(wishId), _))
 
-  override def deleteWishImage(sessionId: UUID, wishId: UUID): Unit = commandProcessor.process(DeleteWishImage(wishId), Option(sessionId))
+  override def deleteWishImage(sessionId: UUID, wishId: UUID): Unit =
+    withValidSession(sessionId)(commandProcessor.process(DeleteWishImage(wishId), _))
 
-  private def uploadedFilePath(imageMetadata: ImageMetadata) = Paths.get(ImageProcessor.tempDir.toString, imageMetadata.fileName)
+  private def uploadedFilePath(imageMetadata: ImageMetadata): Path = Paths.get(ImageProcessor.tempDir.toString, imageMetadata.fileName)
 
   override def uploadImage(inputStream: InputStream, imageMetadata: ImageMetadata, wishId: UUID, sessionId: UUID): Try[Unit] = {
-    Try {
-      val origFile = uploadedFilePath(imageMetadata)
-      Files.copy(inputStream, origFile) //todo move to adapter
+    withValidSession(sessionId) { userId =>
+      Try {
+        val origFile = uploadedFilePath(imageMetadata)
+        Files.copy(inputStream, origFile) //todo move to adapter
 
-      val imageLinks = wishImages.uploadImageAndResizedCopies(imageMetadata, origFile)
-      val setWishDetailsEvent = SetWishDetails(Wish(wishId, image = Option(imageLinks)))
-      commandProcessor.process(setWishDetailsEvent, Option(sessionId))
+        val imageLinks = wishImages.uploadImageAndResizedCopies(imageMetadata, origFile)
+        val setWishDetailsEvent = SetWishDetails(Wish(wishId, image = Option(imageLinks)))
+        commandProcessor.process(setWishDetailsEvent, userId)
+      }
     }
   }
 
@@ -223,15 +227,7 @@ class DelegatingPublicApi(commandProcessor: CommandProcessor,
 
   //TODO check if user was the original reserver
   override def unreserveWish(userId: UUID, friendId: UUID, wishId: UUID): Either[ValidationError, Unit] = {
-    commandProcessor.process(UnreserveWish(wishId), friendId)
+    commandProcessor.validatedProcess(UnreserveWish(wishId), friendId)
     Right(())
   }
-}
-
-sealed trait ValidationError {
-  val msg: String
-}
-
-case object NotFriends extends ValidationError {
-  override val msg: String = "Users are not friends"
 }

@@ -19,17 +19,19 @@ class DataStoreNotificationsProjection(dataStore: DataStore) extends Notificatio
     case FriendRequestSent(sender, userId, id) => id.foreach { requestId =>
       retry {
         val lastSeqNum = dataStore.lastSequenceNum(userId)
-        dataStore.saveUserEvents(userId, lastSeqNum, DateTime.now(), List(
+        val result = dataStore.saveUserEvents(userId, lastSeqNum, DateTime.now(), List(
           FriendRequestNotificationCreated(randomUUID(), userId, sender, requestId)
         ))
+        Either.cond(result, (), DbErrorEventsNotSaved)
       }
     }
     case FriendRequestStatusChanged(userId, reqId, from, status) if status == Approved =>
       retry {
         val lastSeqNum = dataStore.lastSequenceNum(from)
-        dataStore.saveUserEvents(from, lastSeqNum, DateTime.now(), List(
+        val result = dataStore.saveUserEvents(from, lastSeqNum, DateTime.now(), List(
           FriendRequestAcceptedNotificationCreated(randomUUID(), from, userId, reqId)
         ))
+        Either.cond(result, (), DbErrorEventsNotSaved)
       }
     case _ =>
   }

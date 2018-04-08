@@ -3,7 +3,7 @@ package co.wishkeeper.server
 import java.util.UUID
 import java.util.UUID.randomUUID
 
-import co.wishkeeper.server.Commands.MarkAllNotificationsViewed
+import co.wishkeeper.server.user.commands.MarkAllNotificationsViewed
 import co.wishkeeper.server.Events.{NotificationViewed, UserEvent}
 import co.wishkeeper.server.EventsTestHelper.asEventInstant
 import co.wishkeeper.server.UserTestHelper._

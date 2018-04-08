@@ -5,7 +5,7 @@ import java.util.UUID.randomUUID
 
 import co.wishkeeper.DataStoreTestHelper
 import co.wishkeeper.json._
-import co.wishkeeper.server.Commands.{ConnectFacebookUser, SendFriendRequest, SetWishDetails}
+import co.wishkeeper.server.user.commands.{ConnectFacebookUser, SendFriendRequest, SetWishDetails}
 import co.wishkeeper.server.FriendRequestStatus.Pending
 import co.wishkeeper.server.HttpTestKit._
 import co.wishkeeper.server.NotificationsData.{FriendRequestAcceptedNotification, FriendRequestNotification}

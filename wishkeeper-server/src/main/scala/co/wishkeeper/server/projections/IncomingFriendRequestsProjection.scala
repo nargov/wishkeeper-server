@@ -12,9 +12,9 @@ class DataStoreIncomingFriendRequestsProjection(dataStore: DataStore) extends In
       id.foreach { _ =>
         val lastSequenceNum = dataStore.lastSequenceNum(userId)
         CommandProcessor.retry {
-          dataStore.saveUserEvents(userId, lastSequenceNum, DateTime.now(), List(
+          Either.cond(dataStore.saveUserEvents(userId, lastSequenceNum, DateTime.now(), List(
             FriendRequestReceived(userId, sender, id)
-          ))
+          )), (), DbErrorEventsNotSaved)
         }
       }
     case _ =>

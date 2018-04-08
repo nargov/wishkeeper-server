@@ -15,9 +15,10 @@ import akka.stream.ActorMaterializer
 import akka.stream.scaladsl.StreamConverters
 import akka.util.Timeout
 import co.wishkeeper.json._
-import co.wishkeeper.server.Commands._
-import co.wishkeeper.server.api.{ManagementApi, NotFriends, PublicApi}
+import co.wishkeeper.server.user.commands._
+import co.wishkeeper.server.api.{ManagementApi, PublicApi}
 import co.wishkeeper.server.image.ImageMetadata
+import co.wishkeeper.server.user.NotFriends
 import co.wishkeeper.server.web.WebApi.imageDimensionsHeader
 import de.heikoseeberger.akkahttpcirce.FailFastCirceSupport._
 import io.circe.generic.extras.Configuration

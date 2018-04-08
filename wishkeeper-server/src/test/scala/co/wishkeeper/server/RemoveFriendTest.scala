@@ -3,7 +3,7 @@ package co.wishkeeper.server
 import java.util.UUID
 import java.util.UUID.randomUUID
 
-import co.wishkeeper.server.Commands.RemoveFriend
+import co.wishkeeper.server.user.commands.RemoveFriend
 import co.wishkeeper.server.Events.FriendRemoved
 import org.specs2.mutable.Specification
 

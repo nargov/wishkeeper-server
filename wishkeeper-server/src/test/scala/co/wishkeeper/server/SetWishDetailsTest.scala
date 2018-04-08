@@ -2,7 +2,7 @@ package co.wishkeeper.server
 
 import java.util.UUID
 
-import co.wishkeeper.server.Commands.SetWishDetails
+import co.wishkeeper.server.user.commands.SetWishDetails
 import co.wishkeeper.server.Events._
 import co.wishkeeper.server.UserTestHelper._
 import org.joda.time.DateTime

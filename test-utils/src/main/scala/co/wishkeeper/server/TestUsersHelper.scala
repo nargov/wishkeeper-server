@@ -5,10 +5,10 @@ import java.util.UUID.randomUUID
 import akka.actor.ActorSystem
 import akka.stream.ActorMaterializer
 import co.wishkeeper.json._
-import co.wishkeeper.server.Commands.{ConnectFacebookUser, SendFriendRequest}
 import co.wishkeeper.server.HttpTestKit.{Get, Post}
 import co.wishkeeper.server.NotificationsData.FriendRequestNotification
 import co.wishkeeper.server.projections.PotentialFriend
+import co.wishkeeper.server.user.commands.{ConnectFacebookUser, SendFriendRequest}
 import io.circe.generic.extras.Configuration
 import io.circe.generic.extras.auto._
 

@@ -2,7 +2,7 @@ package co.wishkeeper.server
 
 import java.util.UUID
 
-import co.wishkeeper.server.Commands.SetFacebookUserInfo
+import co.wishkeeper.server.user.commands.SetFacebookUserInfo
 import co.wishkeeper.server.Events._
 import org.scalatest.{FlatSpec, Matchers}
 

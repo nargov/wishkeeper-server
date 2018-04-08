@@ -2,7 +2,7 @@ package co.wishkeeper.server
 
 import java.util.UUID.randomUUID
 
-import co.wishkeeper.server.Commands.DeleteWish
+import co.wishkeeper.server.user.commands.DeleteWish
 import co.wishkeeper.server.Events.WishDeleted
 import org.specs2.mutable.Specification
 
