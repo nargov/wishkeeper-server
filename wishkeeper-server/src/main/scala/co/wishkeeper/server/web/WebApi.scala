@@ -18,7 +18,7 @@ import co.wishkeeper.json._
 import co.wishkeeper.server.user.commands._
 import co.wishkeeper.server.api.{ManagementApi, PublicApi}
 import co.wishkeeper.server.image.ImageMetadata
-import co.wishkeeper.server.user.NotFriends
+import co.wishkeeper.server.user.{InvalidStatusChange, NotFriends, ValidationError}
 import co.wishkeeper.server.web.WebApi.imageDimensionsHeader
 import de.heikoseeberger.akkahttpcirce.FailFastCirceSupport._
 import io.circe.generic.extras.Configuration
@@ -62,10 +62,17 @@ class WebApi(publicApi: PublicApi, managementApi: ManagementApi)
       }
     }
 
+  val handleErrors: ValidationError => Route = {
+    case err: InvalidStatusChange => complete(StatusCodes.Conflict -> err)
+    case err: ValidationError => complete(StatusCodes.ServerError -> err)
+    case _ => complete(StatusCodes.ServerError)
+  }
+
   val unreserveWish: (UUID, UUID, UUID) => Route = (userId, friendId, wishId) =>
     delete {
       publicApi.unreserveWish(userId, friendId, wishId) match {
         case Right(_) => complete(StatusCodes.OK)
+        case Left(e: ValidationError) => handleErrors(e)
       }
     }
 
