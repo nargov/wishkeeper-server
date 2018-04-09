@@ -138,7 +138,7 @@ class DelegatingPublicApiTest extends Specification with JMock {
   "reserve wish" in new LoggedInContext {
     val wishId = randomUUID()
     checking {
-      oneOf(commandProcessor).process(ReserveWish(userId, wishId), friendId)
+      oneOf(commandProcessor).validatedProcess(ReserveWish(userId, wishId), friendId)
     }
 
     api.reserveWish(userId, friendId, wishId)

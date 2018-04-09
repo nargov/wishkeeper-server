@@ -16,3 +16,7 @@ case class InvalidStatusChange(status: WishStatus, message: String) extends Vali
 case class WishNotFound(wishId: UUID) extends ValidationError {
   override val message: String = s"Wish [$wishId] not found."
 }
+
+case object DummyError extends ValidationError{
+  override val message: String = "Oops!"
+}

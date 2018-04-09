@@ -3,7 +3,7 @@ package co.wishkeeper.server.user.commands
 import java.util.UUID
 
 import co.wishkeeper.server.Events._
-import co.wishkeeper.server.WishStatus.Reserved
+import co.wishkeeper.server.WishStatus.{Active, Reserved}
 import co.wishkeeper.server.user.{InvalidStatusChange, ValidationError, WishNotFound}
 import co.wishkeeper.server.{User, Wish}
 import org.joda.time.DateTime
@@ -44,6 +44,16 @@ case class ReserveWish(reserverId: UUID, wishId: UUID) extends UserCommand {
   override def process(user: User): List[UserEvent] = List(
     WishReserved(wishId, reserverId),
     WishReservedNotificationCreated(UUID.randomUUID(), wishId, reserverId))
+}
+object ReserveWish {
+  implicit val validator = new UserCommandValidator[ReserveWish] {
+    override def validate(user: User, command: ReserveWish): Either[ValidationError, Unit] = {
+      user.wishes.get(command.wishId).map(_.status match {
+        case Active => Right()
+        case s => Left(InvalidStatusChange(Reserved(command.reserverId), s"Cannot reserve wish in status $s"))
+      }).getOrElse(Left(WishNotFound(command.wishId)))
+    }
+  }
 }
 
 case class UnreserveWish(wishId: UUID) extends UserCommand {

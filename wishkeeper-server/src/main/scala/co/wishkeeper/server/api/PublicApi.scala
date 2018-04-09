@@ -20,9 +20,9 @@ import scala.util.Try
 
 trait PublicApi {
 
-  def unreserveWish(userId: UUID, friendId: UUID, wishId: UUID): Either[ValidationError, Unit]
+  def unreserveWish(userId: UUID, friendId: UUID, wishId: UUID): Either[Error, Unit]
 
-  def reserveWish(userId: UUID, friendId: UUID, wishId: UUID): Either[ValidationError, Unit]
+  def reserveWish(userId: UUID, friendId: UUID, wishId: UUID): Either[Error, Unit]
 
   def grantWish(userId: UUID, wishId: UUID): Either[ValidationError, Unit]
 
@@ -220,14 +220,12 @@ class DelegatingPublicApi(commandProcessor: CommandProcessor,
     Right(())
   }
 
-  override def reserveWish(userId: UUID, friendId: UUID, wishId: UUID): Either[ValidationError, Unit] = {
-    commandProcessor.process(ReserveWish(userId, wishId), friendId)
-    Right(())
+  override def reserveWish(userId: UUID, friendId: UUID, wishId: UUID): Either[Error, Unit] = {
+    commandProcessor.validatedProcess(ReserveWish(userId, wishId), friendId)
   }
 
   //TODO check if user was the original reserver
-  override def unreserveWish(userId: UUID, friendId: UUID, wishId: UUID): Either[ValidationError, Unit] = {
+  override def unreserveWish(userId: UUID, friendId: UUID, wishId: UUID): Either[Error, Unit] = {
     commandProcessor.validatedProcess(UnreserveWish(wishId), friendId)
-    Right(())
   }
 }

@@ -382,6 +382,16 @@ class RouteTest extends Specification with Specs2RouteTest with JMock {
         status must beEqualTo(StatusCodes.Conflict)
       }
     }
+
+    "return an error when reserving fails" in new LoggedInUserContext {
+      checking {
+        allowing(publicApi).reserveWish(userId, friendId, wishId).willReturn(Left(InvalidStatusChange(Deleted, "cannot reserve deleted wish")))
+      }
+
+      Post(s"/${friendId.toString}/wishes/${wishId.toString}/reserve").withHeaders(sessionIdHeader) ~> webApi.newUserRoute ~> check {
+        status must beEqualTo(StatusCodes.Conflict)
+      }
+    }
   }
 
   trait BaseContext extends Scope {

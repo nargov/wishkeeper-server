@@ -2,9 +2,10 @@ package co.wishkeeper.server
 
 import java.util.UUID
 
-import co.wishkeeper.server.user.commands.{ConnectFacebookUser, SetFacebookUserInfo}
 import co.wishkeeper.server.Events.{Event, UserConnected, UserEvent, UserFacebookIdSet}
 import co.wishkeeper.server.EventsTestHelper.{asEventInstants, userConnectEvent}
+import co.wishkeeper.server.user.DummyError
+import co.wishkeeper.server.user.commands.{ConnectFacebookUser, SetFacebookUserInfo, UserCommand, UserCommandValidator}
 import com.wixpress.common.specs2.JMock
 import org.joda.time.DateTime
 import org.specs2.matcher.{Matcher, MatcherMacros}
@@ -14,51 +15,6 @@ import org.specs2.specification.Scope
 import scala.language.experimental.macros
 
 class UserCommandProcessorTest extends Specification with JMock with MatcherMacros {
-
-  trait Context extends Scope {
-    val userId: UUID = UUID.randomUUID()
-    val dataStore: DataStore = mock[DataStore]
-    val commandProcessor: CommandProcessor = new UserCommandProcessor(dataStore)
-    val sessionId: UUID = UUID.randomUUID()
-    val facebookId = "facebook-id"
-    val authToken = "auth-token"
-
-    def assumeExistingUser() = checking {
-      allowing(dataStore).userEvents(userId).willReturn(
-        UserEventInstant(UserConnected(userId, DateTime.now().minusDays(1), UUID.randomUUID()), DateTime.now().minusDays(1)) :: Nil)
-      allowing(dataStore).userBySession(sessionId).willReturn(Some(userId))
-      allowing(dataStore).userIdByFacebookId(facebookId).willReturn(Some(userId))
-    }
-
-    def assumeHasSequenceNum() = checking {
-      allowing(dataStore).lastSequenceNum(userId).willReturn(Some(3L))
-    }
-
-    def assumeNoSuchUserForFacebookId() = checking {
-      allowing(dataStore).userIdByFacebookId(facebookId).willReturn(None)
-    }
-
-    def processUserConnect() = {
-      commandProcessor.process(ConnectFacebookUser(facebookId, authToken, sessionId))
-    }
-
-    def ignoringSaveUserEvents() = checking {
-      ignoring(dataStore).saveUserEvents(having(any[UUID]), having(any), having(any[DateTime]), having(any[Seq[Event]])).willReturn(true)
-    }
-
-    def ignoringSaveUserSession() = checking {
-      ignoring(dataStore).saveUserSession(having(any[UUID]), having(any[UUID]), having(any[DateTime]))
-    }
-  }
-
-  trait EventProcessorContext extends Context {
-    val eventProcessor: EventProcessor = mock[EventProcessor]
-    override val commandProcessor = new UserCommandProcessor(dataStore, eventProcessor :: Nil)
-
-    def ignoringProcessFacebookIdSet() = checking {
-      ignoring(eventProcessor).process(having(any[UserFacebookIdSet]))
-    }
-  }
 
   "notify event processors on new events" in new EventProcessorContext {
     assumeNoSuchUserForFacebookId()
@@ -148,5 +104,71 @@ class UserCommandProcessorTest extends Specification with JMock with MatcherMacr
     commandProcessor.process(SetFacebookUserInfo(name = Option("name")), Some(sessionId))
   }
 
-  def aUserConnectedEventFor(userId: UUID): Matcher[UserConnected] = ===(userId) ^^ {(_:UserConnected).userId}
+  "return failure when validation fails" in new Context {
+    val validationError = Left(DummyError)
+    val command = DummyCommand()
+    val validator: UserCommandValidator[DummyCommand] = mock[UserCommandValidator[DummyCommand]]
+
+    assumeExistingUser()
+    assumeHasSequenceNum()
+
+    checking {
+      oneOf(validator).validate(having(any[User]), having(any[UserCommand])).willReturn(validationError)
+    }
+
+    commandProcessor.validatedProcess(command, userId)(validator) must beLeft
+  }
+
+
+  trait Context extends Scope {
+    val userId: UUID = UUID.randomUUID()
+    val dataStore: DataStore = mock[DataStore]
+    val commandProcessor: CommandProcessor = new UserCommandProcessor(dataStore)
+    val sessionId: UUID = UUID.randomUUID()
+    val facebookId = "facebook-id"
+    val authToken = "auth-token"
+
+    def assumeExistingUser() = checking {
+      allowing(dataStore).userEvents(userId).willReturn(
+        UserEventInstant(UserConnected(userId, DateTime.now().minusDays(1), UUID.randomUUID()), DateTime.now().minusDays(1)) :: Nil)
+      allowing(dataStore).userBySession(sessionId).willReturn(Some(userId))
+      allowing(dataStore).userIdByFacebookId(facebookId).willReturn(Some(userId))
+    }
+
+    def assumeHasSequenceNum() = checking {
+      allowing(dataStore).lastSequenceNum(userId).willReturn(Some(3L))
+    }
+
+    def assumeNoSuchUserForFacebookId() = checking {
+      allowing(dataStore).userIdByFacebookId(facebookId).willReturn(None)
+    }
+
+    def processUserConnect() = {
+      commandProcessor.process(ConnectFacebookUser(facebookId, authToken, sessionId))
+    }
+
+    def ignoringSaveUserEvents() = checking {
+      ignoring(dataStore).saveUserEvents(having(any[UUID]), having(any), having(any[DateTime]), having(any[Seq[Event]])).willReturn(true)
+    }
+
+    def ignoringSaveUserSession() = checking {
+      ignoring(dataStore).saveUserSession(having(any[UUID]), having(any[UUID]), having(any[DateTime]))
+    }
+  }
+
+  trait EventProcessorContext extends Context {
+    val eventProcessor: EventProcessor = mock[EventProcessor]
+    override val commandProcessor = new UserCommandProcessor(dataStore, eventProcessor :: Nil)
+
+    def ignoringProcessFacebookIdSet() = checking {
+      ignoring(eventProcessor).process(having(any[UserFacebookIdSet]))
+    }
+  }
+
+
+  def aUserConnectedEventFor(userId: UUID): Matcher[UserConnected] = ===(userId) ^^ ((_: UserConnected).userId)
+}
+
+case class DummyCommand() extends UserCommand {
+  override def process(user: User): List[UserEvent] = Nil
 }

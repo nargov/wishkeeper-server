@@ -15,6 +15,7 @@ import akka.stream.ActorMaterializer
 import akka.stream.scaladsl.StreamConverters
 import akka.util.Timeout
 import co.wishkeeper.json._
+import co.wishkeeper.server.Error
 import co.wishkeeper.server.user.commands._
 import co.wishkeeper.server.api.{ManagementApi, PublicApi}
 import co.wishkeeper.server.image.ImageMetadata
@@ -40,6 +41,14 @@ class WebApi(publicApi: PublicApi, managementApi: ManagementApi)
     logging.info(res.toString)
   }
 
+  val handleErrors: Error => Route = {
+    case err: InvalidStatusChange => complete(StatusCodes.Conflict -> err)
+    case err: ValidationError => complete(StatusCodes.ServerError -> err)
+    case _ => complete(StatusCodes.ServerError)
+  }
+
+  val handleCommandResult: Either[Error, Unit] => Route = _.fold(handleErrors, _ => complete(StatusCodes.OK))
+
   val userIdFromSession: Directive1[UUID] = headerValueByName(WebApi.sessionIdHeader).flatMap {
     sessionId =>
       Try(UUID.fromString(sessionId)).toOption.
@@ -57,23 +66,12 @@ class WebApi(publicApi: PublicApi, managementApi: ManagementApi)
 
   val reserveWish: (UUID, UUID, UUID) => Route = (userId, friendId, wishId) =>
     post {
-      publicApi.reserveWish(userId, friendId, wishId) match {
-        case Right(_) => complete(StatusCodes.OK)
-      }
+      handleCommandResult(publicApi.reserveWish(userId, friendId, wishId))
     }
-
-  val handleErrors: ValidationError => Route = {
-    case err: InvalidStatusChange => complete(StatusCodes.Conflict -> err)
-    case err: ValidationError => complete(StatusCodes.ServerError -> err)
-    case _ => complete(StatusCodes.ServerError)
-  }
 
   val unreserveWish: (UUID, UUID, UUID) => Route = (userId, friendId, wishId) =>
     delete {
-      publicApi.unreserveWish(userId, friendId, wishId) match {
-        case Right(_) => complete(StatusCodes.OK)
-        case Left(e: ValidationError) => handleErrors(e)
-      }
+      handleCommandResult(publicApi.unreserveWish(userId, friendId, wishId))
     }
 
   val wishReservation: (UUID, UUID, UUID) => Route = (userId, friendId, wishId) =>

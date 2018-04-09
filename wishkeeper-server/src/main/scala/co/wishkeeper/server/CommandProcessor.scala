@@ -57,14 +57,27 @@ class UserCommandProcessor(dataStore: DataStore, eventProcessors: List[EventProc
   }
 
   override def validatedProcess[C <: UserCommand](command: C, userId: UUID)(implicit validator: UserCommandValidator[C]): Either[Error, Unit] =
-    process(command, userId)
+    retry {
+      val lastSeqNum = dataStore.lastSequenceNum(userId)
+      val user = User.replay(dataStore.userEvents(userId))
+      validator.validate(user, command).flatMap { _ =>
+        val events: Seq[UserEvent] = command.process(user)
+        val success = dataStore.saveUserEvents(userId, lastSeqNum, DateTime.now(), events)
+        if (success)
+          events.foreach(event => eventProcessors.foreach(_.process(event)))
+        Either.cond(success, (), DbErrorEventsNotSaved)
+      }
+    }
 }
 
 object CommandProcessor {
   @tailrec
   def retry(f: => Either[Error, Unit], retries: Int = 50): Either[Error, Unit] = {
     val result = f
-    if (result.isRight || retries == 0) result else retry(f, retries - 1)
+    result match {
+      case Left(DbErrorEventsNotSaved) if retries > 0 => retry(f, retries - 1)
+      case _ => result
+    }
   }
 }
 
