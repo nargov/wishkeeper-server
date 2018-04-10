@@ -11,7 +11,7 @@ import co.wishkeeper.server.NotificationsData.{FriendRequestNotification, Notifi
 import co.wishkeeper.server.WishStatus.WishStatus
 import co.wishkeeper.server._
 import co.wishkeeper.server.projections._
-import co.wishkeeper.server.user.{NotFriends, ValidationError}
+import co.wishkeeper.server.user.{NotFriends, ValidationError, WishNotFound}
 import com.wixpress.common.specs2.JMock
 import org.joda.time.DateTime
 import org.specs2.matcher.Matcher
@@ -171,6 +171,25 @@ class DelegatingPublicApiTest extends Specification with JMock {
     }
 
     api.unreserveWish(userId, friendId, wishId)
+  }
+
+  "return wish by id" in new LoggedInContext {
+    val wishId = randomUUID()
+    val wishName = "name"
+    checking {
+      allowing(dataStore).userEvents(userId).willReturn(EventsList(userId).withWish(wishId, wishName).list)
+    }
+
+    api.wishById(userId, wishId) must beRight(aWishWith(wishId, wishName))
+  }
+
+  "return wish not found if doesn't exist" in new LoggedInContext {
+    val wishId = randomUUID()
+    checking {
+      allowing(dataStore).userEvents(userId).willReturn(EventsList(userId).list)
+    }
+
+    api.wishById(userId, wishId) must beLeft[Error](WishNotFound(wishId))
   }
 
   def userWishesWith(wishId: UUID, wishName: String): Matcher[UserWishes] = contain(aWishWith(wishId, wishName)) ^^ {(_: UserWishes).wishes}

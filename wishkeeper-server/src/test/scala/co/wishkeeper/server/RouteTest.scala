@@ -14,7 +14,7 @@ import co.wishkeeper.server.WishStatus.Deleted
 import co.wishkeeper.server.api.{ManagementApi, PublicApi}
 import co.wishkeeper.server.image.ImageMetadata
 import co.wishkeeper.server.projections.{Friend, PotentialFriend, UserFriends}
-import co.wishkeeper.server.user.{InvalidStatusChange, NotFriends, ValidationError}
+import co.wishkeeper.server.user.{InvalidStatusChange, NotFriends, ValidationError, WishNotFound}
 import co.wishkeeper.server.web.{ManagementRoute, WebApi}
 import com.wixpress.common.specs2.JMock
 import de.heikoseeberger.akkahttpcirce.FailFastCirceSupport._
@@ -390,6 +390,31 @@ class RouteTest extends Specification with Specs2RouteTest with JMock {
 
       Post(s"/${friendId.toString}/wishes/${wishId.toString}/reserve").withHeaders(sessionIdHeader) ~> webApi.newUserRoute ~> check {
         status must beEqualTo(StatusCodes.Conflict)
+      }
+    }
+
+    "return wish by id" in new LoggedInUserContext {
+      val wish = Wish(wishId)
+
+      checking {
+        allowing(publicApi).wishById(userId, wishId).willReturn(Right(wish))
+      }
+
+      Get(s"/me/wishes/$wishId").withHeaders(sessionIdHeader) ~> webApi.newUserRoute ~> check {
+        responseAs[Wish] must beEqualTo(wish)
+        status must beEqualTo(StatusCodes.OK)
+      }
+    }
+
+    "return error when wish not found" in new LoggedInUserContext {
+      val wish = Wish(wishId)
+
+      checking {
+        allowing(publicApi).wishById(userId, wishId).willReturn(Left(WishNotFound(wishId)))
+      }
+
+      Get(s"/me/wishes/$wishId").withHeaders(sessionIdHeader) ~> webApi.newUserRoute ~> check {
+        status must beEqualTo(StatusCodes.NotFound)
       }
     }
   }

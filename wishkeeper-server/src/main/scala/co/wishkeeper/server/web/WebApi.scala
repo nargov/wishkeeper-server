@@ -19,7 +19,7 @@ import co.wishkeeper.server.Error
 import co.wishkeeper.server.api.{ManagementApi, PublicApi}
 import co.wishkeeper.server.image.ImageMetadata
 import co.wishkeeper.server.user.commands._
-import co.wishkeeper.server.user.{InvalidStatusChange, NotFriends, ValidationError}
+import co.wishkeeper.server.user.{InvalidStatusChange, NotFriends, ValidationError, WishNotFound}
 import co.wishkeeper.server.web.WebApi.imageDimensionsHeader
 import de.heikoseeberger.akkahttpcirce.FailFastCirceSupport._
 import io.circe.generic.extras.Configuration
@@ -42,6 +42,7 @@ class WebApi(publicApi: PublicApi, managementApi: ManagementApi)
   }
 
   val handleErrors: Error => Route = {
+    case err: WishNotFound => complete(StatusCodes.NotFound, err)
     case err: InvalidStatusChange => complete(StatusCodes.Conflict, err)
     case err: ValidationError => complete(StatusCodes.InternalServerError, err)
     case _ => complete(StatusCodes.InternalServerError)
@@ -80,10 +81,16 @@ class WebApi(publicApi: PublicApi, managementApi: ManagementApi)
         unreserveWish(userId, friendId, wishId)
     }
 
+  val getWish: (UUID, UUID) => Route = (userId, wishId) =>
+    get {
+      publicApi.wishById(userId, wishId).fold(handleErrors, complete(_))
+    }
+
   val wishes: UUID => Route = userId =>
     pathPrefix("wishes") {
       pathPrefix(JavaUUID) { wishId =>
-        grantWish(userId, wishId)
+        grantWish(userId, wishId) ~
+        getWish(userId, wishId)
       }
     }
 

@@ -13,12 +13,14 @@ import co.wishkeeper.server.WishStatus.{Active, Reserved, WishStatus}
 import co.wishkeeper.server._
 import co.wishkeeper.server.image._
 import co.wishkeeper.server.projections._
-import co.wishkeeper.server.user.{NotFriends, ValidationError}
+import co.wishkeeper.server.user.{NotFriends, ValidationError, WishNotFound}
 
 import scala.concurrent.{ExecutionContext, Future}
 import scala.util.Try
 
 trait PublicApi {
+
+  def wishById(userId: UUID, wishId: UUID): Either[Error, Wish]
 
   def unreserveWish(userId: UUID, friendId: UUID, wishId: UUID): Either[Error, Unit]
 
@@ -227,5 +229,10 @@ class DelegatingPublicApi(commandProcessor: CommandProcessor,
   //TODO check if user was the original reserver
   override def unreserveWish(userId: UUID, friendId: UUID, wishId: UUID): Either[Error, Unit] = {
     commandProcessor.validatedProcess(UnreserveWish(wishId), friendId)
+  }
+
+  override def wishById(userId: UUID, wishId: UUID): Either[Error, Wish] = {
+    val wishes = replayUser(userId).wishes
+    Either.cond(wishes.contains(wishId), wishes(wishId), WishNotFound(wishId))
   }
 }
