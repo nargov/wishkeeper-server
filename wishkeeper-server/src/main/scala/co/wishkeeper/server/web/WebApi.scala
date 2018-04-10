@@ -16,9 +16,9 @@ import akka.stream.scaladsl.StreamConverters
 import akka.util.Timeout
 import co.wishkeeper.json._
 import co.wishkeeper.server.Error
-import co.wishkeeper.server.user.commands._
 import co.wishkeeper.server.api.{ManagementApi, PublicApi}
 import co.wishkeeper.server.image.ImageMetadata
+import co.wishkeeper.server.user.commands._
 import co.wishkeeper.server.user.{InvalidStatusChange, NotFriends, ValidationError}
 import co.wishkeeper.server.web.WebApi.imageDimensionsHeader
 import de.heikoseeberger.akkahttpcirce.FailFastCirceSupport._
@@ -42,9 +42,9 @@ class WebApi(publicApi: PublicApi, managementApi: ManagementApi)
   }
 
   val handleErrors: Error => Route = {
-    case err: InvalidStatusChange => complete(StatusCodes.Conflict -> err)
-    case err: ValidationError => complete(StatusCodes.ServerError -> err)
-    case _ => complete(StatusCodes.ServerError)
+    case err: InvalidStatusChange => complete(StatusCodes.Conflict, err)
+    case err: ValidationError => complete(StatusCodes.InternalServerError, err)
+    case _ => complete(StatusCodes.InternalServerError)
   }
 
   val handleCommandResult: Either[Error, Unit] => Route = _.fold(handleErrors, _ => complete(StatusCodes.OK))
@@ -75,9 +75,9 @@ class WebApi(publicApi: PublicApi, managementApi: ManagementApi)
     }
 
   val wishReservation: (UUID, UUID, UUID) => Route = (userId, friendId, wishId) =>
-    pathPrefix("reserve"){
+    pathPrefix("reserve") {
       reserveWish(userId, friendId, wishId) ~
-      unreserveWish(userId, friendId, wishId)
+        unreserveWish(userId, friendId, wishId)
     }
 
   val wishes: UUID => Route = userId =>
@@ -128,7 +128,7 @@ class WebApi(publicApi: PublicApi, managementApi: ManagementApi)
               (path("friends") & get) {
                 sessionUUID.map(publicApi.friendsListFor(_, userId)).map {
                   case Right(userFriends) => complete(userFriends)
-                  case Left(reason) => complete(StatusCodes.ServerError -> reason)
+                  case Left(reason) => complete(StatusCodes.InternalServerError -> reason)
                 }.get
               } ~
                 delete {
