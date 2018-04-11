@@ -10,6 +10,9 @@ import org.joda.time.DateTime
 object NotificationsData {
 
   sealed trait NotificationData
+  sealed trait WishNotification extends NotificationData {
+    val wishId: UUID
+  }
 
   case class FriendRequestNotification(from: UUID,
                                        requestId: UUID,
@@ -26,12 +29,12 @@ object NotificationsData {
   case class WishReservedNotification(wishId: UUID,
                                       reserver: UUID,
                                       reserverProfile: Option[UserProfile] = None,
-                                      wishName: Option[String] = None) extends NotificationData
+                                      wishName: Option[String] = None) extends WishNotification
 
   case class WishUnreservedNotification(wishId: UUID,
                                         reserver: UUID,
                                         reserverProfile: Option[UserProfile] = None,
-                                        wishName: Option[String] = None) extends NotificationData
+                                        wishName: Option[String] = None) extends WishNotification
 }
 
 case class Notification(id: UUID, data: NotificationData, viewed: Boolean = false, time: DateTime = DateTime.now())

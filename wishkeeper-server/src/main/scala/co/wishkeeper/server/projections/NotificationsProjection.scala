@@ -54,8 +54,7 @@ class DataStoreNotificationsProjection(dataStore: DataStore) extends Notificatio
   }
 
   private val shouldBeDiscarded: User => Notification => Boolean = user => {
-    case Notification(_, WishReservedNotification(wishId, _, _, _), _, _) if user.wishes(wishId).status == Deleted => true
-    case Notification(_, WishUnreservedNotification(wishId, _, _, _), _, _) if user.wishes(wishId).status == Deleted => true
+    case Notification(_, wn: WishNotification, _, _) if user.wishes(wn.wishId).status == Deleted => true
     case _ => false
   }
 }

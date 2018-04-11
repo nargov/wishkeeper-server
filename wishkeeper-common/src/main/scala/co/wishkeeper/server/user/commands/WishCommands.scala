@@ -49,7 +49,7 @@ object ReserveWish {
   implicit val validator = new UserCommandValidator[ReserveWish] {
     override def validate(user: User, command: ReserveWish): Either[ValidationError, Unit] = {
       user.wishes.get(command.wishId).map(_.status match {
-        case Active => Right()
+        case Active => Right(())
         case s => Left(InvalidStatusChange(Reserved(command.reserverId), s"Cannot reserve wish in status $s"))
       }).getOrElse(Left(WishNotFound(command.wishId)))
     }
