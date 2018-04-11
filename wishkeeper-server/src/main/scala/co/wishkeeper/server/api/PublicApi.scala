@@ -172,7 +172,7 @@ class DelegatingPublicApi(commandProcessor: CommandProcessor,
     }
   }
 
-  private def replayUser(userId: UUID) = User.replay(dataStore.userEvents(userId))
+  private def replayUser(userId: UUID): User = User.replay(dataStore.userEvents(userId))
 
   override def notificationsFor(sessionId: UUID): UserNotifications = {
     withValidSession(sessionId) { userId =>
@@ -183,7 +183,7 @@ class DelegatingPublicApi(commandProcessor: CommandProcessor,
 
   def handleMissingSession(sessionId: UUID) = throw new SessionNotFoundException(Option(sessionId))
 
-  def withValidSession[T](sessionId: UUID)(f: UUID => T) =
+  def withValidSession[T](sessionId: UUID)(f: UUID => T): T =
     dataStore.
       userBySession(sessionId).
       map(userId => f(userId)).

@@ -4,7 +4,7 @@ import java.util.UUID
 import java.util.UUID.randomUUID
 
 import co.wishkeeper.server.Events._
-import co.wishkeeper.server.EventsTestHelper.{asEventInstants, userConnectEvent}
+import co.wishkeeper.server.EventsTestHelper.{EventsList, asEventInstants, userConnectEvent}
 import co.wishkeeper.server.FriendRequestStatus.{Approved, Ignored}
 import co.wishkeeper.server.NotificationsData.{FriendRequestAcceptedNotification, FriendRequestNotification}
 import co.wishkeeper.server._
@@ -74,6 +74,20 @@ class DataStoreNotificationsProjectionTest extends Specification with JMock {
 
   "not return a FriendRequestAcceptedNotificationCreated when friend request status changes to ignored" in new Context {
     projection.process(FriendRequestStatusChanged(userId, friendReqId, friendId, Ignored))
+  }
+
+  "not return notifications for wishes that have been deleted" in new Context {
+    val wishId = randomUUID()
+
+    checking {
+      allowing(dataStore).userEvents(userId).willReturn(EventsList(userId).
+        withDeletedWish(wishId).
+        withEvent(WishReservedNotificationCreated(randomUUID(), wishId, randomUUID())).
+        withEvent(WishUnreservedNotificationCreated(randomUUID(), wishId)).
+        list)
+    }
+
+    projection.notificationsFor(userId) must beEmpty
   }
 
 

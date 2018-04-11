@@ -36,6 +36,15 @@ object EventsTestHelper {
       listWithName.copy(list = listWithName.list :+ asEventInstant(WishReserved(id, reserver)))
     }
 
+    def withDeletedWish(id: UUID, name: String = "some wish"): EventsList = {
+      val listWithName = this.withWish(id, name)
+      listWithName.copy(list = listWithName.list :+ asEventInstant(WishDeleted(id)))
+    }
+
+    def withEvent(event: UserEvent): EventsList = {
+      this.copy(list = this.list :+ asEventInstant(event))
+    }
+
     def withPic(link: String) = this.copy(list = list :+ asEventInstant(UserPictureSet(userId, link)))
   }
 
