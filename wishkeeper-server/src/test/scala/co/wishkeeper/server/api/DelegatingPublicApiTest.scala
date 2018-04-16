@@ -90,7 +90,6 @@ class DelegatingPublicApiTest extends Specification with JMock {
 
   "return friend wishlist" in new LoggedInContext {
     val friendName = "Joe"
-    val wishId = randomUUID()
     val wishName = "expected wish"
 
     checking {
@@ -127,7 +126,6 @@ class DelegatingPublicApiTest extends Specification with JMock {
   }
 
   "grant wish" in new LoggedInContext {
-    val wishId = randomUUID()
     checking {
       oneOf(commandProcessor).process(GrantWish(wishId), userId)
     }
@@ -136,7 +134,6 @@ class DelegatingPublicApiTest extends Specification with JMock {
   }
 
   "reserve wish" in new LoggedInContext {
-    val wishId = randomUUID()
     checking {
       oneOf(commandProcessor).validatedProcess(ReserveWish(userId, wishId), friendId)
     }
@@ -165,7 +162,6 @@ class DelegatingPublicApiTest extends Specification with JMock {
   }
 
   "unreserve wish" in new LoggedInContext {
-    val wishId = randomUUID()
     checking {
       oneOf(commandProcessor).validatedProcess(UnreserveWish(wishId), friendId)
     }
@@ -174,7 +170,6 @@ class DelegatingPublicApiTest extends Specification with JMock {
   }
 
   "return wish by id" in new LoggedInContext {
-    val wishId = randomUUID()
     val wishName = "name"
     checking {
       allowing(dataStore).userEvents(userId).willReturn(EventsList(userId).withWish(wishId, wishName).list)
@@ -184,12 +179,20 @@ class DelegatingPublicApiTest extends Specification with JMock {
   }
 
   "return wish not found if doesn't exist" in new LoggedInContext {
-    val wishId = randomUUID()
     checking {
       allowing(dataStore).userEvents(userId).willReturn(EventsList(userId).list)
     }
 
     api.wishById(userId, wishId) must beLeft[Error](WishNotFound(wishId))
+  }
+
+  "delete wish" in new LoggedInContext {
+    checking {
+      allowing(dataStore).userEvents(userId).willReturn(EventsList(userId).withWish(wishId, "expected wish").list)
+      oneOf(commandProcessor).validatedProcess(DeleteWish(wishId), userId).willReturn(Right(()))
+    }
+
+    api.deleteWish(userId, wishId) must beRight(())
   }
 
   def userWishesWith(wishId: UUID, wishName: String): Matcher[UserWishes] = contain(aWishWith(wishId, wishName)) ^^ {(_: UserWishes).wishes}
@@ -213,6 +216,7 @@ class DelegatingPublicApiTest extends Specification with JMock {
     val friendId: UUID = randomUUID()
     val friendRequestId = randomUUID()
     val notificationData = FriendRequestNotification(friendId, friendRequestId)
+    val wishId = randomUUID()
   }
 
   trait LoggedInContext extends Context {

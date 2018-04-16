@@ -44,7 +44,7 @@ trait PublicApi {
 
   def userFlagsFor(sessionId: UUID): Flags
 
-  def deleteWish(sessionId: UUID, wishId: UUID): Unit
+  def deleteWish(userId: UUID, wishId: UUID): Either[Error, Unit]
 
   def wishListFor(sessionId: UUID): Option[UserWishes]
 
@@ -81,7 +81,7 @@ class DelegatingPublicApi(commandProcessor: CommandProcessor,
 
   private val wishImages = new WishImages(imageStore, new ScrimageImageProcessor)
 
-  override def deleteWish(sessionId: UUID, wishId: UUID): Unit = withValidSession(sessionId)(commandProcessor.process(DeleteWish(wishId), _))
+  override def deleteWish(userId: UUID, wishId: UUID): Either[Error, Unit] = commandProcessor.validatedProcess(DeleteWish(wishId), userId)
 
   override def deleteWishImage(sessionId: UUID, wishId: UUID): Unit =
     withValidSession(sessionId)(commandProcessor.process(DeleteWishImage(wishId), _))

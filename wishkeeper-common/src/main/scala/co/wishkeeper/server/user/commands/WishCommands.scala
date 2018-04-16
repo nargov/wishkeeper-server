@@ -3,7 +3,7 @@ package co.wishkeeper.server.user.commands
 import java.util.UUID
 
 import co.wishkeeper.server.Events._
-import co.wishkeeper.server.WishStatus.{Active, Reserved}
+import co.wishkeeper.server.WishStatus.{Active, Deleted, Granted, Reserved}
 import co.wishkeeper.server.user.{InvalidStatusChange, ValidationError, WishNotFound}
 import co.wishkeeper.server.{User, Wish}
 import org.joda.time.DateTime
@@ -35,9 +35,27 @@ case class DeleteWishImage(wishId: UUID) extends UserCommand {
 case class DeleteWish(wishId: UUID) extends UserCommand {
   override def process(user: User): List[UserEvent] = WishDeleted(wishId) :: Nil
 }
+object DeleteWish{
+  implicit val validator = new UserCommandValidator[DeleteWish] {
+    override def validate(user: User, command: DeleteWish): Either[ValidationError, Unit] =
+      user.wishes.get(command.wishId).map(_.status match {
+        case Active => Right(())
+        case s => Left(InvalidStatusChange(Deleted, s"Can't delete wish in status $s"))
+      }).getOrElse(Left(WishNotFound(command.wishId)))
+  }
+}
 
 case class GrantWish(wishId: UUID) extends UserCommand {
   override def process(user: User): List[UserEvent] = WishGranted(wishId) :: Nil
+}
+object GrantWish {
+  implicit val validator = new UserCommandValidator[GrantWish] {
+    override def validate(user: User, command: GrantWish): Either[ValidationError, Unit] =
+      user.wishes.get(command.wishId).map(_.status match {
+        case Active | Reserved(_) => Right(())
+        case s => Left(InvalidStatusChange(Granted(None), s"Cannot grant wish that is not active or reserved. Status was $s"))
+      }).getOrElse(Left(WishNotFound(command.wishId)))
+  }
 }
 
 case class ReserveWish(reserverId: UUID, wishId: UUID) extends UserCommand {
@@ -66,7 +84,7 @@ object UnreserveWish {
     override def validate(user: User, command: UnreserveWish): Either[ValidationError, Unit] =
       user.wishes.get(command.wishId).map(_.status match {
         case Reserved(_) => Right(())
-        case s => Left(InvalidStatusChange(s, s"Can only Unreserve a reserved wish. Current status of wish [${command.wishId}] is $s"))
+        case s => Left(InvalidStatusChange(Active, s"Can only Unreserve a reserved wish. Current status of wish [${command.wishId}] is $s"))
       }).getOrElse(Left(WishNotFound(command.wishId)))
   }
 }

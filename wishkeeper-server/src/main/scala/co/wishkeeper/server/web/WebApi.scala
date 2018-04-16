@@ -210,10 +210,9 @@ class WebApi(publicApi: PublicApi, managementApi: ManagementApi)
                       }
                   } ~
                   (delete & path(JavaUUID)) { wishId =>
-                    sessionUUID.map { sessionId =>
-                      publicApi.deleteWish(sessionId, wishId)
-                      complete(StatusCodes.OK)
-                    }.get
+                    userIdFromSession { userId =>
+                      handleCommandResult(publicApi.deleteWish(userId, wishId))
+                    }
                   } ~
                   pathPrefix(JavaUUID / "image") { wishId =>
                     post {

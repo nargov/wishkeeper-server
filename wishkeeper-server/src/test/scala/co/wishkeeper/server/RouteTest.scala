@@ -151,7 +151,7 @@ class RouteTest extends Specification with Specs2RouteTest with JMock {
 
     "Delete Wish" in new LoggedInUserContext {
       checking {
-        oneOf(publicApi).deleteWish(sessionId, wishId)
+        oneOf(publicApi).deleteWish(userId, wishId).willReturn(Right(()))
       }
 
       Delete(s"/users/wishes/$wishId").withHeaders(sessionIdHeader) ~> webApi.userRoute ~> check {

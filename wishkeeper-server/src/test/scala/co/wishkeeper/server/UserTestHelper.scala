@@ -24,6 +24,10 @@ object UserTestHelper {
       events.foldLeft(user)(_.applyEvent(_))
     }
 
+    def withDeletedWish(id: UUID = UUID.randomUUID()): User = {
+      EventsList(user.id).withDeletedWish(id).list.foldLeft(user)(_.applyEvent(_))
+    }
+
     def withExistingFriendRequest(reqId: UUID, from: UUID): User =
       user.applyEvent(UserEventInstant(FriendRequestReceived(user.id, from, Option(reqId)), now))
 
