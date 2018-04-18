@@ -90,7 +90,7 @@ class WebApi(publicApi: PublicApi, managementApi: ManagementApi)
     pathPrefix("wishes") {
       pathPrefix(JavaUUID) { wishId =>
         grantWish(userId, wishId) ~
-        getWish(userId, wishId)
+          getWish(userId, wishId)
       }
     }
 
@@ -195,8 +195,9 @@ class WebApi(publicApi: PublicApi, managementApi: ManagementApi)
               } ~
               pathPrefix("wishes") {
                 (post & entity(as[SetWishDetails])) { setWishDetails =>
-                  publicApi.processCommand(setWishDetails, sessionUUID)
-                  complete(StatusCodes.OK)
+                  userIdFromSession { userId =>
+                    handleCommandResult(publicApi.processCommand(setWishDetails, userId))
+                  }
                 } ~
                   get {
                     pathEnd {

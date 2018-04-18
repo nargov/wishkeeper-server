@@ -52,6 +52,8 @@ trait PublicApi {
 
   def processCommand(command: UserCommand, sessionId: Option[UUID]): Unit
 
+  def processCommand[C <: UserCommand](command: C, userId: UUID)(implicit validator: UserCommandValidator[C]): Either[Error, Unit]
+
   def connectFacebookUser(command: ConnectFacebookUser): Future[Boolean]
 
   def userProfileFor(sessionId: UUID): Option[UserProfile]
@@ -235,4 +237,7 @@ class DelegatingPublicApi(commandProcessor: CommandProcessor,
     val wishes = replayUser(userId).wishes
     Either.cond(wishes.contains(wishId), wishes(wishId), WishNotFound(wishId))
   }
+
+  override def processCommand[C <: UserCommand](command: C, userId: UUID)(implicit validator: UserCommandValidator[C]): Either[Error, Unit] =
+    commandProcessor.validatedProcess(command, userId)
 }

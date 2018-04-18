@@ -20,3 +20,7 @@ case class WishNotFound(wishId: UUID) extends ValidationError {
 case object DummyError extends ValidationError{
   override val message: String = "Oops!"
 }
+
+case class InvalidWishStatus(status: WishStatus) extends ValidationError {
+  override val message: String = s"Cannot perform command when wish is in status $status"
+}

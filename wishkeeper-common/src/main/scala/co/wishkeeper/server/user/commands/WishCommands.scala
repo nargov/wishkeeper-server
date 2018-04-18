@@ -4,7 +4,7 @@ import java.util.UUID
 
 import co.wishkeeper.server.Events._
 import co.wishkeeper.server.WishStatus.{Active, Deleted, Granted, Reserved}
-import co.wishkeeper.server.user.{InvalidStatusChange, ValidationError, WishNotFound}
+import co.wishkeeper.server.user.{InvalidStatusChange, InvalidWishStatus, ValidationError, WishNotFound}
 import co.wishkeeper.server.{User, Wish}
 import org.joda.time.DateTime
 
@@ -25,6 +25,15 @@ case class SetWishDetails(wish: Wish) extends UserCommand {
       List(WishCreated(wish.id, user.id, DateTime.now()))
     else
       Nil
+  }
+}
+object SetWishDetails {
+  implicit val validator = new UserCommandValidator[SetWishDetails] {
+    override def validate(user: User, command: SetWishDetails): Either[ValidationError, Unit] =
+      user.wishes.get(command.wish.id).map(_.status match {
+        case Active => Right(())
+        case s => Left(InvalidWishStatus(s))
+      }).getOrElse(Left(WishNotFound(command.wish.id)))
   }
 }
 

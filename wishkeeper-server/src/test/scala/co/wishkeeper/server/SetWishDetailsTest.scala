@@ -1,18 +1,20 @@
 package co.wishkeeper.server
 
 import java.util.UUID
+import java.util.UUID.randomUUID
 
-import co.wishkeeper.server.user.commands.SetWishDetails
 import co.wishkeeper.server.Events._
 import co.wishkeeper.server.UserTestHelper._
-import org.joda.time.DateTime
+import co.wishkeeper.server.WishStatus.Reserved
+import co.wishkeeper.server.user.commands.SetWishDetails
+import co.wishkeeper.server.user.{InvalidWishStatus, ValidationError, WishNotFound}
 import org.specs2.matcher.Matcher
 import org.specs2.mutable.Specification
 
 class SetWishDetailsTest extends Specification {
 
   val user = aUser
-  val wishId = UUID.randomUUID()
+  val wishId = randomUUID()
 
   "should create event for name" in {
     val name = "name"
@@ -79,6 +81,19 @@ class SetWishDetailsTest extends Specification {
 
   "should not create a wish creation event if the wish already exists" in {
     SetWishDetails(Wish(wishId)).process(user.withWish(wishId)) must beEmpty
+  }
+
+  "should fail validation if wish is not in Active state" in {
+    SetWishDetails.validator.validate(aUser.withReservedWish(wishId, randomUUID()), SetWishDetails(Wish(wishId))) must beInInvalidStatusForChange
+  }
+
+  "should fail validation if wish doesn't exist" in {
+    SetWishDetails.validator.validate(aUser, SetWishDetails(Wish(wishId))) must beLeft[ValidationError](WishNotFound(wishId))
+  }
+
+  def beInInvalidStatusForChange: Matcher[Either[Error, Unit]] = (e: Either[Error, Unit]) => e match {
+    case Left(InvalidWishStatus(Reserved(_))) => (true, "Error is invalid wish status")
+    case _ => (false, "Error is not invalid wish status")
   }
 
   def containWishCreatedEvent(wishId: UUID, createdBy: UUID): Matcher[List[UserEvent]] = { eventList: List[UserEvent] =>
