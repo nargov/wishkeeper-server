@@ -56,8 +56,6 @@ case class User(id: UUID,
       updateWishProperty(wishId, _.withStatus(WishStatus.Granted(granter), time))
     case UserEventInstant(WishReserved(wishId, reserver), time) => updateWishProperty(wishId, _.withStatus(WishStatus.Reserved(reserver), time))
     case UserEventInstant(WishUnreserved(wishId), time) => updateWishProperty(wishId, _.withStatus(WishStatus.Active, time))
-    case UserEventInstant(WishReservedNotificationCreated(notifId, wishId, reserver), time) if overDelayThreshold(time) =>
-      this.copy(notifications = Notification(notifId, WishReservedNotification(wishId, reserver), time = time) :: notifications)
     case UserEventInstant(FacebookFriendsListSeen(seen), _) => this.copy(flags = flags.copy(seenFacebookFriendsList = seen))
     case UserEventInstant(FriendRequestNotificationCreated(notificationId, _, from, reqId), time) => this.copy(
       notifications = Notification(notificationId, FriendRequestNotification(from, reqId), time = time) :: notifications)
@@ -84,8 +82,9 @@ case class User(id: UUID,
         this.copy(notifications = notifications.updated(index, updatedNotification))
       }
       else this
-
     case UserEventInstant(FriendRemoved(_, friendId), _) => this.copy(friends = friends.copy(current = friends.current.filterNot(_ == friendId)))
+
+    case UserEventInstant(n@WishReservedNotificationCreated(_, _, _), time) => handleEventWithHandler(n, time)
     case UserEventInstant(e@WishUnreservedNotificationCreated(_, _), time) => handleEventWithHandler(e, time)
     case _ => this
   }

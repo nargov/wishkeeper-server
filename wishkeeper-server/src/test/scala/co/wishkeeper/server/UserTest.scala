@@ -315,9 +315,9 @@ class UserTest extends Specification with MatcherMacros with JMock with Notifica
     notifications must
       have size 2 and
       contain(aNotificationWithId(notifId1)) and
-      contain(aNotificationWithId(notifId2)) and
-      not(contain(aNotificationWithId(notifId3))) and
-      not(contain(aNotificationWithId(notifId4)))
+      contain(aNotificationWithId(notifId4)) and
+      not(contain(aNotificationWithId(notifId2))) and
+      not(contain(aNotificationWithId(notifId3)))
   }
 
   "ignore notification-viewed event if notification was discarded" in new Context {
@@ -336,6 +336,19 @@ class UserTest extends Specification with MatcherMacros with JMock with Notifica
       notifications
 
     notifications must beEmpty
+  }
+
+  "discard WishUnreservedNotification if WishReservedNotification exists within threshold" in new Context {
+    val reserveTime = DateTime.now().minusMinutes(20)
+    val unreserveTime = reserveTime.plusMinutes(10)
+    val reReserveTime = unreserveTime.plusMinutes(3)
+    val notifications: List[Notification] = user.
+      applyEvent(asEventInstant(WishReservedNotificationCreated(randomUUID(), wishId, friendId), reserveTime)).
+      applyEvent(asEventInstant(WishUnreservedNotificationCreated(randomUUID(), wishId), unreserveTime)).
+      applyEvent(asEventInstant(WishReservedNotificationCreated(randomUUID(), wishId, friendId), reReserveTime)).
+      notifications
+
+    notifications must have size 1
   }
 
   trait Context extends Scope {
