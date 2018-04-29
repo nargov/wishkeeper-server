@@ -64,7 +64,6 @@ object NotificationEventHandlers {
   implicit val wishReservedNotificationHandler = new UserEventHandler[WishReservedNotificationCreated] {
     override def apply(user: User, event: WishReservedNotificationCreated, time: DateTime): User = {
       val lastUnreserveNotification = aWishUnreservedNotificationFor(event.wishId)
-      println(s"At this point, there are ${user.notifications.size} notifications")
       user.notifications.find(lastUnreserveNotification).map { unreserveNotification =>
         if(isTimeSinceLastReciprocalOverThreshold(unreserveNotification.time, time)) {
           if(overDelayThreshold(time))

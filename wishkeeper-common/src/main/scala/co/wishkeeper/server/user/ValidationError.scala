@@ -24,3 +24,11 @@ case object DummyError extends ValidationError{
 case class InvalidWishStatus(status: WishStatus) extends ValidationError {
   override val message: String = s"Cannot perform command when wish is in status $status"
 }
+
+case class GrantToSelfWhenReserved(wishId: UUID, reserver: UUID) extends ValidationError {
+  override val message: String = s"Cannot grant wish [$wishId] to self when reserved by [$reserver]"
+}
+
+case class GrantWhenNotReserved(wishId: UUID, granter: UUID, reservedBy: Option[UUID] = None) extends ValidationError {
+  override val message: String = s"Cannot grant by user [$granter] when wish is ${reservedBy.fold("not reserved")(by => s"reserved by $by")}"
+}

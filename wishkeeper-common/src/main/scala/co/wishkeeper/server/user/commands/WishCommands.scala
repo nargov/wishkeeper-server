@@ -4,7 +4,7 @@ import java.util.UUID
 
 import co.wishkeeper.server.Events._
 import co.wishkeeper.server.WishStatus.{Active, Deleted, Granted, Reserved}
-import co.wishkeeper.server.user.{InvalidStatusChange, InvalidWishStatus, ValidationError, WishNotFound}
+import co.wishkeeper.server.user._
 import co.wishkeeper.server.{User, Wish}
 import org.joda.time.DateTime
 
@@ -27,13 +27,14 @@ case class SetWishDetails(wish: Wish) extends UserCommand {
       Nil
   }
 }
+
 object SetWishDetails {
   implicit val validator = new UserCommandValidator[SetWishDetails] {
     override def validate(user: User, command: SetWishDetails): Either[ValidationError, Unit] =
       user.wishes.get(command.wish.id).map(_.status match {
         case Active => Right(())
         case s => Left(InvalidWishStatus(s))
-      }).getOrElse(Left(WishNotFound(command.wish.id)))
+      }).getOrElse(Right(()))
   }
 }
 
@@ -44,7 +45,8 @@ case class DeleteWishImage(wishId: UUID) extends UserCommand {
 case class DeleteWish(wishId: UUID) extends UserCommand {
   override def process(user: User): List[UserEvent] = WishDeleted(wishId) :: Nil
 }
-object DeleteWish{
+
+object DeleteWish {
   implicit val validator = new UserCommandValidator[DeleteWish] {
     override def validate(user: User, command: DeleteWish): Either[ValidationError, Unit] =
       user.wishes.get(command.wishId).map(_.status match {
@@ -54,16 +56,26 @@ object DeleteWish{
   }
 }
 
-case class GrantWish(wishId: UUID) extends UserCommand {
+case class GrantWish(wishId: UUID, granterId: Option[UUID] = None) extends UserCommand {
   override def process(user: User): List[UserEvent] = WishGranted(wishId) :: Nil
 }
+
 object GrantWish {
   implicit val validator = new UserCommandValidator[GrantWish] {
-    override def validate(user: User, command: GrantWish): Either[ValidationError, Unit] =
+    override def validate(user: User, command: GrantWish): Either[ValidationError, Unit] = {
       user.wishes.get(command.wishId).map(_.status match {
-        case Active | Reserved(_) => Right(())
+        case Active => command.granterId match {
+          case Some(granter) => Left(GrantWhenNotReserved(command.wishId, granter))
+          case None => Right(())
+        }
+        case Reserved(reserver) => command.granterId match {
+          case Some(granter) if reserver == granter => Right(())
+          case Some(granter) if reserver != granter => Left(GrantWhenNotReserved(command.wishId, granter, Option(reserver)))
+          case None => Left(GrantToSelfWhenReserved(command.wishId, reserver))
+        }
         case s => Left(InvalidStatusChange(Granted(None), s"Cannot grant wish that is not active or reserved. Status was $s"))
       }).getOrElse(Left(WishNotFound(command.wishId)))
+    }
   }
 }
 
@@ -72,6 +84,7 @@ case class ReserveWish(reserverId: UUID, wishId: UUID) extends UserCommand {
     WishReserved(wishId, reserverId),
     WishReservedNotificationCreated(UUID.randomUUID(), wishId, reserverId))
 }
+
 object ReserveWish {
   implicit val validator = new UserCommandValidator[ReserveWish] {
     override def validate(user: User, command: ReserveWish): Either[ValidationError, Unit] = {
@@ -88,6 +101,7 @@ case class UnreserveWish(wishId: UUID) extends UserCommand {
     WishUnreserved(wishId),
     WishUnreservedNotificationCreated(UUID.randomUUID(), wishId))
 }
+
 object UnreserveWish {
   implicit val validator = new UserCommandValidator[UnreserveWish] {
     override def validate(user: User, command: UnreserveWish): Either[ValidationError, Unit] =

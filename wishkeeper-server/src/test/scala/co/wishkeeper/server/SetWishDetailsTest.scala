@@ -87,8 +87,8 @@ class SetWishDetailsTest extends Specification {
     SetWishDetails.validator.validate(aUser.withReservedWish(wishId, randomUUID()), SetWishDetails(Wish(wishId))) must beInInvalidStatusForChange
   }
 
-  "should fail validation if wish doesn't exist" in {
-    SetWishDetails.validator.validate(aUser, SetWishDetails(Wish(wishId))) must beLeft[ValidationError](WishNotFound(wishId))
+  "should pass validation if wish doesn't exist (since it will be created)" in {
+    SetWishDetails.validator.validate(aUser, SetWishDetails(Wish(wishId))) must beRight(())
   }
 
   def beInInvalidStatusForChange: Matcher[Either[Error, Unit]] = (e: Either[Error, Unit]) => e match {

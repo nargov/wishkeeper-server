@@ -26,7 +26,7 @@ trait PublicApi {
 
   def reserveWish(userId: UUID, friendId: UUID, wishId: UUID): Either[Error, Unit]
 
-  def grantWish(userId: UUID, wishId: UUID): Either[ValidationError, Unit]
+  def grantWish(userId: UUID, wishId: UUID, granterId: Option[UUID] = None): Either[Error, Unit]
 
   def unfriend(sessionId: UUID, friendId: UUID): Either[ValidationError, Unit]
 
@@ -219,9 +219,8 @@ class DelegatingPublicApi(commandProcessor: CommandProcessor,
 
   override def userIdForSession(sessionId: UUID): Option[UUID] = dataStore.userBySession(sessionId)
 
-  override def grantWish(userId: UUID, wishId: UUID): Either[ValidationError, Unit] = {
-    commandProcessor.process(GrantWish(wishId), userId)
-    Right(())
+  override def grantWish(userId: UUID, wishId: UUID, granterId: Option[UUID] = None): Either[Error, Unit] = {
+    commandProcessor.validatedProcess(GrantWish(wishId, granterId), userId)
   }
 
   override def reserveWish(userId: UUID, friendId: UUID, wishId: UUID): Either[Error, Unit] = {

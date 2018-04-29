@@ -27,6 +27,7 @@ import io.circe.generic.extras.auto._
 
 import scala.concurrent.duration._
 import scala.concurrent.{ExecutionContextExecutor, Future}
+import scala.language.postfixOps
 import scala.util.{Failure, Success, Try}
 
 class WebApi(publicApi: PublicApi, managementApi: ManagementApi)
@@ -60,8 +61,8 @@ class WebApi(publicApi: PublicApi, managementApi: ManagementApi)
 
   val grantWish: (UUID, UUID) => Route = (userId, wishId) =>
     (post & pathPrefix("grant")) {
-      publicApi.grantWish(userId, wishId) match {
-        case Right(_) => complete(StatusCodes.OK)
+      parameter("granter"?) { granterId =>
+        handleCommandResult(publicApi.grantWish(userId, wishId, granterId.map(UUID.fromString)))
       }
     }
 

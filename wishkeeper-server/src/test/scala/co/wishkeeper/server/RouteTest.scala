@@ -335,12 +335,23 @@ class RouteTest extends Specification with Specs2RouteTest with JMock {
       }
     }
 
-    "grant wish" in new LoggedInUserContext {
+    "grant wish to self" in new LoggedInUserContext {
       checking{
-        oneOf(publicApi).grantWish(userId, wishId).willReturn(Right(()))
+        oneOf(publicApi).grantWish(userId, wishId, None).willReturn(Right(()))
       }
 
       Post(s"/me/wishes/${wishId.toString}/grant").withHeaders(sessionIdHeader) ~> webApi.newUserRoute ~> check {
+        handled must beTrue
+        status must beEqualTo(StatusCodes.OK)
+      }
+    }
+
+    "mark reserved wish granted" in new LoggedInUserContext {
+      checking {
+        oneOf(publicApi).grantWish(userId, wishId, Option(friendId)).willReturn(Right(()))
+      }
+
+      Post(s"/me/wishes/${wishId.toString}/grant?granter=$friendId").withHeaders(sessionIdHeader) ~> webApi.newUserRoute ~> check {
         handled must beTrue
         status must beEqualTo(StatusCodes.OK)
       }
