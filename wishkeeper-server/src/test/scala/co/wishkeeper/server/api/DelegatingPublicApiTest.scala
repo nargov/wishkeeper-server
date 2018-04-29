@@ -127,10 +127,10 @@ class DelegatingPublicApiTest extends Specification with JMock {
 
   "grant wish" in new LoggedInContext {
     checking {
-      oneOf(commandProcessor).process(GrantWish(wishId), userId)
+      oneOf(commandProcessor).validatedProcess(GrantWish(wishId, Option(friendId)), userId).willReturn(Right(()))
     }
 
-    api.grantWish(userId, wishId)
+    api.grantWish(userId, wishId, Option(friendId))
   }
 
   "reserve wish" in new LoggedInContext {
