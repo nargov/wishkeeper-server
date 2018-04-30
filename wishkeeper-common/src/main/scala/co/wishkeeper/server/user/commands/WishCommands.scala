@@ -42,6 +42,17 @@ case class DeleteWishImage(wishId: UUID) extends UserCommand {
   override def process(user: User): List[UserEvent] = List(WishImageDeleted(wishId))
 }
 
+object DeleteWishImage {
+  implicit val validator = new UserCommandValidator[DeleteWishImage] {
+    override def validate(user: User, command: DeleteWishImage): Either[ValidationError, Unit] = {
+      user.wishes.get(command.wishId).map(_.status match {
+        case Active => Right(())
+        case s => Left(InvalidWishStatus(s))
+      }).getOrElse(Left(WishNotFound(command.wishId)))
+    }
+  }
+}
+
 case class DeleteWish(wishId: UUID) extends UserCommand {
   override def process(user: User): List[UserEvent] = WishDeleted(wishId) :: Nil
 }

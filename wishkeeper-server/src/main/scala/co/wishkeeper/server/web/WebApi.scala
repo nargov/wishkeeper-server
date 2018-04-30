@@ -61,7 +61,7 @@ class WebApi(publicApi: PublicApi, managementApi: ManagementApi)
 
   val grantWish: (UUID, UUID) => Route = (userId, wishId) =>
     (post & pathPrefix("grant")) {
-      parameter("granter"?) { granterId =>
+      parameter("granter" ?) { granterId =>
         handleCommandResult(publicApi.grantWish(userId, wishId, granterId.map(UUID.fromString)))
       }
     }
