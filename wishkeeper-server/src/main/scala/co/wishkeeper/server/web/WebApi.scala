@@ -2,25 +2,28 @@ package co.wishkeeper.server.web
 
 import java.util.UUID
 
+import akka.NotUsed
 import akka.actor.ActorSystem
 import akka.event.LoggingAdapter
 import akka.http.javadsl.server.Rejections
 import akka.http.scaladsl.Http.ServerBinding
+import akka.http.scaladsl.model.ws.{Message, TextMessage}
 import akka.http.scaladsl.model.{HttpRequest, StatusCodes}
 import akka.http.scaladsl.server.Directives.{as, complete, entity, get, headerValueByName, path, pathPrefix, post, _}
 import akka.http.scaladsl.server._
 import akka.http.scaladsl.server.directives.{DebuggingDirectives, LoggingMagnet}
 import akka.http.scaladsl.{Http, HttpExt}
-import akka.stream.ActorMaterializer
-import akka.stream.scaladsl.StreamConverters
+import akka.stream.scaladsl.{Flow, Sink, Source, SourceQueueWithComplete, StreamConverters}
+import akka.stream.{ActorMaterializer, OverflowStrategy}
 import akka.util.Timeout
 import co.wishkeeper.json._
 import co.wishkeeper.server.Error
 import co.wishkeeper.server.api.{ManagementApi, PublicApi}
 import co.wishkeeper.server.image.ImageMetadata
+import co.wishkeeper.server.messaging.ClientRegistry
 import co.wishkeeper.server.user.commands._
 import co.wishkeeper.server.user.{InvalidStatusChange, NotFriends, ValidationError, WishNotFound}
-import co.wishkeeper.server.web.WebApi.imageDimensionsHeader
+import co.wishkeeper.server.web.WebApi.{imageDimensionsHeader, sessionIdHeader}
 import de.heikoseeberger.akkahttpcirce.FailFastCirceSupport._
 import io.circe.generic.extras.Configuration
 import io.circe.generic.extras.auto._
@@ -30,7 +33,7 @@ import scala.concurrent.{ExecutionContextExecutor, Future}
 import scala.language.postfixOps
 import scala.util.{Failure, Success, Try}
 
-class WebApi(publicApi: PublicApi, managementApi: ManagementApi)
+class WebApi(publicApi: PublicApi, managementApi: ManagementApi, clientRegistry: ClientRegistry)
             (implicit system: ActorSystem, mat: ActorMaterializer, ec: ExecutionContextExecutor) {
 
   private implicit val timeout: Timeout = 4.seconds
@@ -51,13 +54,13 @@ class WebApi(publicApi: PublicApi, managementApi: ManagementApi)
 
   val handleCommandResult: Either[Error, Unit] => Route = _.fold(handleErrors, _ => complete(StatusCodes.OK))
 
-  val userIdFromSession: Directive1[UUID] = headerValueByName(WebApi.sessionIdHeader).flatMap {
-    sessionId =>
-      Try(UUID.fromString(sessionId)).toOption.
-        flatMap(publicApi.userIdForSession).
-        map(provide).
-        getOrElse(reject(Rejections.authorizationFailed))
-  }
+  val userIdFromSessionId: String => Directive1[UUID] = sessionId =>
+    Try(UUID.fromString(sessionId)).toOption.
+      flatMap(publicApi.userIdForSession).
+      map(provide).
+      getOrElse(reject(Rejections.authorizationFailed))
+
+  val userIdFromSessionHeader: Directive1[UUID] = headerValueByName(sessionIdHeader).flatMap(userIdFromSessionId)
 
   val grantWish: (UUID, UUID) => Route = (userId, wishId) =>
     (post & pathPrefix("grant")) {
@@ -106,8 +109,26 @@ class WebApi(publicApi: PublicApi, managementApi: ManagementApi)
     complete(id)
   }
 
+  val in: Sink[Message, NotUsed] = Flow[Message].to(Sink.ignore)
+  val out: Source[Message, SourceQueueWithComplete[Message]] = Source.queue(10, OverflowStrategy.fail)
+  val handler: UUID => Flow[Message, Message, Any] = userId => Flow.fromSinkAndSourceMat(in, out)((_, outbound) => {
+    val connectionId = clientRegistry.add(userId, message => outbound.offer(TextMessage(message)))
+    println(s">>>>>>>>>>>>>>>>>> Added websocket connection for user $userId")
+    outbound.watchCompletion().foreach(_ => {
+      println(s">>>>>>>>>>>>>>>>>>> Websocket connection closed for user $userId. Removing from registry.")
+      clientRegistry.remove(userId, connectionId)
+    })
+  })
+  val websocket: Route = pathPrefix("ws") {
+    parameter(sessionIdHeader) { sessionId =>
+      userIdFromSessionId(sessionId) { userId =>
+        handleWebSocketMessages(handler(userId))
+      }
+    }
+  }
+
   val newUserRoute: Route =
-    userIdFromSession { userId =>
+    userIdFromSessionHeader { userId =>
       pathPrefix("me") {
         wishes(userId) ~
           myId(userId)
@@ -115,7 +136,8 @@ class WebApi(publicApi: PublicApi, managementApi: ManagementApi)
         pathPrefix(JavaUUID) { friendId =>
           friendWishes(userId, friendId)
         }
-    }
+    } ~
+      websocket
 
   val userRoute: Route =
     DebuggingDirectives.logRequestResult(LoggingMagnet(printer)) {
@@ -130,7 +152,7 @@ class WebApi(publicApi: PublicApi, managementApi: ManagementApi)
             }
           }
         } ~
-          headerValueByName(WebApi.sessionIdHeader) { sessionId =>
+          headerValueByName(sessionIdHeader) { sessionId =>
             val sessionUUID = Option(UUID.fromString(sessionId))
             pathPrefix(JavaUUID) { userId =>
               (path("friends") & get) {
@@ -196,7 +218,7 @@ class WebApi(publicApi: PublicApi, managementApi: ManagementApi)
               } ~
               pathPrefix("wishes") {
                 (post & entity(as[SetWishDetails])) { setWishDetails =>
-                  userIdFromSession { userId =>
+                  userIdFromSessionHeader { userId =>
                     handleCommandResult(publicApi.processCommand(setWishDetails, userId))
                   }
                 } ~
@@ -212,7 +234,7 @@ class WebApi(publicApi: PublicApi, managementApi: ManagementApi)
                       }
                   } ~
                   (delete & path(JavaUUID)) { wishId =>
-                    userIdFromSession { userId =>
+                    userIdFromSessionHeader { userId =>
                       handleCommandResult(publicApi.deleteWish(userId, wishId))
                     }
                   } ~
@@ -316,7 +338,7 @@ class WebApi(publicApi: PublicApi, managementApi: ManagementApi)
     val httpExt: HttpExt = Http()
     bindings = List(
       httpExt.bindAndHandle(userRoute, "0.0.0.0", port), //TODO replace IP with parameter
-      httpExt.bindAndHandle(ManagementRoute(managementApi), "0.0.0.0", managementPort)
+      httpExt.bindAndHandle(ManagementRoute(managementApi, clientRegistry), "0.0.0.0", managementPort)
     )
   }
 

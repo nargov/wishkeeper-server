@@ -7,15 +7,22 @@ import akka.http.scaladsl.server.directives.{DebuggingDirectives, LoggingMagnet}
 import akka.http.scaladsl.server.{Route, RouteResult}
 import co.wishkeeper.json._
 import co.wishkeeper.server.api.ManagementApi
+import co.wishkeeper.server.messaging.ClientRegistry
 import de.heikoseeberger.akkahttpcirce.FailFastCirceSupport._
 import io.circe.generic.extras.Configuration
 import io.circe.generic.extras.auto._
 
 object ManagementRoute {
-  def apply(managementApi: ManagementApi)(implicit system: ActorSystem, circeConfig: Configuration): Route = {
+  def apply(managementApi: ManagementApi, clientRegistry: ClientRegistry)(implicit system: ActorSystem, circeConfig: Configuration): Route = {
     val printer: HttpRequest => RouteResult => Unit = req => res => {
       system.log.info(req.toString)
       system.log.info(res.toString)
+    }
+
+    val ws: Route = complete(WebSocketsStats(clientRegistry.connectedClients))
+
+    val stats: Route = pathPrefix("stats") {
+      ws
     }
 
     DebuggingDirectives.logRequestResult(LoggingMagnet(_ => printer)) {
@@ -42,9 +49,10 @@ object ManagementRoute {
               complete(StatusCodes.OK)
             }
           }
-      }
+      } ~
+      stats
     }
   }
-
-
 }
+
+case class WebSocketsStats(connections: Int = 0)

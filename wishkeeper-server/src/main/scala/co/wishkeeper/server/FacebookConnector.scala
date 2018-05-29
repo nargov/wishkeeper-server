@@ -24,7 +24,7 @@ object FacebookConnector {
 class AkkaHttpFacebookConnector(appId: String, appSecret: String)
                                (implicit actorSystem: ActorSystem, ec: ExecutionContext, am: ActorMaterializer) extends FacebookConnector {
 
-  implicit val circeConfig = Configuration.default.withDefaults.withSnakeCaseKeys
+  implicit val circeConfig = Configuration.default.withDefaults.withSnakeCaseMemberNames
 
   override def isValid(token: String): Future[Boolean] = {
     val eventualResponse = Http().singleRequest(HttpRequest().

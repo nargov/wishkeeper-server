@@ -7,7 +7,7 @@ import com.google.cloud.storage.Storage.{BlobField, BlobGetOption}
 import com.google.cloud.storage.{BlobId, Storage, StorageOptions}
 
 trait ImageStore {
-  def delete(id: String): Unit
+  def delete(id: String): Boolean
 
   def read(id: String): Option[ImageData]
 
@@ -33,7 +33,7 @@ class GoogleCloudStorageImageStore(bucket: String) extends ImageStore {
     }
   }
 
-  override def delete(id: String): Unit = storage.delete(BlobId.of(bucket, id))
+  override def delete(id: String): Boolean = storage.delete(BlobId.of(bucket, id))
 
   override def imageLinkBase = s"http://$bucket"
 }

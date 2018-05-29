@@ -5,6 +5,7 @@ import akka.stream.ActorMaterializer
 import co.wishkeeper.json._
 import co.wishkeeper.server.api.{DelegatingManagementApi, DelegatingPublicApi, ManagementApi}
 import co.wishkeeper.server.image.{GoogleCloudStorageImageStore, ImageStore}
+import co.wishkeeper.server.messaging.ClientRegistry
 import co.wishkeeper.server.projections._
 import co.wishkeeper.server.web.WebApi
 import com.typesafe.config.ConfigFactory
@@ -23,8 +24,10 @@ class WishkeeperServer {
   private val dataStoreConfig = DataStoreConfig(config.getStringList("wishkeeper.datastore.urls").asScala.toList)
   private val dataStore: DataStore = new CassandraDataStore(dataStoreConfig)
 
+  private val clientRegistry = new ClientRegistry
+
   private val userIdByFacebookIdProjection = new DataStoreUserIdByFacebookIdProjection(dataStore)
-  private val incomingFriendRequestsProjection = new DataStoreIncomingFriendRequestsProjection(dataStore)
+  private val incomingFriendRequestsProjection = new DataStoreIncomingFriendRequestsProjection(dataStore, clientRegistry.sendTo)
   private val notificationsProjection: NotificationsProjection = new DataStoreNotificationsProjection(dataStore)
 
   private val facebookConnector: FacebookConnector = new AkkaHttpFacebookConnector(
@@ -50,7 +53,7 @@ class WishkeeperServer {
     incomingFriendRequestsProjection, userProfileProjection, userFriendsProjection, notificationsProjection, imageStore)
   private val managementApi: ManagementApi = new DelegatingManagementApi(userIdByFacebookIdProjection, userProfileProjection,
     dataStore, commandProcessor)
-  private val webApi = new WebApi(publicApi, managementApi)
+  private val webApi = new WebApi(publicApi, managementApi, clientRegistry)
 
   def start(): Unit = {
     dataStore.connect()

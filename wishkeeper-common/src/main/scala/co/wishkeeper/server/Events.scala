@@ -47,6 +47,10 @@ object Events {
 
   case class FriendRequestAcceptedNotificationCreated(id: UUID, userId: UUID, by: UUID, requestId: UUID) extends UserEvent
 
+  case class FacebookFriendsListSeen(seen: Boolean = true) extends UserEvent
+
+  case class FriendRemoved(userId: UUID, friendId: UUID) extends UserEvent
+
   case class NotificationViewed(id: UUID) extends UserEvent
 
   case class WishNameSet(wishId: UUID, name: String) extends UserEvent
@@ -78,10 +82,6 @@ object Events {
   case class WishUnreserved(wishId: UUID) extends UserEvent
 
   case class WishUnreservedNotificationCreated(id: UUID, wishId: UUID) extends UserEvent
-
-  case class FacebookFriendsListSeen(seen: Boolean = true) extends UserEvent
-
-  case class FriendRemoved(userId: UUID, friendId: UUID) extends UserEvent
 }
 
 case class UserEventInstant[E <: UserEvent](event: E, time: DateTime)

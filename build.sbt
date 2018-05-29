@@ -1,4 +1,4 @@
-val circeVersion = "0.8.0"
+val circeVersion = "0.9.3"
 val dockerTestKitVersion = "0.9.0"
 val logbackVersion = "1.2.1"
 val specs2Version = "3.9.5"
@@ -76,9 +76,9 @@ lazy val server = (project in file("wishkeeper-server")).
     name := "wishkeeper-server",
     resolvers += Resolver.bintrayRepo("hseeberger", "maven"),
     libraryDependencies ++= Seq(
-      "com.typesafe.akka" %% "akka-http" % "10.0.11",
-      "com.typesafe.akka" %% "akka-http-testkit" % "10.0.11",
-      "de.heikoseeberger" %% "akka-http-circe" % "1.18.1",
+      "com.typesafe.akka" %% "akka-http" % "10.1.1",
+      "com.typesafe.akka" %% "akka-http-testkit" % "10.1.1",
+      "de.heikoseeberger" %% "akka-http-circe" % "1.20.1",
       "com.datastax.cassandra" % "cassandra-driver-core" % "3.2.0",
       "org.slf4j" % "slf4j-api" % "1.7.22",
       "commons-io" % "commons-io" % "2.5",
