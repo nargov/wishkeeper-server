@@ -34,7 +34,7 @@ class UserCommandProcessor(dataStore: DataStore, eventProcessors: List[EventProc
         val savedSession = dataStore.saveUserSession(user.id, connectUser.sessionId, now)
         val events = command.process(user)
         val savedEvents = dataStore.saveUserEvents(user.id, lastSeqNum, now, events)
-        events.foreach(event => eventProcessors.foreach(_.process(event)))
+        events.foreach(event => eventProcessors.foreach(_.process(event, user.id)))
         savedEvents && savedSession
 
       case _ =>
@@ -51,7 +51,7 @@ class UserCommandProcessor(dataStore: DataStore, eventProcessors: List[EventProc
       val events: Seq[UserEvent] = command.process(user)
       val success = dataStore.saveUserEvents(userId, lastSeqNum, DateTime.now(), events)
       if (success)
-        events.foreach(event => eventProcessors.foreach(_.process(event)))
+        events.foreach(event => eventProcessors.foreach(_.process(event, user.id)))
       Either.cond(success, (), DbErrorEventsNotSaved)
     }
   }
@@ -64,7 +64,7 @@ class UserCommandProcessor(dataStore: DataStore, eventProcessors: List[EventProc
         val events: Seq[UserEvent] = command.process(user)
         val success = dataStore.saveUserEvents(userId, lastSeqNum, DateTime.now(), events)
         if (success)
-          events.foreach(event => eventProcessors.foreach(_.process(event)))
+          events.foreach(event => eventProcessors.foreach(_.process(event, user.id)))
         Either.cond(success, (), DbErrorEventsNotSaved)
       }
     }
@@ -82,14 +82,14 @@ object CommandProcessor {
 }
 
 trait EventProcessor {
-  def process(event: Event): Unit
+  def process(event: Event, userId: UUID): Unit
 }
 
 class UserByEmailProjection(dataStore: DataStore) extends EventProcessor {
 
-  override def process(event: Event): Unit = {
+  override def process(event: Event, userId: UUID): Unit = {
     event match {
-      case UserEmailSet(userId, email) => dataStore.saveUserByEmail(email, userId)
+      case UserEmailSet(_, email) => dataStore.saveUserByEmail(email, userId)
       case _ =>
     }
   }

@@ -69,11 +69,11 @@ class DataStoreNotificationsProjectionTest extends Specification with JMock {
         having(contain(aFriendRequesdAcceptedNotificationCreatedEvent(friendId, userId, friendReqId)))).willReturn(true)
     }
 
-    projection.process(FriendRequestStatusChanged(userId, friendReqId, friendId, Approved))
+    projection.process(FriendRequestStatusChanged(userId, friendReqId, friendId, Approved), userId)
   }
 
   "not return a FriendRequestAcceptedNotificationCreated when friend request status changes to ignored" in new Context {
-    projection.process(FriendRequestStatusChanged(userId, friendReqId, friendId, Ignored))
+    projection.process(FriendRequestStatusChanged(userId, friendReqId, friendId, Ignored), userId)
   }
 
   "not return notifications for wishes that have been deleted" in new Context {
@@ -100,7 +100,7 @@ class DataStoreNotificationsProjectionTest extends Specification with JMock {
     val friendProfile = UserProfile(name = Option("Luke Skywalker"), picture = Option("http://example.com/mypicture"))
     val notificationId = randomUUID()
 
-    def processFriendRequest() = projection.process(FriendRequestSent(friendId, userId, Option(friendReqId)))
+    def processFriendRequest() = projection.process(FriendRequestSent(friendId, userId, Option(friendReqId)), userId)
 
     def assumeExistingEvents() = checking {
       allowing(dataStore).lastSequenceNum(having(any[UUID])).willReturn(Some(5L))

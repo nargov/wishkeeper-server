@@ -16,6 +16,7 @@ class AkkaWebsocketsLearningTest extends Specification with Specs2RouteTest {
 
       val in: Sink[Message, NotUsed] = Flow[Message].to(Sink.foreach {
         case TextMessage.Strict(msg) => println(msg)
+        case _ =>
       })
 
       val out: Source[Message, SourceQueueWithComplete[Message]] = Source.queue(10, OverflowStrategy.fail)

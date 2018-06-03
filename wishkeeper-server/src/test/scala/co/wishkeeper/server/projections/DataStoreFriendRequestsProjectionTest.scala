@@ -16,14 +16,14 @@ class DataStoreFriendRequestsProjectionTest extends Specification with JMock {
     assumeFriendPriorEventsExist()
     expectSavedEvent(FriendRequestStatusChanged(friendId, requestId, friendId, Approved))
 
-    notificationsProjection.process(FriendRequestStatusChanged(userId, requestId, friendId, Approved))
+    notificationsProjection.process(FriendRequestStatusChanged(userId, requestId, friendId, Approved), userId)
   }
 
   "return a reciprocating FriendRemoved event" in new Context {
     assumeFriendPriorEventsExist()
     expectSavedEvent(FriendRemoved(friendId, userId))
 
-    notificationsProjection.process(FriendRemoved(userId, friendId))
+    notificationsProjection.process(FriendRemoved(userId, friendId), userId)
   }
 
   trait Context extends Scope {

@@ -7,7 +7,7 @@ import akka.http.scaladsl.server.directives.{DebuggingDirectives, LoggingMagnet}
 import akka.http.scaladsl.server.{Route, RouteResult}
 import co.wishkeeper.json._
 import co.wishkeeper.server.api.ManagementApi
-import co.wishkeeper.server.messaging.ClientRegistry
+import co.wishkeeper.server.messaging.{ClientRegistry, MemStateClientRegistry}
 import de.heikoseeberger.akkahttpcirce.FailFastCirceSupport._
 import io.circe.generic.extras.Configuration
 import io.circe.generic.extras.auto._

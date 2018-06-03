@@ -211,8 +211,8 @@ class DelegatingPublicApiTest extends Specification with JMock {
     val commandProcessor = mock[CommandProcessor]
     val userFriendsProjection: UserFriendsProjection = mock[UserFriendsProjection]
     val userProfileProjection: UserProfileProjection = new ReplayingUserProfileProjection(dataStore)
-    val api: PublicApi = new DelegatingPublicApi(commandProcessor,
-      dataStore, null, null, userProfileProjection, userFriendsProjection, notificationsProjection, null)(null, null, null)
+    val api: PublicApi = new DelegatingPublicApi(commandProcessor, dataStore, null, userProfileProjection, userFriendsProjection,
+      notificationsProjection, null)(null, null, null)
     val friendId: UUID = randomUUID()
     val friendRequestId = randomUUID()
     val notificationData = FriendRequestNotification(friendId, friendRequestId)

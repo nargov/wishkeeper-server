@@ -6,7 +6,7 @@ import com.wixpress.common.specs2.JMock
 import org.specs2.mutable.Specification
 import org.specs2.specification.Scope
 
-class ClientRegistryTest extends Specification with JMock {
+class MemStateClientRegistryTest extends Specification with JMock {
   type MessageDispatcher = String => Unit
 
   "ClientRegistry" should {
@@ -56,12 +56,12 @@ class ClientRegistryTest extends Specification with JMock {
   }
 
   trait Context extends Scope {
-    val expectedMessage = "Hi"
+    val expectedMessage = ServerNotification.toJson(NotificationsUpdated)
     val dispatcherSpy = mock[MessageDispatcher]
-    val registry = new ClientRegistry
+    val registry = new MemStateClientRegistry
     val userId = UUID.randomUUID()
 
-    def sendMessageToUser() = registry.sendTo(expectedMessage, userId)
+    def sendMessageToUser() = registry.sendTo(NotificationsUpdated, userId)
   }
 
 }

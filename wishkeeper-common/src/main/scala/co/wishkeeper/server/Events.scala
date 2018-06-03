@@ -82,6 +82,7 @@ object Events {
   case class WishUnreserved(wishId: UUID) extends UserEvent
 
   case class WishUnreservedNotificationCreated(id: UUID, wishId: UUID) extends UserEvent
+
 }
 
 case class UserEventInstant[E <: UserEvent](event: E, time: DateTime)

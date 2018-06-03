@@ -8,23 +8,21 @@ import co.wishkeeper.server.messaging.{NotificationsUpdated, ServerNotification}
 import org.joda.time.DateTime
 
 
-trait IncomingFriendRequestsProjection
-
-
 // TODO change this to be an actual projection, and not save new events.
-class DataStoreIncomingFriendRequestsProjection(dataStore: DataStore, notifyClient: (String, UUID) => Unit)
-  extends IncomingFriendRequestsProjection with EventProcessor {
+class IncomingFriendRequestsProjection(dataStore: DataStore, notifyClient: (ServerNotification, UUID) => Unit) extends EventProcessor {
 
-  override def process(event: Event): Unit = event match {
-    case FriendRequestSent(sender, userId, id) =>
+  override def process(event: Event, userId: UUID): Unit = event match {
+    case FriendRequestSent(sender, targetUserId, id) =>
       id.foreach { _ =>
-        val lastSequenceNum = dataStore.lastSequenceNum(userId)
+        val lastSequenceNum = dataStore.lastSequenceNum(targetUserId)
         val result = CommandProcessor.retry {
-          Either.cond(dataStore.saveUserEvents(userId, lastSequenceNum, DateTime.now(), List(
-            FriendRequestReceived(userId, sender, id)
+          Either.cond(dataStore.saveUserEvents(targetUserId, lastSequenceNum, DateTime.now(), List(
+            FriendRequestReceived(targetUserId, sender, id)
           )), (), DbErrorEventsNotSaved)
         }
-        result.foreach(_ => notifyClient(ServerNotification.toJson(NotificationsUpdated), userId))
+        result.foreach(_ => {
+          notifyClient(NotificationsUpdated, targetUserId)
+        })
       }
     case _ =>
   }

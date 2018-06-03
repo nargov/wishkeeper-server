@@ -16,17 +16,17 @@ trait NotificationsProjection extends EventProcessor {
 }
 
 class DataStoreNotificationsProjection(dataStore: DataStore) extends NotificationsProjection {
-  override def process(event: Event): Unit = event match {
-    case FriendRequestSent(sender, userId, id) => id.foreach { requestId =>
+  override def process(event: Event, userId: UUID): Unit = event match {
+    case FriendRequestSent(sender, toUserId, id) => id.foreach { requestId =>
       retry {
-        val lastSeqNum = dataStore.lastSequenceNum(userId)
-        val result = dataStore.saveUserEvents(userId, lastSeqNum, DateTime.now(), List(
-          FriendRequestNotificationCreated(randomUUID(), userId, sender, requestId)
+        val lastSeqNum = dataStore.lastSequenceNum(toUserId)
+        val result = dataStore.saveUserEvents(toUserId, lastSeqNum, DateTime.now(), List(
+          FriendRequestNotificationCreated(randomUUID(), toUserId, sender, requestId)
         ))
         Either.cond(result, (), DbErrorEventsNotSaved)
       }
     }
-    case FriendRequestStatusChanged(userId, reqId, from, status) if status == Approved =>
+    case FriendRequestStatusChanged(_, reqId, from, status) if status == Approved =>
       retry {
         val lastSeqNum = dataStore.lastSequenceNum(from)
         val result = dataStore.saveUserEvents(from, lastSeqNum, DateTime.now(), List(

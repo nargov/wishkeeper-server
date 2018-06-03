@@ -13,7 +13,7 @@ import co.wishkeeper.server.NotificationsData.FriendRequestNotification
 import co.wishkeeper.server.WishStatus.Deleted
 import co.wishkeeper.server.api.{ManagementApi, PublicApi}
 import co.wishkeeper.server.image.ImageMetadata
-import co.wishkeeper.server.messaging.ClientRegistry
+import co.wishkeeper.server.messaging.MemStateClientRegistry
 import co.wishkeeper.server.projections.{Friend, PotentialFriend, UserFriends}
 import co.wishkeeper.server.user.{InvalidStatusChange, NotFriends, ValidationError, WishNotFound}
 import co.wishkeeper.server.web.{ManagementRoute, WebApi}
@@ -36,7 +36,7 @@ class RouteTest extends Specification with Specs2RouteTest with JMock {
 
   trait ManagementContext extends Scope {
     val managementApi: ManagementApi = mock[ManagementApi]
-    val managementRoute = ManagementRoute(managementApi, new ClientRegistry)
+    val managementRoute = ManagementRoute(managementApi, new MemStateClientRegistry)
     val userId: UUID = randomUUID()
   }
 
@@ -435,7 +435,7 @@ class RouteTest extends Specification with Specs2RouteTest with JMock {
     val publicApi = mock[PublicApi]
     val managementApi = mock[ManagementApi]
 
-    val webApi = new WebApi(publicApi, managementApi, new ClientRegistry)
+    val webApi = new WebApi(publicApi, managementApi, new MemStateClientRegistry)
   }
 
   trait LoggedInUserContext extends BaseContext {

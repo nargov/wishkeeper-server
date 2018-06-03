@@ -22,7 +22,7 @@ class UserCommandProcessorTest extends Specification with JMock with MatcherMacr
     ignoringSaveUserEvents()
 
     checking {
-      atLeast(1).of(eventProcessor).process(having(any[Event]))
+      atLeast(1).of(eventProcessor).process(having(any[Event]), having(any[UUID]))
     }
 
     processUserConnect()
@@ -35,7 +35,7 @@ class UserCommandProcessorTest extends Specification with JMock with MatcherMacr
     ignoringSaveUserSession()
 
     checking {
-      oneOf(eventProcessor).process(having(any[UserConnected]))
+      oneOf(eventProcessor).process(having(any[UserConnected]), having(any[UUID]))
     }
 
     processUserConnect()
@@ -49,7 +49,7 @@ class UserCommandProcessorTest extends Specification with JMock with MatcherMacr
     ignoringProcessFacebookIdSet()
 
     checking {
-      oneOf(eventProcessor).process(having(aUserConnectedEventFor(userId)))
+      oneOf(eventProcessor).process(having(aUserConnectedEventFor(userId)), having(===(userId)))
     }
 
     processUserConnect()
@@ -98,7 +98,7 @@ class UserCommandProcessorTest extends Specification with JMock with MatcherMacr
     checking {
       allowing(dataStore).saveUserEvents(having(===(userId)), having(beSome(3L)), having(any[DateTime]), having(contain(any[UserEvent]))).
         will(returnValue(false), returnValue(true))
-      oneOf(eventProcessor).process(having(any[Event]))
+      oneOf(eventProcessor).process(having(any[Event]), having(===(userId)))
     }
 
     commandProcessor.process(SetFacebookUserInfo(name = Option("name")), Some(sessionId))
@@ -161,7 +161,7 @@ class UserCommandProcessorTest extends Specification with JMock with MatcherMacr
     override val commandProcessor = new UserCommandProcessor(dataStore, eventProcessor :: Nil)
 
     def ignoringProcessFacebookIdSet() = checking {
-      ignoring(eventProcessor).process(having(any[UserFacebookIdSet]))
+      ignoring(eventProcessor).process(having(any[UserFacebookIdSet]), having(any[UUID]))
     }
   }
 

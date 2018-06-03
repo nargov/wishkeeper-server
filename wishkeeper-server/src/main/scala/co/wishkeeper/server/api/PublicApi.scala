@@ -74,7 +74,6 @@ trait PublicApi {
 class DelegatingPublicApi(commandProcessor: CommandProcessor,
                           dataStore: DataStore,
                           facebookConnector: FacebookConnector,
-                          incomingFriendRequestsProjection: IncomingFriendRequestsProjection,
                           userProfileProjection: UserProfileProjection,
                           userFriendsProjection: UserFriendsProjection,
                           notificationsProjection: NotificationsProjection,

@@ -3,7 +3,7 @@ package co.wishkeeper.server
 import java.util.UUID
 
 import co.wishkeeper.server.Events.{Event, NoOp, UserFacebookIdSet}
-import co.wishkeeper.server.projections.DataStoreUserIdByFacebookIdProjection
+import co.wishkeeper.server.projections.{DataStoreUserIdByFacebookIdProjection, UserIdByFacebookIdProjection}
 import com.wixpress.common.specs2.JMock
 import org.specs2.mutable.Specification
 import org.specs2.specification.Scope
@@ -12,7 +12,7 @@ class UserIdByFacebookIdProjectionTest extends Specification with JMock {
 
   trait Context extends Scope {
     val dataStore = mock[DataStore]
-    val facebookIdProjection = new DataStoreUserIdByFacebookIdProjection(dataStore)
+    val facebookIdProjection: UserIdByFacebookIdProjection with EventProcessor = new DataStoreUserIdByFacebookIdProjection(dataStore)
     val userId = UUID.randomUUID()
     val facebookId = "facebook-id"
   }
@@ -23,7 +23,7 @@ class UserIdByFacebookIdProjectionTest extends Specification with JMock {
       oneOf(dataStore).saveUserIdByFacebookId(facebookId, userId)
     }
 
-    facebookIdProjection.process(UserFacebookIdSet(userId, facebookId))
+    facebookIdProjection.process(UserFacebookIdSet(userId, facebookId), userId)
   }
 
   "ignore irrelevant events" in new Context {
@@ -31,7 +31,7 @@ class UserIdByFacebookIdProjectionTest extends Specification with JMock {
       never(dataStore).saveUserIdByFacebookId(having(any[String]), having(any[UUID]))
     }
 
-    facebookIdProjection.process(NoOp)
+    facebookIdProjection.process(NoOp, userId)
   }
 
   "return a list of users for given list of facebook ids" in new Context {
