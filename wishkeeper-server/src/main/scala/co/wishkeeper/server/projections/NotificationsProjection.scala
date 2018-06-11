@@ -16,25 +16,23 @@ trait NotificationsProjection extends EventProcessor {
 }
 
 class DataStoreNotificationsProjection(dataStore: DataStore) extends NotificationsProjection {
-  override def process(event: Event, userId: UUID): Unit = event match {
-    case FriendRequestSent(sender, toUserId, id) => id.foreach { requestId =>
+  override def process(event: Event, userId: UUID): List[(UUID, Event)] = event match {
+    case FriendRequestSent(sender, toUserId, id) => id.flatMap { requestId =>
+      val newEvents = List(FriendRequestNotificationCreated(randomUUID(), toUserId, sender, requestId))
       retry {
         val lastSeqNum = dataStore.lastSequenceNum(toUserId)
-        val result = dataStore.saveUserEvents(toUserId, lastSeqNum, DateTime.now(), List(
-          FriendRequestNotificationCreated(randomUUID(), toUserId, sender, requestId)
-        ))
+        val result = dataStore.saveUserEvents(toUserId, lastSeqNum, DateTime.now(), newEvents)
         Either.cond(result, (), DbErrorEventsNotSaved)
-      }
-    }
+      }.map(_ => newEvents.map((toUserId, _))).toOption
+    }.getOrElse(Nil)
     case FriendRequestStatusChanged(_, reqId, from, status) if status == Approved =>
+      val newEvents = List(FriendRequestAcceptedNotificationCreated(randomUUID(), from, userId, reqId))
       retry {
         val lastSeqNum = dataStore.lastSequenceNum(from)
-        val result = dataStore.saveUserEvents(from, lastSeqNum, DateTime.now(), List(
-          FriendRequestAcceptedNotificationCreated(randomUUID(), from, userId, reqId)
-        ))
+        val result = dataStore.saveUserEvents(from, lastSeqNum, DateTime.now(), newEvents)
         Either.cond(result, (), DbErrorEventsNotSaved)
-      }
-    case _ =>
+      }.map(_ => newEvents.map((from, _))).getOrElse(Nil)
+    case _ => Nil
   }
 
   def notificationsFor(userId: UUID): List[Notification] = {

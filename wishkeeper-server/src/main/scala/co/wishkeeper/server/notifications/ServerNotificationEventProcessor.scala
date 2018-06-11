@@ -7,16 +7,20 @@ import co.wishkeeper.server.messaging.{ClientNotifier, FriendsListUpdated, Notif
 import co.wishkeeper.server.{EventProcessor, Events}
 
 class ServerNotificationEventProcessor(clientRegistry: ClientNotifier) extends EventProcessor {
-  override def process(event: Events.Event, userId: UUID): Unit = event match {
-    case _: WishReserved |
-         _: WishUnreserved
-    => clientRegistry.sendTo(WishListUpdated, userId)
-    case _: FriendRequestStatusChanged |
-         _: FriendRemoved
-    => clientRegistry.sendTo(FriendsListUpdated, userId)
-    case _: FriendRequestNotificationCreated |
-         _: FriendRequestAcceptedNotificationCreated
-    => clientRegistry.sendTo(NotificationsUpdated, userId)
-    case _ =>
+  override def process(event: Events.Event, userId: UUID): List[(UUID, Event)] = {
+    event match {
+      case _: WishReserved |
+           _: WishUnreserved
+      => clientRegistry.sendTo(WishListUpdated, userId)
+      case FriendRequestStatusChanged(_, _, from, _) =>  clientRegistry.sendTo(FriendsListUpdated, from)
+      case _: FriendRemoved |
+           _: FriendRequestReceived
+      => clientRegistry.sendTo(FriendsListUpdated, userId)
+      case _: FriendRequestNotificationCreated |
+           _: FriendRequestAcceptedNotificationCreated
+      => clientRegistry.sendTo(NotificationsUpdated, userId)
+      case _ =>
+    }
+    Nil
   }
 }

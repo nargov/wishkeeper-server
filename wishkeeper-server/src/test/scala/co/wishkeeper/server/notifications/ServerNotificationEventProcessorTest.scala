@@ -1,9 +1,11 @@
 package co.wishkeeper.server.notifications
 
+import java.util.UUID
 import java.util.UUID.randomUUID
 
 import co.wishkeeper.server.Events._
 import co.wishkeeper.server.FriendRequestStatus
+import co.wishkeeper.server.FriendRequestStatus.Approved
 import co.wishkeeper.server.messaging.{ClientNotifier, FriendsListUpdated, NotificationsUpdated, WishListUpdated}
 import com.wixpress.common.specs2.JMock
 import org.specs2.mutable.Specification
@@ -26,7 +28,9 @@ class ServerNotificationEventProcessorTest extends Specification with JMock {
   "Send friends list updated notification when friend request status changed" in new Context {
     checkingFriendsListUpdateNotificationSent()
 
-    processEvent(FriendRequestStatusChanged(randomUUID(), randomUUID(), userId, FriendRequestStatus.Approved))
+//    processEvent(FriendRequestStatusChanged(randomUUID(), randomUUID(), userId, Approved))
+    val friendId: UUID = randomUUID()
+    processor.process(FriendRequestStatusChanged(friendId, randomUUID(), userId, Approved), friendId)
   }
 
   "Send notifications updated notification when friend request notification created" in new Context {
@@ -47,9 +51,16 @@ class ServerNotificationEventProcessorTest extends Specification with JMock {
     processEvent(FriendRemoved(userId, randomUUID()))
   }
 
+  "Send notifications updated when friend request received" in new Context {
+    checkingFriendsListUpdateNotificationSent()
+
+    processEvent(FriendRequestReceived(userId, randomUUID()))
+  }
+
+
   trait Context extends Scope {
     val clientNotifier = mock[ClientNotifier]
-    val projection = new ServerNotificationEventProcessor(clientNotifier)
+    val processor = new ServerNotificationEventProcessor(clientNotifier)
     val userId = randomUUID()
 
     def checkingWishListUpdateNotificationSent() = checking {
@@ -65,7 +76,7 @@ class ServerNotificationEventProcessorTest extends Specification with JMock {
     }
 
 
-    def processEvent(event: Event) = projection.process(event, userId)
+    def processEvent(event: Event) = processor.process(event, userId) must beEmpty
   }
 
 }

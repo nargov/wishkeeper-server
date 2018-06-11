@@ -3,8 +3,8 @@ package co.wishkeeper.server
 import java.util.UUID
 
 import co.wishkeeper.server.CommandProcessor.retry
-import co.wishkeeper.server.user.commands.{ConnectFacebookUser, UserCommand, UserCommandValidator}
 import co.wishkeeper.server.Events._
+import co.wishkeeper.server.user.commands.{ConnectFacebookUser, UserCommand, UserCommandValidator}
 import org.joda.time.DateTime
 
 import scala.annotation.tailrec
@@ -34,7 +34,7 @@ class UserCommandProcessor(dataStore: DataStore, eventProcessors: List[EventProc
         val savedSession = dataStore.saveUserSession(user.id, connectUser.sessionId, now)
         val events = command.process(user)
         val savedEvents = dataStore.saveUserEvents(user.id, lastSeqNum, now, events)
-        events.foreach(event => eventProcessors.foreach(_.process(event, user.id)))
+        if (savedEvents) publishEvents(events, user.id)
         savedEvents && savedSession
 
       case _ =>
@@ -48,23 +48,29 @@ class UserCommandProcessor(dataStore: DataStore, eventProcessors: List[EventProc
     retry {
       val lastSeqNum = dataStore.lastSequenceNum(userId)
       val user = User.replay(dataStore.userEvents(userId))
-      val events: Seq[UserEvent] = command.process(user)
+      val events: List[UserEvent] = command.process(user)
       val success = dataStore.saveUserEvents(userId, lastSeqNum, DateTime.now(), events)
-      if (success)
-        events.foreach(event => eventProcessors.foreach(_.process(event, user.id)))
+      if (success) publishEvents(events, user.id)
       Either.cond(success, (), DbErrorEventsNotSaved)
     }
   }
+
+  private def publishEvents(events: List[Event], userId: UUID): Unit = {
+    println("Publishing events: " + events.mkString)
+    events.foreach(publishEvent(_, userId))
+  }
+
+  private def publishEvent(event: Event, userId: UUID): Unit = eventProcessors.foreach(processor =>
+    processor.process(event, userId).foreach(newEvent => publishEvent(newEvent._2, newEvent._1)))
 
   override def validatedProcess[C <: UserCommand](command: C, userId: UUID)(implicit validator: UserCommandValidator[C]): Either[Error, Unit] =
     retry {
       val lastSeqNum = dataStore.lastSequenceNum(userId)
       val user = User.replay(dataStore.userEvents(userId))
       validator.validate(user, command).flatMap { _ =>
-        val events: Seq[UserEvent] = command.process(user)
+        val events: List[UserEvent] = command.process(user)
         val success = dataStore.saveUserEvents(userId, lastSeqNum, DateTime.now(), events)
-        if (success)
-          events.foreach(event => eventProcessors.foreach(_.process(event, user.id)))
+        if (success) publishEvents(events, user.id)
         Either.cond(success, (), DbErrorEventsNotSaved)
       }
     }
@@ -82,15 +88,15 @@ object CommandProcessor {
 }
 
 trait EventProcessor {
-  def process(event: Event, userId: UUID): Unit
+  def process(event: Event, userId: UUID): List[(UUID, Event)] = Nil
 }
 
 class UserByEmailProjection(dataStore: DataStore) extends EventProcessor {
-
-  override def process(event: Event, userId: UUID): Unit = {
+  override def process(event: Event, userId: UUID): List[(UUID, Event)] = {
     event match {
       case UserEmailSet(_, email) => dataStore.saveUserByEmail(email, userId)
       case _ =>
     }
+    Nil
   }
 }

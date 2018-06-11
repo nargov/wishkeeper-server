@@ -19,15 +19,17 @@ class DataStoreNotificationsProjectionTest extends Specification with JMock {
   "save notification for incoming friend request" in new Context {
     assumeExistingEvents()
 
+    val friendReqMatcher: Matcher[Event] = aFriendRequestNotificationCreatedEvent(userId, friendId)
+
     checking {
       oneOf(dataStore).saveUserEvents(
         having(equalTo(userId)),
         having(any[Option[Long]]),
         having(any[DateTime]),
-        having(contain(aFriendRequestNotificationCreatedEvent(userId, friendId)))).willReturn(true)
+        having(contain(friendReqMatcher))).willReturn(true)
     }
 
-    processFriendRequest()
+    processEvent(FriendRequestSent(friendId, userId, Option(friendReqId))) must contain(aTupleWith(userId, friendReqMatcher))
   }
 
   "retrieve friend request notification with full data" in new Context {
@@ -61,19 +63,21 @@ class DataStoreNotificationsProjectionTest extends Specification with JMock {
   "return a FriendRequestAcceptedNotificationCreated when friend request status changes to approved" in new Context {
     assumeExistingEvents()
 
+    val aFriendRequestAccepted = aFriendRequestAcceptedNotificationCreatedEvent(friendId, userId, friendReqId)
+
     checking {
       oneOf(dataStore).saveUserEvents(
         having(equalTo(friendId)),
         having(any[Option[Long]]),
         having(any[DateTime]),
-        having(contain(aFriendRequesdAcceptedNotificationCreatedEvent(friendId, userId, friendReqId)))).willReturn(true)
+        having(contain(aFriendRequestAccepted))).willReturn(true)
     }
 
-    projection.process(FriendRequestStatusChanged(userId, friendReqId, friendId, Approved), userId)
+    processEvent(FriendRequestStatusChanged(userId, friendReqId, friendId, Approved)) must contain(aTupleWith(friendId, aFriendRequestAccepted))
   }
 
   "not return a FriendRequestAcceptedNotificationCreated when friend request status changes to ignored" in new Context {
-    projection.process(FriendRequestStatusChanged(userId, friendReqId, friendId, Ignored), userId)
+    processEvent(FriendRequestStatusChanged(userId, friendReqId, friendId, Ignored)) must beEmpty
   }
 
   "not return notifications for wishes that have been deleted" in new Context {
@@ -100,11 +104,11 @@ class DataStoreNotificationsProjectionTest extends Specification with JMock {
     val friendProfile = UserProfile(name = Option("Luke Skywalker"), picture = Option("http://example.com/mypicture"))
     val notificationId = randomUUID()
 
-    def processFriendRequest() = projection.process(FriendRequestSent(friendId, userId, Option(friendReqId)), userId)
-
     def assumeExistingEvents() = checking {
       allowing(dataStore).lastSequenceNum(having(any[UUID])).willReturn(Some(5L))
     }
+
+    def processEvent(event: Event): List[(UUID, Event)] = projection.process(event, userId)
 
     def assumingFriendExists() = checking {
       checking {
@@ -115,16 +119,19 @@ class DataStoreNotificationsProjectionTest extends Specification with JMock {
         )))
       }
     }
+
+    def aTupleWith(uuid: UUID, eventMatcher: Matcher[Event]): Matcher[(UUID, Event)] = (tup: (UUID, Event)) =>
+      (tup._1 == uuid && eventMatcher.test(tup._2), s"uuid and matcher did not match. $uuid, ${tup._1}, matcher mached? ${eventMatcher.test(tup._2)}")
   }
 
-  def aFriendRequesdAcceptedNotificationCreatedEvent(userId: UUID, by: UUID, reqId: UUID): Matcher[UserEvent] =
-    (event: UserEvent) => event match {
-      case e: FriendRequestAcceptedNotificationCreated => e.userId == userId && e.by == by && e.requestId == reqId
-      case _ => false
+  def aFriendRequestAcceptedNotificationCreatedEvent(userId: UUID, by: UUID, reqId: UUID): Matcher[Event] = (event: Event) => event match {
+      case e: FriendRequestAcceptedNotificationCreated => (e.userId == userId && e.by == by && e.requestId == reqId,
+        "event is a FriendRequestAcceptedNotificationCreated Event")
+      case _ => (false, "event is not a FriendRequestAcceptedNotificationCreated event")
     }
 
-  def aFriendRequestNotificationCreatedEvent(userId: UUID, from: UUID): Matcher[UserEvent] = (event: UserEvent) => (event match {
-    case FriendRequestNotificationCreated(_, uId, sender, reqId) => uId == userId && sender == from
+  def aFriendRequestNotificationCreatedEvent(userId: UUID, from: UUID): Matcher[Event] = (event: Event) => (event match {
+    case FriendRequestNotificationCreated(_, uId, sender, _) => uId == userId && sender == from
     case _ => false
   }, s"$event does not have userId $userId and from $from")
 

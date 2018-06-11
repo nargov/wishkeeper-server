@@ -4,9 +4,9 @@ import java.util.UUID
 
 import co.wishkeeper.server.Events._
 import co.wishkeeper.server.FriendRequestStatus.{Approved, Pending}
-import co.wishkeeper.server.NotificationsData.{FriendRequestAcceptedNotification, FriendRequestNotification, WishReservedNotification}
-import co.wishkeeper.server.user.events.NotificationEventHandlers._
+import co.wishkeeper.server.NotificationsData.{FriendRequestAcceptedNotification, FriendRequestNotification}
 import co.wishkeeper.server.user.events.UserEventHandler
+import co.wishkeeper.server.user.events.NotificationEventHandlers._
 import org.joda.time.DateTime
 
 
@@ -64,7 +64,9 @@ case class User(id: UUID,
         receivedRequests = if (from != id) friends.receivedRequests.filterNot(_.id == reqId) else friends.receivedRequests,
         sentRequests = if (from == id) friends.sentRequests.filterNot(_.id == reqId) else friends.sentRequests,
         current = toStatus match {
-          case Approved => friends.current :+ (if (from == id) friends.sentRequests.find(_.id == reqId).map(_.userId).get else from)
+          case Approved => if (from == id) {
+            friends.sentRequests.find(_.id == reqId).map(_.userId).map(friends.current :+ _).getOrElse(friends.current)
+          } else friends.current :+ from
           case _ => friends.current
         }),
       notifications = notifications.map {
@@ -77,7 +79,7 @@ case class User(id: UUID,
       notifications = Notification(notificationId, FriendRequestAcceptedNotification(by, requestId), time = time) :: notifications)
     case UserEventInstant(NotificationViewed(notificationId), _) =>
       val index = notifications.indexWhere(_.id == notificationId)
-      if(index >= 0) {
+      if (index >= 0) {
         val updatedNotification = notifications(index).copy(viewed = true)
         this.copy(notifications = notifications.updated(index, updatedNotification))
       }

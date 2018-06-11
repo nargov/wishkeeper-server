@@ -20,7 +20,7 @@ import co.wishkeeper.json._
 import co.wishkeeper.server.Error
 import co.wishkeeper.server.api.{ManagementApi, PublicApi}
 import co.wishkeeper.server.image.ImageMetadata
-import co.wishkeeper.server.messaging.{ClientRegistry, MemStateClientRegistry}
+import co.wishkeeper.server.messaging.ClientRegistry
 import co.wishkeeper.server.user.commands._
 import co.wishkeeper.server.user.{InvalidStatusChange, NotFriends, ValidationError, WishNotFound}
 import co.wishkeeper.server.web.WebApi.{imageDimensionsHeader, sessionIdHeader}

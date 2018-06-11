@@ -2,7 +2,7 @@ package co.wishkeeper.server
 
 import java.util.UUID
 
-import co.wishkeeper.server.Events.{Event, UserConnected, UserEvent, UserFacebookIdSet}
+import co.wishkeeper.server.Events._
 import co.wishkeeper.server.EventsTestHelper.{asEventInstants, userConnectEvent}
 import co.wishkeeper.server.user.DummyError
 import co.wishkeeper.server.user.commands.{ConnectFacebookUser, SetFacebookUserInfo, UserCommand, UserCommandValidator}
@@ -22,7 +22,7 @@ class UserCommandProcessorTest extends Specification with JMock with MatcherMacr
     ignoringSaveUserEvents()
 
     checking {
-      atLeast(1).of(eventProcessor).process(having(any[Event]), having(any[UUID]))
+      atLeast(1).of(eventProcessor).process(having(any[Event]), having(any[UUID])).willReturn(Nil)
     }
 
     processUserConnect()
@@ -35,7 +35,7 @@ class UserCommandProcessorTest extends Specification with JMock with MatcherMacr
     ignoringSaveUserSession()
 
     checking {
-      oneOf(eventProcessor).process(having(any[UserConnected]), having(any[UUID]))
+      oneOf(eventProcessor).process(having(any[UserConnected]), having(any[UUID])).willReturn(Nil)
     }
 
     processUserConnect()
@@ -49,7 +49,7 @@ class UserCommandProcessorTest extends Specification with JMock with MatcherMacr
     ignoringProcessFacebookIdSet()
 
     checking {
-      oneOf(eventProcessor).process(having(aUserConnectedEventFor(userId)), having(===(userId)))
+      oneOf(eventProcessor).process(having(aUserConnectedEventFor(userId)), having(===(userId))).willReturn(Nil)
     }
 
     processUserConnect()
@@ -84,8 +84,12 @@ class UserCommandProcessorTest extends Specification with JMock with MatcherMacr
     assumeHasSequenceNum()
 
     checking {
-      exactly(2).of(dataStore).saveUserEvents(having(===(userId)), having(beSome(3L)), having(any[DateTime]), having(contain(any[UserEvent]))).
-        will(returnValue(false), returnValue(true))
+      exactly(2).of(dataStore).saveUserEvents(
+        having(===(userId)),
+        having(beSome(3L)),
+        having(any[DateTime]),
+        having(contain(any[UserEvent]))
+      ).will(returnValue(false), returnValue(true))
     }
 
     commandProcessor.process(SetFacebookUserInfo(name = Option("name")), Some(sessionId))
@@ -98,7 +102,7 @@ class UserCommandProcessorTest extends Specification with JMock with MatcherMacr
     checking {
       allowing(dataStore).saveUserEvents(having(===(userId)), having(beSome(3L)), having(any[DateTime]), having(contain(any[UserEvent]))).
         will(returnValue(false), returnValue(true))
-      oneOf(eventProcessor).process(having(any[Event]), having(===(userId)))
+      oneOf(eventProcessor).process(having(any[Event]), having(===(userId))).willReturn(Nil)
     }
 
     commandProcessor.process(SetFacebookUserInfo(name = Option("name")), Some(sessionId))
@@ -106,7 +110,6 @@ class UserCommandProcessorTest extends Specification with JMock with MatcherMacr
 
   "return failure when validation fails" in new Context {
     val validationError = Left(DummyError)
-    val command = DummyCommand()
     val validator: UserCommandValidator[DummyCommand] = mock[UserCommandValidator[DummyCommand]]
 
     assumeExistingUser()
@@ -116,7 +119,23 @@ class UserCommandProcessorTest extends Specification with JMock with MatcherMacr
       oneOf(validator).validate(having(any[User]), having(any[UserCommand])).willReturn(validationError)
     }
 
-    commandProcessor.validatedProcess(command, userId)(validator) must beLeft
+    commandProcessor.validatedProcess(DummyCommand(), userId)(validator) must beLeft
+  }
+
+  "publish events that come from event processors" in new EventProcessorContext {
+    assumeExistingUser()
+    assumeHasSequenceNum()
+    ignoringSaveUserEvents()
+
+    val alwaysValid: UserCommandValidator[DummyCommand] = (_: User, _: DummyCommand) => Right(())
+    val expectedEvent = UserFirstNameSet(userId, "Roger")
+
+    checking {
+      allowing(eventProcessor).process(NoOp, userId).willReturn((userId, expectedEvent) :: Nil)
+      oneOf(eventProcessor).process(expectedEvent, userId).willReturn(Nil)
+    }
+
+    commandProcessor.validatedProcess(DummyCommand(NoOp :: Nil), userId)(alwaysValid)
   }
 
 
@@ -161,7 +180,7 @@ class UserCommandProcessorTest extends Specification with JMock with MatcherMacr
     override val commandProcessor = new UserCommandProcessor(dataStore, eventProcessor :: Nil)
 
     def ignoringProcessFacebookIdSet() = checking {
-      ignoring(eventProcessor).process(having(any[UserFacebookIdSet]), having(any[UUID]))
+      ignoring(eventProcessor).process(having(any[UserFacebookIdSet]), having(any[UUID])).willReturn(Nil)
     }
   }
 
@@ -169,6 +188,6 @@ class UserCommandProcessorTest extends Specification with JMock with MatcherMacr
   def aUserConnectedEventFor(userId: UUID): Matcher[UserConnected] = ===(userId) ^^ ((_: UserConnected).userId)
 }
 
-case class DummyCommand() extends UserCommand {
-  override def process(user: User): List[UserEvent] = Nil
+case class DummyCommand(eventsToReturn: List[UserEvent] = Nil) extends UserCommand {
+  override def process(user: User): List[UserEvent] = eventsToReturn
 }

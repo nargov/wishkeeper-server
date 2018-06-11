@@ -13,9 +13,12 @@ class DataStoreUserIdByFacebookIdProjection(dataStore: DataStore) extends UserId
 
   override def get(facebookIds: List[String]): Map[String, UUID] = dataStore.userIdsByFacebookIds(facebookIds)
 
-  override def process(event: Event, userId: UUID): Unit = event match {
-    case UserFacebookIdSet(_, facebookId) => dataStore.saveUserIdByFacebookId(facebookId, userId)
-    case _ => //ignore all other events
+  override def process(event: Event, userId: UUID): List[(UUID, Event)] = {
+    event match {
+      case UserFacebookIdSet(_, facebookId) => dataStore.saveUserIdByFacebookId(facebookId, userId)
+      case _ =>
+    }
+    Nil
   }
 }
 

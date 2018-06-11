@@ -23,7 +23,7 @@ class UserIdByFacebookIdProjectionTest extends Specification with JMock {
       oneOf(dataStore).saveUserIdByFacebookId(facebookId, userId)
     }
 
-    facebookIdProjection.process(UserFacebookIdSet(userId, facebookId), userId)
+    facebookIdProjection.process(UserFacebookIdSet(userId, facebookId), userId) must beEmpty
   }
 
   "ignore irrelevant events" in new Context {
@@ -31,7 +31,7 @@ class UserIdByFacebookIdProjectionTest extends Specification with JMock {
       never(dataStore).saveUserIdByFacebookId(having(any[String]), having(any[UUID]))
     }
 
-    facebookIdProjection.process(NoOp, userId)
+    facebookIdProjection.process(NoOp, userId) must beEmpty
   }
 
   "return a list of users for given list of facebook ids" in new Context {
