@@ -16,6 +16,7 @@ object EventsTestHelper {
   def anEventsListFor(userId: UUID) = EventsList(userId)
 
   case class EventsList(userId: UUID, list: List[UserEventInstant[_ <: UserEvent]]) {
+
     def withFriend(friendId: UUID, requestId: UUID = UUID.randomUUID()) = this.copy(list = list ++ asEventInstants(List(
       FriendRequestSent(userId, friendId, Option(requestId)),
       FriendRequestStatusChanged(userId, requestId, userId, Approved)
@@ -23,6 +24,9 @@ object EventsTestHelper {
 
     def withFriendRequest(friendId: UUID, requestId: UUID = UUID.randomUUID()) =
       this.copy(list = list :+ asEventInstant(FriendRequestSent(userId, friendId, Option(requestId))))
+
+    def withIncomingFriendRequest(friendId: UUID, friendRequestId: UUID) =
+      this.copy(list = list :+ asEventInstant(FriendRequestReceived(userId, friendId, Option(friendRequestId))))
 
     def withName(name: String) = this.copy(list = list :+ asEventInstant(UserNameSet(userId, name)))
 

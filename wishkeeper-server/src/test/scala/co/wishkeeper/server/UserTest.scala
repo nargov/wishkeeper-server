@@ -4,7 +4,7 @@ import java.util.UUID
 import java.util.UUID.randomUUID
 
 import co.wishkeeper.server.Events._
-import co.wishkeeper.server.EventsTestHelper.asEventInstant
+import co.wishkeeper.server.EventsTestHelper.{EventsList, asEventInstant}
 import co.wishkeeper.server.FriendRequestStatus.Approved
 import co.wishkeeper.server.NotificationsData.{FriendRequestNotification, WishReservedNotification, WishUnreservedNotification}
 import co.wishkeeper.server.UserTestHelper._
@@ -349,6 +349,11 @@ class UserTest extends Specification with MatcherMacros with JMock with Notifica
       notifications
 
     notifications must have size 1
+  }
+
+  "return incoming friend request id" in new Context {
+
+    user.applyEvent(asEventInstant(FriendRequestReceived(user.id, friendId, Option(requestId)))).friendRequestId(friendId) must beSome(requestId)
   }
 
   trait Context extends Scope {

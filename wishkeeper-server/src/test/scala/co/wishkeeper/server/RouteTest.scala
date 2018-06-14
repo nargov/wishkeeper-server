@@ -8,13 +8,13 @@ import akka.http.scaladsl.model.StatusCodes
 import akka.http.scaladsl.model.headers.RawHeader
 import akka.http.scaladsl.testkit.Specs2RouteTest
 import co.wishkeeper.json._
-import co.wishkeeper.server.user.commands.{ConnectFacebookUser, SendFriendRequest, SetFlagFacebookFriendsListSeen}
 import co.wishkeeper.server.NotificationsData.FriendRequestNotification
 import co.wishkeeper.server.WishStatus.Deleted
 import co.wishkeeper.server.api.{ManagementApi, PublicApi}
 import co.wishkeeper.server.image.ImageMetadata
 import co.wishkeeper.server.messaging.MemStateClientRegistry
 import co.wishkeeper.server.projections.{Friend, PotentialFriend, UserFriends}
+import co.wishkeeper.server.user.commands.{ConnectFacebookUser, SendFriendRequest, SetFlagFacebookFriendsListSeen}
 import co.wishkeeper.server.user.{InvalidStatusChange, NotFriends, ValidationError, WishNotFound}
 import co.wishkeeper.server.web.{ManagementRoute, WebApi}
 import com.wixpress.common.specs2.JMock
@@ -427,6 +427,18 @@ class RouteTest extends Specification with Specs2RouteTest with JMock {
 
       Get(s"/me/wishes/$wishId").withHeaders(sessionIdHeader) ~> webApi.newUserRoute ~> check {
         status must beEqualTo(StatusCodes.NotFound)
+      }
+    }
+
+    "send a friend request" in new LoggedInUserContext {
+      val request = SendFriendRequest(friendId)
+
+      checking {
+        oneOf(publicApi).sendFriendRequest(userId, request).willReturn(Right(()))
+      }
+
+      Put(s"/me/friends").withHeaders(sessionIdHeader).withEntity(`application/json`, request.asJson.noSpaces) ~> webApi.newUserRoute ~> check {
+        status must beEqualTo(StatusCodes.OK)
       }
     }
   }

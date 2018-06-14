@@ -3,6 +3,7 @@ package co.wishkeeper.server.user.commands
 import java.util.UUID
 
 import co.wishkeeper.server.Events._
+import co.wishkeeper.server.user.ValidationError
 import co.wishkeeper.server.{FriendRequestStatus, User}
 
 trait UserCommand {
@@ -15,6 +16,11 @@ case class SendFriendRequest(friendId: UUID) extends UserCommand {
       Nil
     else
       List(FriendRequestSent(user.id, friendId, Option(UUID.randomUUID())))
+}
+object SendFriendRequest {
+  implicit val validator = new UserCommandValidator[SendFriendRequest] {
+    override def validate(user: User, command: SendFriendRequest): Either[ValidationError, Unit] = Right(())
+  }
 }
 
 
@@ -29,6 +35,9 @@ case class ChangeFriendRequestStatus(requestId: UUID, status: FriendRequestStatu
       map(request => FriendRequestStatusChanged(user.id, requestId, request.from, status) :: Nil).
       getOrElse(Nil)
   }
+}
+object ChangeFriendRequestStatus {
+  implicit val validator: UserCommandValidator[ChangeFriendRequestStatus] = UserCommandValidator.Always
 }
 
 case object MarkAllNotificationsViewed extends UserCommand {

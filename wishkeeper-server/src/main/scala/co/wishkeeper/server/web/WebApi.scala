@@ -127,10 +127,20 @@ class WebApi(publicApi: PublicApi, managementApi: ManagementApi, clientRegistry:
     }
   }
 
+  val sendFriendRequest: UUID => Route = userId =>
+    (put & entity(as[SendFriendRequest])) { friendRequest =>
+      handleCommandResult(publicApi.sendFriendRequest(userId, friendRequest))
+    }
+
+  val friends: UUID => Route = userId => pathPrefix("friends") {
+    sendFriendRequest(userId)
+  }
+
   val newUserRoute: Route =
     userIdFromSessionHeader { userId =>
       pathPrefix("me") {
         wishes(userId) ~
+        friends(userId) ~
           myId(userId)
       } ~
         pathPrefix(JavaUUID) { friendId =>
@@ -209,7 +219,7 @@ class WebApi(publicApi: PublicApi, managementApi: ManagementApi, clientRegistry:
                       }
                     }
                 } ~
-                  (path("request") & post) {
+                  (path("request") & post) {//TODO deprecated
                     entity(as[SendFriendRequest]) { sendFriendRequest =>
                       publicApi.processCommand(sendFriendRequest, sessionUUID)
                       complete(StatusCodes.OK)

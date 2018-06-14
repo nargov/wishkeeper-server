@@ -17,6 +17,7 @@ case class User(id: UUID,
                 flags: Flags = Flags(),
                 notifications: List[Notification] = Nil) {
 
+
   def applyEvent[E <: UserEvent](event: UserEventInstant[E]): User = event match {
     case UserEventInstant(UserFirstNameSet(_, value), _) => this.copy(userProfile = this.userProfile.copy(firstName = Option(value)))
     case UserEventInstant(UserLastNameSet(_, value), _) => this.copy(userProfile = this.userProfile.copy(lastName = Option(value)))
@@ -106,6 +107,8 @@ case class User(id: UUID,
     this.copy(wishes = wishes + (wishId -> updater(wishes.getOrElse(wishId, Wish(wishId)))))
 
   lazy val facebookId: Option[String] = userProfile.socialData.flatMap(_.facebookId)
+
+  def friendRequestId(friendId: UUID): Option[UUID] = friends.receivedRequests.find(_.from == friendId).map(_.id)
 }
 
 object User {

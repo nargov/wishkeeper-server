@@ -12,20 +12,18 @@ import org.specs2.specification.Scope
 
 class SendFriendRequestTest extends Specification {
 
-  "should create FriendRequestSent event" in {
-    val friendId: UUID = randomUUID()
-    val user: User = UserTestHelper.aUser
+  "should create FriendRequestSent event" in new Context {
+    val user = aUser
     SendFriendRequest(friendId).process(user) must contain(aFriendRequestSentEvent(friendId, user.id))
   }
 
-  "should not create an event if friend request for this friend already exists" in {
-    val friendId: UUID = randomUUID()
-    val user = UserTestHelper.aUser.withSentFriendRequest(randomUUID(), friendId)
+  "should not create an event if friend request for this friend already exists" in new Context {
+    val user = aUser.withSentFriendRequest(randomUUID(), friendId)
     SendFriendRequest(friendId).process(user) must beEmpty
   }
 
   trait Context extends Scope {
-
+    val friendId: UUID = randomUUID()
   }
 
   def aFriendRequestSentEvent(friendId: UUID, userId: UUID): Matcher[UserEvent] = (event: UserEvent) => event match {

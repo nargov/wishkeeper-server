@@ -20,6 +20,8 @@ import scala.util.Try
 
 trait PublicApi {
 
+  def sendFriendRequest(userId: UUID, request: SendFriendRequest): Either[Error, Unit]
+
   def wishById(userId: UUID, wishId: UUID): Either[Error, Wish]
 
   def unreserveWish(userId: UUID, friendId: UUID, wishId: UUID): Either[Error, Unit]
@@ -238,4 +240,10 @@ class DelegatingPublicApi(commandProcessor: CommandProcessor,
 
   override def processCommand[C <: UserCommand](command: C, userId: UUID)(implicit validator: UserCommandValidator[C]): Either[Error, Unit] =
     commandProcessor.validatedProcess(command, userId)
+
+  override def sendFriendRequest(userId: UUID, request: SendFriendRequest): Either[Error, Unit] = {
+    replayUser(userId).friendRequestId(request.friendId).
+      fold(commandProcessor.validatedProcess(request, userId))(reqId =>
+        commandProcessor.validatedProcess(ChangeFriendRequestStatus(reqId, Approved), userId))
+  }
 }

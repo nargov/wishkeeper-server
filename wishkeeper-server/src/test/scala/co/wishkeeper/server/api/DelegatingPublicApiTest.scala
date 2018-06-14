@@ -195,6 +195,28 @@ class DelegatingPublicApiTest extends Specification with JMock {
     api.deleteWish(userId, wishId) must beRight(())
   }
 
+  "sends a friend request" in new LoggedInContext {
+    val friendRequest = SendFriendRequest(friendId)
+
+    checking {
+      allowing(dataStore).userEvents(userId).willReturn(EventsList(userId).list)
+      oneOf(commandProcessor).validatedProcess(friendRequest, userId).willReturn(Right(()))
+    }
+
+    api.sendFriendRequest(userId, friendRequest) must beRight(())
+  }
+
+  "accepts existing friend request instead of issuing a new one" in new LoggedInContext {
+    val userEvents = EventsList(userId).withIncomingFriendRequest(friendId, friendRequestId).list
+
+    checking {
+      allowing(dataStore).userEvents(userId).willReturn(userEvents)
+      oneOf(commandProcessor).validatedProcess(ChangeFriendRequestStatus(friendRequestId, Approved), userId).willReturn(Right(()))
+    }
+
+    api.sendFriendRequest(userId, SendFriendRequest(friendId))
+  }
+
   def userWishesWith(wishId: UUID, wishName: String): Matcher[UserWishes] = contain(aWishWith(wishId, wishName)) ^^ {(_: UserWishes).wishes}
 
   def aWishWith(id: UUID, name: String): Matcher[Wish] = (wish: Wish) =>
