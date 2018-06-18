@@ -118,8 +118,18 @@ class EventBasedUserFriendsProjectionTest(implicit ee: ExecutionEnv) extends Spe
     userFriendsProjection.friendsFor(userId).requested must contain(aFriend(friendId))
   }
 
-  def aFriend(id: UUID): Matcher[Friend] = ===(id) ^^ {(_:Friend).userId}
+  "return friends that sent friend request to user" in new Context {
+    checking {
+      allowing(dataStore).userEvents(userId).willReturn(EventsList(userId).withIncomingFriendRequest(friendId, requestId).list)
+      allowing(dataStore).userEvents(friendId).willReturn(EventsList(friendId).list)
+    }
 
+    userFriendsProjection.friendsFor(userId).incoming must contain(anIncomingFriendRequestFrom(friendId, requestId))
+  }
+
+  def aFriend(id: UUID): Matcher[Friend] = ===(id) ^^ {(_:Friend).userId}
+  def anIncomingFriendRequestFrom(friend: UUID, requestId: UUID): Matcher[IncomingFriendRequest] = (req: IncomingFriendRequest) =>
+    (req.id == requestId && req.friend.userId == friend, s"Friend request mismatch. Expected request [$requestId] from [$friend] but got $req")
 
   trait Context extends Scope{
     val userFacebookId = "user-facebook-id"

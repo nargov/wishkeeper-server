@@ -39,8 +39,9 @@ class EventBasedUserFriendsProjection(facebookConnector: FacebookConnector,
   override def friendsFor(userId: UUID): UserFriends = {
     val user = User.replay(dataStore.userEvents(userId))
     val friends = user.friends.current.map(friendDetails)
-    val requested = user.friends.sentRequests.map(friendDetailsByFriendRequest)
-    UserFriends(friends, requested = requested)
+    val requested = user.friends.sentRequests.map(userIdFromFriendRequest andThen friendDetails)
+    val incoming = user.friends.receivedRequests.map(req => IncomingFriendRequest(req.id, friendDetails(req.from)))
+    UserFriends(friends, requested = requested, incoming = incoming)
   }
 
   private val userIdFromFriendRequest: FriendRequest => UUID = _.userId
@@ -49,8 +50,6 @@ class EventBasedUserFriendsProjection(facebookConnector: FacebookConnector,
     val friend = User.replay(dataStore.userEvents(friendId))
     Friend(friendId, friend.userProfile.name, friend.userProfile.picture, friend.userProfile.firstName)
   }
-
-  private val friendDetailsByFriendRequest = userIdFromFriendRequest andThen friendDetails
 
   override def friendsFor(friendId: UUID, userId: UUID) = {
     val userFriends = User.replay(dataStore.userEvents(userId)).friends
@@ -69,6 +68,8 @@ class EventBasedUserFriendsProjection(facebookConnector: FacebookConnector,
 
 case class Friend(userId: UUID, name: Option[String] = None, image: Option[String] = None, firstName: Option[String] = None)
 
-case class UserFriends(list: List[Friend], mutual: List[Friend] = Nil, requested: List[Friend] = Nil) {
+case class IncomingFriendRequest(id: UUID, friend: Friend)
+
+case class UserFriends(list: List[Friend], mutual: List[Friend] = Nil, requested: List[Friend] = Nil, incoming: List[IncomingFriendRequest] = Nil) {
   def excluding(friendId: UUID) = copy(list = list.filterNot(_.userId == friendId))
 }
