@@ -88,6 +88,7 @@ lazy val server = (project in file("wishkeeper-server")).
       "com.google.cloud" % "google-cloud-storage" % "1.14.0"
         exclude("org.apache.httpcomponents", "httpclient")
         exclude("com.google.guava", "guava-jdk5"),
+      "com.google.cloud" % "google-cloud-pubsub" % "1.31.0",
       "com.sksamuel.scrimage" %% "scrimage-core" % "2.1.8"
         exclude("commons-io", "commons-io"),
       "io.appium" % "java-client" % "5.0.0-BETA6" % "it" exclude("com.codeborne", "phantomjsdriver")
