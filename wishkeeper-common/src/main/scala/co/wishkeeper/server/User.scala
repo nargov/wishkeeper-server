@@ -15,7 +15,8 @@ case class User(id: UUID,
                 friends: Friends = Friends(),
                 wishes: Map[UUID, Wish] = Map.empty,
                 flags: Flags = Flags(),
-                notifications: List[Notification] = Nil) {
+                notifications: List[Notification] = Nil,
+                pendingNotifications: List[Notification] = Nil) {
 
 
   def applyEvent[E <: UserEvent](event: UserEventInstant[E]): User = event match {

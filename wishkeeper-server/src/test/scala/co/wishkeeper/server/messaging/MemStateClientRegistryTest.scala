@@ -1,6 +1,7 @@
 package co.wishkeeper.server.messaging
 
 import java.util.UUID
+import java.util.concurrent.atomic.{AtomicBoolean, AtomicReference}
 
 import com.wixpress.common.specs2.JMock
 import org.specs2.mutable.Specification
@@ -52,6 +53,25 @@ class MemStateClientRegistryTest extends Specification with JMock {
     "Decrement number of connected clients on remove" in new Context {
       registry.remove(userId, registry.add(userId, dispatcherSpy))
       registry.connectedClients must beEqualTo(0)
+    }
+
+    "notify listeners when user connection is added" in new Context {
+      val called = new AtomicReference[ClientRegistryEvent]()
+      registry.addListener(called.set)
+
+      registry.add(userId, _ => ())
+
+      called.get() must beEqualTo(UserConnectionAdded(userId))
+    }
+
+    "notify listeners when user connection is removed" in new Context {
+      val called = new AtomicReference[ClientRegistryEvent]()
+      val connectionId: UUID = registry.add(userId, _ => ())
+      registry.addListener(called.set)
+
+      registry.remove(userId, connectionId)
+
+      called.get() must beEqualTo(UserConnectionRemoved(userId))
     }
   }
 

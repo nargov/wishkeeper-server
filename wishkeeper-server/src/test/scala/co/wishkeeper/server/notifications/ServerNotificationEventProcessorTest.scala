@@ -60,7 +60,7 @@ class ServerNotificationEventProcessorTest extends Specification with JMock {
 
   trait Context extends Scope {
     val clientNotifier = mock[ClientNotifier]
-    val processor = new ServerNotificationEventProcessor(clientNotifier)
+    val processor = new ServerNotificationEventProcessor(clientNotifier, NoOpNotificationsScheduler)
     val userId = randomUUID()
 
     def checkingWishListUpdateNotificationSent() = checking {

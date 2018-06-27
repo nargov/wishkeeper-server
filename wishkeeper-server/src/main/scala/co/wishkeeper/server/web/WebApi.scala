@@ -113,11 +113,7 @@ class WebApi(publicApi: PublicApi, managementApi: ManagementApi, clientRegistry:
   val out: Source[Message, SourceQueueWithComplete[Message]] = Source.queue(10, OverflowStrategy.fail)
   val handler: UUID => Flow[Message, Message, Any] = userId => Flow.fromSinkAndSourceMat(in, out)((_, outbound) => {
     val connectionId = clientRegistry.add(userId, message => outbound.offer(TextMessage(message)))
-    println(s">>>>>>>>>>>>>>>>>> Added websocket connection for user $userId")
-    outbound.watchCompletion().foreach(_ => {
-      println(s">>>>>>>>>>>>>>>>>>> Websocket connection closed for user $userId. Removing from registry.")
-      clientRegistry.remove(userId, connectionId)
-    })
+    outbound.watchCompletion().foreach(_ => clientRegistry.remove(userId, connectionId))
   })
   val websocket: Route = pathPrefix("ws") {
     parameter(sessionIdHeader) { sessionId =>

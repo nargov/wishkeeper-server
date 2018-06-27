@@ -356,6 +356,20 @@ class UserTest extends Specification with MatcherMacros with JMock with Notifica
     user.applyEvent(asEventInstant(FriendRequestReceived(user.id, friendId, Option(requestId)))).friendRequestId(friendId) must beSome(requestId)
   }
 
+  "return pending Wish reserved notification" in new Context {
+    val time = DateTime.now().minusMinutes(2)
+    user.applyEvent(asEventInstant(WishReservedNotificationCreated(notificationId, wishId, friendId), time)).
+      pendingNotifications must beEqualTo(List(Notification(notificationId, WishReservedNotification(wishId, friendId), time = time)))
+  }
+
+  "return pending wish unreserved notification" in new Context {
+    val time = DateTime.now().minusMinutes(2)
+    user.
+      applyEvent(asEventInstant(WishReservedNotificationCreated(randomUUID(), wishId, friendId), time.minusMinutes(20))).
+      applyEvent(asEventInstant(WishUnreservedNotificationCreated(notificationId, wishId), time)).
+      pendingNotifications must beEqualTo(List(Notification(notificationId, WishUnreservedNotification(wishId, friendId), time = time)))
+  }
+
   trait Context extends Scope {
     val user: User = User.createNew()
     val wish: Wish = Wish(randomUUID())

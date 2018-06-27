@@ -1,13 +1,14 @@
 package co.wishkeeper.server
 
 import java.util.UUID
+import java.util.UUID.randomUUID
 
 import co.wishkeeper.server.Events._
 import co.wishkeeper.server.FriendRequestStatus.Approved
 import org.joda.time.DateTime
 
 object EventsTestHelper {
-  def userConnectEvent(userId: UUID) = UserConnected(userId, DateTime.now(), UUID.randomUUID())
+  def userConnectEvent(userId: UUID) = UserConnected(userId, DateTime.now(), randomUUID())
 
   def asEventInstants(events: List[UserEvent]): List[UserEventInstant[_ <: UserEvent]] = events.map(asEventInstant(_))
 
@@ -17,12 +18,13 @@ object EventsTestHelper {
 
   case class EventsList(userId: UUID, list: List[UserEventInstant[_ <: UserEvent]]) {
 
-    def withFriend(friendId: UUID, requestId: UUID = UUID.randomUUID()) = this.copy(list = list ++ asEventInstants(List(
+
+    def withFriend(friendId: UUID, requestId: UUID = randomUUID()) = this.copy(list = list ++ asEventInstants(List(
       FriendRequestSent(userId, friendId, Option(requestId)),
       FriendRequestStatusChanged(userId, requestId, userId, Approved)
     )))
 
-    def withFriendRequest(friendId: UUID, requestId: UUID = UUID.randomUUID()) =
+    def withFriendRequest(friendId: UUID, requestId: UUID = randomUUID()) =
       this.copy(list = list :+ asEventInstant(FriendRequestSent(userId, friendId, Option(requestId))))
 
     def withIncomingFriendRequest(friendId: UUID, friendRequestId: UUID) =
@@ -39,6 +41,12 @@ object EventsTestHelper {
       val listWithName = this.withWish(id, name)
       listWithName.copy(list = listWithName.list :+ asEventInstant(WishReserved(id, reserver)))
     }
+
+    def withReservedWishNotification(notificationId: UUID, wishId: UUID, reserverId: UUID, time: DateTime = DateTime.now().minusDays(1)) =
+      this.copy(list = list :+ asEventInstant(WishReservedNotificationCreated(notificationId, wishId, reserverId), time))
+
+    def withUnreservedWishNotification(notificationId: UUID, wishId: UUID, time: DateTime): EventsList =
+      this.copy(list = list :+ asEventInstant(WishUnreservedNotificationCreated(notificationId, wishId), time))
 
     def withDeletedWish(id: UUID, name: String = "some wish"): EventsList = {
       val listWithName = this.withWish(id, name)
