@@ -217,6 +217,16 @@ class DelegatingPublicApiTest extends Specification with JMock {
     api.sendFriendRequest(userId, SendFriendRequest(friendId))
   }
 
+  "sets a notification ID" in new LoggedInContext {
+    val notificationId = "id"
+
+    checking {
+      oneOf(commandProcessor).validatedProcess(SetDeviceNotificationId(notificationId), userId).willReturn(Right(()))
+    }
+
+    api.setNotificationId(userId, notificationId)
+  }
+
   def userWishesWith(wishId: UUID, wishName: String): Matcher[UserWishes] = contain(aWishWith(wishId, wishName)) ^^ {(_: UserWishes).wishes}
 
   def aWishWith(id: UUID, name: String): Matcher[Wish] = (wish: Wish) =>

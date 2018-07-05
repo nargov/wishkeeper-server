@@ -5,10 +5,11 @@ import java.util.UUID.randomUUID
 import java.util.concurrent.ArrayBlockingQueue
 import java.util.concurrent.atomic.AtomicReference
 
-import co.wishkeeper.server.DataStore
-import co.wishkeeper.server.Events.WishReservedNotificationCreated
+import co.wishkeeper.server.Events.{DeviceNotificationIdSet, WishReservedNotificationCreated, WishUnreservedNotificationCreated}
 import co.wishkeeper.server.EventsTestHelper.EventsList
-import co.wishkeeper.server.messaging.{MemStateClientRegistry, NotificationsUpdated, ServerNotification}
+import co.wishkeeper.server.NotificationsData.{WishReservedNotification, WishUnreservedNotification}
+import co.wishkeeper.server.messaging.{MemStateClientRegistry, NotificationsUpdated, PushNotifications, ServerNotification}
+import co.wishkeeper.server.{DataStore, PushNotification, UserProfile}
 import com.wixpress.common.specs2.JMock
 import org.jmock.lib.concurrent.DeterministicScheduler
 import org.joda.time.DateTime
@@ -30,7 +31,7 @@ class DelayedNotificationComponentTest extends Specification with JMock {
 
     scheduler.tick(1, SECONDS)
 
-    message.get() must beEqualTo(ServerNotification.toJson(NotificationsUpdated))
+    assertGotNotificationsUpdated()
   }
 
   "User connecting having an existing reserved wish notification pending should get a notification in time" in new Context {
@@ -62,18 +63,59 @@ class DelayedNotificationComponentTest extends Specification with JMock {
 
     scheduler.tick(1, SECONDS)
     messages.size() must beEqualTo(2)
-
   }
+
+  "Wish Reserved Notification should be sent through push channel" in new Context {
+    val event = WishReservedNotificationCreated(randomUUID(), randomUUID(), randomUUID())
+
+    val wishName = "My Wish"
+    val pushNotification = PushNotification(WishReservedNotification(event.wishId, event.reserverId, wishName = Option(wishName)))
+
+    checking {
+      allowing(dataStore).userEvents(userId).willReturn(EventsList(userId).withEvent(idSet).withWish(event.wishId, wishName).list)
+      oneOf(pushNotifications).send(idSet.id, pushNotification)
+    }
+
+    userConnects()
+
+    serverNotificationEventProcessor.process(event, userId)
+    scheduler.tick(config.default.toSeconds, SECONDS)
+
+    assertGotNotificationsUpdated()
+  }
+
+  "Wish Unreserved Notification should be sent after delay to push channel" in new Context {
+    val wishId = randomUUID()
+    val friendId = randomUUID()
+    val event = WishUnreservedNotificationCreated(randomUUID(), wishId)
+    val wishName = "Wish Name"
+    val pushNotification = PushNotification(WishUnreservedNotification(event.wishId, null, wishName = Option(wishName)))
+
+    checking {
+      allowing(dataStore).userEvents(userId).willReturn(EventsList(userId).withEvent(idSet).withReservedWish(wishId, wishName, friendId).list)
+      oneOf(pushNotifications).send(idSet.id, pushNotification)
+    }
+
+    userConnects()
+
+    serverNotificationEventProcessor.process(event, userId)
+    scheduler.tick(config.default.toSeconds, SECONDS)
+
+    assertGotNotificationsUpdated()
+  }
+
 
   trait Context extends Scope {
     val dataStore = mock[DataStore]
+    val pushNotifications = mock[PushNotifications]
     val scheduler = new DeterministicScheduler
     val clientRegistry = new MemStateClientRegistry()
     val config = NotificationDelayConfig(default = 5.seconds)
-    val notificationsScheduler = new ExecutorNotificationsScheduler(config, scheduler, clientRegistry, dataStore)
-    val serverNotificationEventProcessor = new ServerNotificationEventProcessor(clientRegistry, notificationsScheduler)
+    val notificationsScheduler = new ExecutorNotificationsScheduler(config, scheduler, clientRegistry, dataStore, pushNotifications)
+    val serverNotificationEventProcessor = new ServerNotificationEventProcessor(clientRegistry, notificationsScheduler, dataStore, pushNotifications)
     val message = new AtomicReference[String]()
     val userId = randomUUID()
+    val idSet = DeviceNotificationIdSet("id")
 
     def assumingPendingReservedWishNotification() = checking {
       allowing(dataStore).userEvents(userId).willReturn(EventsList(userId).
@@ -89,6 +131,9 @@ class DelayedNotificationComponentTest extends Specification with JMock {
     def userConnects() = clientRegistry.add(userId, message.set)
 
     def userDisconnects(connection: UUID) = clientRegistry.remove(userId, connection)
-  }
 
+    def assertGotNotificationsUpdated() = {
+      message.get() must beEqualTo(ServerNotification.toJson(NotificationsUpdated))
+    }
+  }
 }

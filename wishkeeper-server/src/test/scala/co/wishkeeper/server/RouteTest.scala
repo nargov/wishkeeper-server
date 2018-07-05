@@ -4,8 +4,8 @@ import java.util.UUID
 import java.util.UUID.randomUUID
 
 import akka.http.scaladsl.model.ContentTypes.`application/json`
-import akka.http.scaladsl.model.StatusCodes
-import akka.http.scaladsl.model.headers.RawHeader
+import akka.http.scaladsl.model._
+import akka.http.scaladsl.model.headers._
 import akka.http.scaladsl.testkit.Specs2RouteTest
 import co.wishkeeper.json._
 import co.wishkeeper.server.NotificationsData.FriendRequestNotification
@@ -31,6 +31,8 @@ import scala.util.{Failure, Success}
 
 
 class RouteTest extends Specification with Specs2RouteTest with JMock {
+
+  val formContentType = ContentType(MediaTypes.`application/x-www-form-urlencoded`, HttpCharsets.`UTF-8`)
 
   implicit val circeConfig = Configuration.default.withDefaults
 
@@ -438,6 +440,20 @@ class RouteTest extends Specification with Specs2RouteTest with JMock {
       }
 
       Put(s"/me/friends").withHeaders(sessionIdHeader).withEntity(`application/json`, request.asJson.noSpaces) ~> webApi.newUserRoute ~> check {
+        status must beEqualTo(StatusCodes.OK)
+      }
+    }
+
+    "register a notification id" in new LoggedInUserContext {
+      val notificationId = "notification-id"
+
+      checking {
+        oneOf(publicApi).setNotificationId(userId, notificationId).willReturn(Right(()))
+      }
+
+
+      Post(s"/me/notifications/id", HttpEntity(formContentType, s"id=$notificationId")).
+        withHeaders(sessionIdHeader) ~> webApi.newUserRoute ~> check {
         status must beEqualTo(StatusCodes.OK)
       }
     }

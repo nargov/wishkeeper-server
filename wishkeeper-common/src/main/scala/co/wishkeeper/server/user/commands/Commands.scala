@@ -3,7 +3,7 @@ package co.wishkeeper.server.user.commands
 import java.util.UUID
 
 import co.wishkeeper.server.Events._
-import co.wishkeeper.server.user.ValidationError
+import co.wishkeeper.server.user.{NoChange, ValidationError}
 import co.wishkeeper.server.{FriendRequestStatus, User}
 
 trait UserCommand {
@@ -47,4 +47,14 @@ case object MarkAllNotificationsViewed extends UserCommand {
 
 case class RemoveFriend(friendId: UUID) extends UserCommand {
   override def process(user: User): List[UserEvent] = FriendRemoved(user.id, friendId) :: Nil
+}
+
+case class SetDeviceNotificationId(id: String) extends UserCommand {
+  override def process(user: User): List[UserEvent] = DeviceNotificationIdSet(id) :: Nil
+}
+object SetDeviceNotificationId {
+  implicit val validator = new UserCommandValidator[SetDeviceNotificationId] {
+    override def validate(user: User, command: SetDeviceNotificationId): Either[ValidationError, Unit] =
+      Either.cond(user.settings.deviceNotificationId != Option(command.id), (), NoChange)
+  }
 }

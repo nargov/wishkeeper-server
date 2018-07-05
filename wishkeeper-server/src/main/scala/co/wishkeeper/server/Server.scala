@@ -5,7 +5,7 @@ import akka.stream.ActorMaterializer
 import co.wishkeeper.json._
 import co.wishkeeper.server.api.{DelegatingManagementApi, DelegatingPublicApi, ManagementApi}
 import co.wishkeeper.server.image.{GoogleCloudStorageImageStore, ImageStore}
-import co.wishkeeper.server.messaging.MemStateClientRegistry
+import co.wishkeeper.server.messaging.{FirebasePushNotifications, MemStateClientRegistry}
 import co.wishkeeper.server.notifications.{ExecutorNotificationsScheduler, ServerNotificationEventProcessor}
 import co.wishkeeper.server.projections._
 import co.wishkeeper.server.web.WebApi
@@ -28,7 +28,9 @@ class WishkeeperServer {
   private val clientRegistry = new MemStateClientRegistry
 
   private val userIdByFacebookIdProjection = new DataStoreUserIdByFacebookIdProjection(dataStore)
-  private val notificationsScheduler = new ExecutorNotificationsScheduler(clientNotifier = clientRegistry, dataStore = dataStore)
+  private val pushNotifications = new FirebasePushNotifications
+  private val notificationsScheduler = new ExecutorNotificationsScheduler(clientNotifier = clientRegistry, dataStore = dataStore,
+    pushNotifications = pushNotifications)
   private val notificationsProjection = new DataStoreNotificationsProjection(dataStore)
 
   private val facebookConnector: FacebookConnector = new AkkaHttpFacebookConnector(
@@ -43,7 +45,7 @@ class WishkeeperServer {
     notificationsProjection,
     friendRequestsProjection,
     new UserByEmailProjection(dataStore),
-    new ServerNotificationEventProcessor(clientRegistry, notificationsScheduler)
+    new ServerNotificationEventProcessor(clientRegistry, notificationsScheduler, dataStore, pushNotifications)
   ))
   private val userProfileProjection: UserProfileProjection = new ReplayingUserProfileProjection(dataStore)
   private val imageStore: ImageStore = new GoogleCloudStorageImageStore(config.getString("wishkeeper.image-store.bucket-name"))

@@ -30,7 +30,9 @@ object EventsTestHelper {
     def withIncomingFriendRequest(friendId: UUID, friendRequestId: UUID) =
       this.copy(list = list :+ asEventInstant(FriendRequestReceived(userId, friendId, Option(friendRequestId))))
 
-    def withName(name: String) = this.copy(list = list :+ asEventInstant(UserNameSet(userId, name)))
+    def withName(name: String) = withEvent(UserNameSet(userId, name))
+
+    def withFirstName(name: String) = withEvent(UserFirstNameSet(userId, name))
 
     def withWish(id: UUID, name: String) = this.copy(list = list ++ asEventInstants(List(
       WishCreated(id, userId, DateTime.now().minusDays(1)),
@@ -53,11 +55,11 @@ object EventsTestHelper {
       listWithName.copy(list = listWithName.list :+ asEventInstant(WishDeleted(id)))
     }
 
-    def withEvent(event: UserEvent): EventsList = {
-      this.copy(list = this.list :+ asEventInstant(event))
-    }
+    def withEvent(event: UserEvent): EventsList = copy(list = list :+ asEventInstant(event))
 
     def withPic(link: String) = this.copy(list = list :+ asEventInstant(UserPictureSet(userId, link)))
+
+    def withDeviceId(id: String) = withEvent(DeviceNotificationIdSet(id))
   }
 
   object EventsList {

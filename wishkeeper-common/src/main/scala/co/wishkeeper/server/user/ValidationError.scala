@@ -32,3 +32,7 @@ case class GrantToSelfWhenReserved(wishId: UUID, reserver: UUID) extends Validat
 case class GrantWhenNotReserved(wishId: UUID, granter: UUID, reservedBy: Option[UUID] = None) extends ValidationError {
   override val message: String = s"Cannot grant by user [$granter] when wish is ${reservedBy.fold("not reserved")(by => s"reserved by $by")}"
 }
+
+case object NoChange extends ValidationError{
+  override val message: String = "Sets a field to the same value"
+}

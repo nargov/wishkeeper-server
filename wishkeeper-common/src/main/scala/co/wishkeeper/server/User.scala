@@ -5,8 +5,9 @@ import java.util.UUID
 import co.wishkeeper.server.Events._
 import co.wishkeeper.server.FriendRequestStatus.{Approved, Pending}
 import co.wishkeeper.server.NotificationsData.{FriendRequestAcceptedNotification, FriendRequestNotification}
-import co.wishkeeper.server.user.events.UserEventHandler
 import co.wishkeeper.server.user.events.NotificationEventHandlers._
+import co.wishkeeper.server.user.events.SettingsEventHandlers._
+import co.wishkeeper.server.user.events.UserEventHandler
 import org.joda.time.DateTime
 
 
@@ -16,7 +17,8 @@ case class User(id: UUID,
                 wishes: Map[UUID, Wish] = Map.empty,
                 flags: Flags = Flags(),
                 notifications: List[Notification] = Nil,
-                pendingNotifications: List[Notification] = Nil) {
+                pendingNotifications: List[Notification] = Nil,
+                settings: Settings = Settings()) {
 
 
   def applyEvent[E <: UserEvent](event: UserEventInstant[E]): User = event match {
@@ -90,6 +92,7 @@ case class User(id: UUID,
 
     case UserEventInstant(n@WishReservedNotificationCreated(_, _, _), time) => handleEventWithHandler(n, time)
     case UserEventInstant(e@WishUnreservedNotificationCreated(_, _), time) => handleEventWithHandler(e, time)
+    case UserEventInstant(e@DeviceNotificationIdSet(_), time) => handleEventWithHandler(e, time)
     case _ => this
   }
 
@@ -128,3 +131,5 @@ case class Friends(current: List[UUID] = Nil,
                    receivedRequests: List[FriendRequest] = Nil)
 
 case class Flags(seenFacebookFriendsList: Boolean = false)
+
+case class Settings(deviceNotificationId: Option[String] = None)

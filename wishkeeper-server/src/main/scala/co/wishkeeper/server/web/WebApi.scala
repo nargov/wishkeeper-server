@@ -132,12 +132,21 @@ class WebApi(publicApi: PublicApi, managementApi: ManagementApi, clientRegistry:
     sendFriendRequest(userId)
   }
 
+  val setNotificationId: UUID => Route = userId => (post & pathPrefix("id") & formField("id")) { notificationId =>
+    handleCommandResult(publicApi.setNotificationId(userId, notificationId))
+  }
+
+  val notifications: UUID => Route = userId => pathPrefix("notifications") {
+    setNotificationId(userId)
+  }
+
   val newUserRoute: Route =
     userIdFromSessionHeader { userId =>
       pathPrefix("me") {
         wishes(userId) ~
-        friends(userId) ~
-          myId(userId)
+          friends(userId) ~
+          myId(userId) ~
+          notifications(userId)
       } ~
         pathPrefix(JavaUUID) { friendId =>
           friendWishes(userId, friendId)
@@ -145,198 +154,198 @@ class WebApi(publicApi: PublicApi, managementApi: ManagementApi, clientRegistry:
     } ~
       websocket
 
-  val userRoute: Route =
-    DebuggingDirectives.logRequestResult(LoggingMagnet(printer)) {
-      pathPrefix("users") {
-        path("connect" / "facebook") {
-          post {
-            entity(as[ConnectFacebookUser]) { connectUser ⇒
-              onSuccess(publicApi.connectFacebookUser(connectUser)) { isValid =>
-                if (isValid) complete(StatusCodes.OK)
-                else reject(AuthorizationFailedRejection)
-              }
+  val userRoute: Route = DebuggingDirectives.logRequestResult(LoggingMagnet(printer)) {
+    pathPrefix("users") {
+      path("connect" / "facebook") {
+        post {
+          entity(as[ConnectFacebookUser]) { connectUser ⇒
+            onSuccess(publicApi.connectFacebookUser(connectUser)) { isValid =>
+              if (isValid) complete(StatusCodes.OK)
+              else reject(AuthorizationFailedRejection)
             }
           }
-        } ~
-          headerValueByName(sessionIdHeader) { sessionId =>
-            val sessionUUID = Option(UUID.fromString(sessionId))
-            pathPrefix(JavaUUID) { userId =>
-              (path("friends") & get) {
-                sessionUUID.map(publicApi.friendsListFor(_, userId)).map {
-                  case Right(userFriends) => complete(userFriends)
-                  case Left(reason) => complete(StatusCodes.InternalServerError -> reason)
+        }
+      } ~
+        headerValueByName(sessionIdHeader) { sessionId =>
+          val sessionUUID = Option(UUID.fromString(sessionId))
+          pathPrefix(JavaUUID) { userId =>
+            (path("friends") & get) {
+              sessionUUID.map(publicApi.friendsListFor(_, userId)).map {
+                case Right(userFriends) => complete(userFriends)
+                case Left(reason) => complete(StatusCodes.InternalServerError -> reason)
+              }.get
+            } ~
+              delete {
+                sessionUUID.map {
+                  publicApi.unfriend(_, userId) match {
+                    case Right(_) => complete(StatusCodes.OK)
+                    case Left(reason) => complete(StatusCodes.BadRequest -> reason)
+                  }
                 }.get
+              }
+          } ~
+            pathPrefix("profile") {
+              path("facebook") {
+                post {
+                  entity(as[SetFacebookUserInfo]) { info =>
+                    publicApi.processCommand(info, sessionUUID) //TODO move the UUID parsing to a custom directive
+                    complete(StatusCodes.OK)
+                  }
+                }
               } ~
-                delete {
-                  sessionUUID.map {
-                    publicApi.unfriend(_, userId) match {
-                      case Right(_) => complete(StatusCodes.OK)
-                      case Left(reason) => complete(StatusCodes.BadRequest -> reason)
+                get {
+                  pathEnd {
+                    publicApi.userProfileFor(UUID.fromString(sessionId)).
+                      map(complete(_)).
+                      getOrElse(reject(AuthorizationFailedRejection))
+                  } ~
+                    pathPrefix(JavaUUID) { friendId =>
+                      sessionUUID.
+                        map(publicApi.userProfileFor(_, friendId)).
+                        map {
+                          case Right(profile) => complete(profile)
+                          case Left(reason) if reason == NotFriends => complete(StatusCodes.Forbidden -> reason)
+                        }.get
                     }
+                }
+            } ~
+            pathPrefix("friends") {
+              get {
+                pathEnd {
+                  sessionUUID.map(publicApi.friendsListFor).map(complete(_)).get
+                } ~
+                  path("facebook") {
+                    headerValueByName(WebApi.facebookAccessTokenHeader) { accessToken =>
+                      publicApi.potentialFriendsFor(accessToken, sessionUUID.get).
+                        map(onSuccess(_) {
+                          complete(_)
+                        }).get //TODO test for rejection if user not found
+                    }
+                  }
+              } ~
+                (path("request") & post) {
+                  //TODO deprecated
+                  entity(as[SendFriendRequest]) { sendFriendRequest =>
+                    publicApi.processCommand(sendFriendRequest, sessionUUID)
+                    complete(StatusCodes.OK)
+                  }
+                }
+            } ~
+            pathPrefix("wishes") {
+              (post & entity(as[SetWishDetails])) { setWishDetails =>
+                userIdFromSessionHeader { userId =>
+                  handleCommandResult(publicApi.processCommand(setWishDetails, userId))
+                }
+              } ~
+                get {
+                  pathEnd {
+                    sessionUUID.flatMap(publicApi.wishListFor).map(complete(_)).get
+                  } ~
+                    path(JavaUUID) { friendId =>
+                      sessionUUID.map(publicApi.wishListFor(_, friendId)).map {
+                        case Right(userWishes) => complete(userWishes)
+                        case Left(err) if err == NotFriends => complete(StatusCodes.Forbidden -> err)
+                      }.get
+                    }
+                } ~
+                (delete & path(JavaUUID)) { wishId =>
+                  userIdFromSessionHeader { userId =>
+                    handleCommandResult(publicApi.deleteWish(userId, wishId))
+                  }
+                } ~
+                pathPrefix(JavaUUID / "image") { wishId =>
+                  post {
+                    withRequestTimeout(2.minutes) {
+                      headerValueByName(imageDimensionsHeader) { imageDimensionsHeader =>
+                        val imageWidth :: imageHeight :: Nil = imageDimensionsHeader.split(",").toList
+                        pathEnd {
+                          fileUpload("file") { case (metadata, byteSource) =>
+                            val inputStream = byteSource.runWith(StreamConverters.asInputStream())
+                            publicApi.uploadImage(inputStream,
+                              ImageMetadata(
+                                metadata.contentType.value,
+                                metadata.fileName,
+                                imageWidth.toInt,
+                                imageHeight.toInt),
+                              wishId, UUID.fromString(sessionId)).
+                              map(_ => complete(StatusCodes.Created)).get //TODO Handle upload failure
+
+                          }
+                        } ~
+                          path("url") {
+                            parameters('filename, 'contentType, 'url) { (filename, contentType, url) =>
+                              sessionUUID.map { sessionId =>
+                                val uploadResult = publicApi.uploadImage(
+                                  url,
+                                  ImageMetadata(contentType, filename, imageWidth.toInt, imageHeight.toInt),
+                                  wishId,
+                                  sessionId) //TODO handle error
+                                uploadResult match {
+                                  case Success(_) => complete(StatusCodes.Created)
+                                  case Failure(e) => throw e
+                                }
+                              }.get
+                            }
+                          }
+                      }
+                    }
+                  } ~
+                    delete {
+                      sessionUUID.map { sessionId =>
+                        complete(publicApi.deleteWishImage(sessionId, wishId))
+                      }.get
+                    }
+                }
+            } ~
+            pathPrefix("flags") {
+              post {
+                path("facebook-friends") {
+                  publicApi.processCommand(SetFlagFacebookFriendsListSeen(), sessionUUID)
+                  complete(StatusCodes.OK)
+                }
+              } ~
+                get {
+                  sessionUUID.map { sessionId =>
+                    complete(publicApi.userFlagsFor(sessionId))
                   }.get
                 }
             } ~
-              pathPrefix("profile") {
-                path("facebook") {
-                  post {
-                    entity(as[SetFacebookUserInfo]) { info =>
-                      publicApi.processCommand(info, sessionUUID) //TODO move the UUID parsing to a custom directive
-                      complete(StatusCodes.OK)
-                    }
-                  }
-                } ~
-                  get {
-                    pathEnd {
-                      publicApi.userProfileFor(UUID.fromString(sessionId)).
-                        map(complete(_)).
-                        getOrElse(reject(AuthorizationFailedRejection))
-                    } ~
-                      pathPrefix(JavaUUID) { friendId =>
-                        sessionUUID.
-                          map(publicApi.userProfileFor(_, friendId)).
-                          map {
-                            case Right(profile) => complete(profile)
-                            case Left(reason) if reason == NotFriends => complete(StatusCodes.Forbidden -> reason)
-                          }.get
-                      }
-                  }
+            pathPrefix("notifications") {
+              get {
+                sessionUUID.map { sessionId =>
+                  complete(publicApi.notificationsFor(sessionId))
+                }.get
               } ~
-              pathPrefix("friends") {
-                get {
-                  pathEnd {
-                    sessionUUID.map(publicApi.friendsListFor).map(complete(_)).get
-                  } ~
-                    path("facebook") {
-                      headerValueByName(WebApi.facebookAccessTokenHeader) { accessToken =>
-                        publicApi.potentialFriendsFor(accessToken, sessionUUID.get).
-                          map(onSuccess(_) {
-                            complete(_)
-                          }).get //TODO test for rejection if user not found
-                      }
-                    }
-                } ~
-                  (path("request") & post) {//TODO deprecated
-                    entity(as[SendFriendRequest]) { sendFriendRequest =>
-                      publicApi.processCommand(sendFriendRequest, sessionUUID)
-                      complete(StatusCodes.OK)
-                    }
-                  }
-              } ~
-              pathPrefix("wishes") {
-                (post & entity(as[SetWishDetails])) { setWishDetails =>
-                  userIdFromSessionHeader { userId =>
-                    handleCommandResult(publicApi.processCommand(setWishDetails, userId))
-                  }
-                } ~
-                  get {
-                    pathEnd {
-                      sessionUUID.flatMap(publicApi.wishListFor).map(complete(_)).get
-                    } ~
-                      path(JavaUUID) { friendId =>
-                        sessionUUID.map(publicApi.wishListFor(_, friendId)).map {
-                          case Right(userWishes) => complete(userWishes)
-                          case Left(err) if err == NotFriends => complete(StatusCodes.Forbidden -> err)
-                        }.get
-                      }
-                  } ~
-                  (delete & path(JavaUUID)) { wishId =>
-                    userIdFromSessionHeader { userId =>
-                      handleCommandResult(publicApi.deleteWish(userId, wishId))
-                    }
-                  } ~
-                  pathPrefix(JavaUUID / "image") { wishId =>
-                    post {
-                      withRequestTimeout(2.minutes) {
-                        headerValueByName(imageDimensionsHeader) { imageDimensionsHeader =>
-                          val imageWidth :: imageHeight :: Nil = imageDimensionsHeader.split(",").toList
-                          pathEnd {
-                            fileUpload("file") { case (metadata, byteSource) =>
-                              val inputStream = byteSource.runWith(StreamConverters.asInputStream())
-                              publicApi.uploadImage(inputStream,
-                                ImageMetadata(
-                                  metadata.contentType.value,
-                                  metadata.fileName,
-                                  imageWidth.toInt,
-                                  imageHeight.toInt),
-                                wishId, UUID.fromString(sessionId)).
-                                map(_ => complete(StatusCodes.Created)).get //TODO Handle upload failure
-
-                            }
-                          } ~
-                            path("url") {
-                              parameters('filename, 'contentType, 'url) { (filename, contentType, url) =>
-                                sessionUUID.map { sessionId =>
-                                  val uploadResult = publicApi.uploadImage(
-                                    url,
-                                    ImageMetadata(contentType, filename, imageWidth.toInt, imageHeight.toInt),
-                                    wishId,
-                                    sessionId) //TODO handle error
-                                  uploadResult match {
-                                    case Success(_) => complete(StatusCodes.Created)
-                                    case Failure(e) => throw e
-                                  }
-                                }.get
-                              }
-                            }
-                        }
-                      }
-                    } ~
-                      delete {
-                        sessionUUID.map { sessionId =>
-                          complete(publicApi.deleteWishImage(sessionId, wishId))
-                        }.get
-                      }
-                  }
-              } ~
-              pathPrefix("flags") {
                 post {
-                  path("facebook-friends") {
-                    publicApi.processCommand(SetFlagFacebookFriendsListSeen(), sessionUUID)
-                    complete(StatusCodes.OK)
-                  }
-                } ~
-                  get {
-                    sessionUUID.map { sessionId =>
-                      complete(publicApi.userFlagsFor(sessionId))
-                    }.get
-                  }
-              } ~
-              pathPrefix("notifications") {
-                get {
-                  sessionUUID.map { sessionId =>
-                    complete(publicApi.notificationsFor(sessionId))
-                  }.get
-                } ~
-                  post {
-                    pathPrefix("friendreq" / JavaUUID) { reqId =>
-                      path("approve") {
-                        sessionUUID.map { sessionId =>
-                          publicApi.approveFriendRequest(sessionId, reqId)
-                          complete(StatusCodes.OK)
-                        }.get
-                      } ~
-                        path("ignore") {
-                          sessionUUID.map { sessionId =>
-                            publicApi.ignoreFriendRequest(sessionId, reqId)
-                            complete(StatusCodes.OK)
-                          }.get
-                        }
+                  pathPrefix("friendreq" / JavaUUID) { reqId =>
+                    path("approve") {
+                      sessionUUID.map { sessionId =>
+                        publicApi.approveFriendRequest(sessionId, reqId)
+                        complete(StatusCodes.OK)
+                      }.get
                     } ~
-                      pathPrefix("all" / "viewed") {
+                      path("ignore") {
                         sessionUUID.map { sessionId =>
-                          publicApi.markAllNotificationsViewed(sessionId)
+                          publicApi.ignoreFriendRequest(sessionId, reqId)
                           complete(StatusCodes.OK)
                         }.get
                       }
-                  }
-              }
-          }
+                  } ~
+                    pathPrefix("all" / "viewed") {
+                      sessionUUID.map { sessionId =>
+                        publicApi.markAllNotificationsViewed(sessionId)
+                        complete(StatusCodes.OK)
+                      }.get
+                    }
+                }
+            }
+        }
+    } ~
+      (path("uuid") & get) {
+        complete(UUID.randomUUID())
       } ~
-        (path("uuid") & get) {
-          complete(UUID.randomUUID())
-        } ~
-        newUserRoute
-    }
+      newUserRoute
+  }
 
   private var bindings: Seq[Future[ServerBinding]] = Seq.empty
 

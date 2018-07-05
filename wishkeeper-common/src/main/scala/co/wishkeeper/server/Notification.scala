@@ -4,6 +4,7 @@ import java.util.UUID
 
 import co.wishkeeper.server.FriendRequestStatus.Pending
 import co.wishkeeper.server.NotificationsData.NotificationData
+import io.circe.generic.extras.Configuration
 import org.joda.time.DateTime
 
 
@@ -40,3 +41,11 @@ object NotificationsData {
 case class Notification(id: UUID, data: NotificationData, viewed: Boolean = false, time: DateTime = DateTime.now())
 
 case class UserNotifications(list: List[Notification], unread: Int)
+
+case class PushNotification(data: NotificationData) {
+  import io.circe.generic.extras.auto._
+  import io.circe.syntax._
+  implicit val circeConfig = Configuration.default.withDefaults.withDiscriminator("type")
+
+  def toJson: String = this.asJson.noSpaces
+}

@@ -4,7 +4,7 @@ import java.util.UUID
 import java.util.UUID.randomUUID
 
 import co.wishkeeper.server.Events._
-import co.wishkeeper.server.EventsTestHelper.{EventsList, asEventInstant}
+import co.wishkeeper.server.EventsTestHelper.asEventInstant
 import co.wishkeeper.server.FriendRequestStatus.Approved
 import co.wishkeeper.server.NotificationsData.{FriendRequestNotification, WishReservedNotification, WishUnreservedNotification}
 import co.wishkeeper.server.UserTestHelper._
@@ -368,6 +368,11 @@ class UserTest extends Specification with MatcherMacros with JMock with Notifica
       applyEvent(asEventInstant(WishReservedNotificationCreated(randomUUID(), wishId, friendId), time.minusMinutes(20))).
       applyEvent(asEventInstant(WishUnreservedNotificationCreated(notificationId, wishId), time)).
       pendingNotifications must beEqualTo(List(Notification(notificationId, WishUnreservedNotification(wishId, friendId), time = time)))
+  }
+
+  "apply DeviceNotificationIdSet" in new Context {
+    val id = "expected-id"
+    user.applyEvent(asEventInstant(DeviceNotificationIdSet(id))).settings.deviceNotificationId must beSome(id)
   }
 
   trait Context extends Scope {
