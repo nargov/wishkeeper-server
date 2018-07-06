@@ -9,7 +9,7 @@ import co.wishkeeper.server.Events.{DeviceNotificationIdSet, WishReservedNotific
 import co.wishkeeper.server.EventsTestHelper.EventsList
 import co.wishkeeper.server.NotificationsData.{WishReservedNotification, WishUnreservedNotification}
 import co.wishkeeper.server.messaging.{MemStateClientRegistry, NotificationsUpdated, PushNotifications, ServerNotification}
-import co.wishkeeper.server.{DataStore, PushNotification, UserProfile}
+import co.wishkeeper.server.{DataStore, PushNotification}
 import com.wixpress.common.specs2.JMock
 import org.jmock.lib.concurrent.DeterministicScheduler
 import org.joda.time.DateTime
