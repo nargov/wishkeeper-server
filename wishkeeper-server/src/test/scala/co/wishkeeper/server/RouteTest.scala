@@ -80,6 +80,17 @@ class RouteTest extends Specification with Specs2RouteTest with JMock {
         responseAs[UUID] must beEqualTo(userId)
       }
     }
+
+    "Delete user picture" in new ManagementContext {
+
+      checking {
+        oneOf(managementApi).deleteUserPicture(userId).willReturn(Right(()))
+      }
+
+      Delete(s"/users/$userId/profile/picture") ~> managementRoute ~> check {
+        handled should beTrue
+      }
+    }
   }
 
   "Route" should {

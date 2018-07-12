@@ -4,7 +4,7 @@ import java.util.UUID
 import java.util.UUID.randomUUID
 
 import co.wishkeeper.server.CommandProcessor
-import co.wishkeeper.server.user.commands.SetFlagFacebookFriendsListSeen
+import co.wishkeeper.server.user.commands.{DeleteUserPicture, SetFlagFacebookFriendsListSeen}
 import com.wixpress.common.specs2.JMock
 import org.specs2.mutable.Specification
 
@@ -21,4 +21,14 @@ class DelegatingManagementApiTest extends Specification with JMock {
     new DelegatingManagementApi(null, null, null, commandProcessor).resetFacebookFriendsSeenFlag(userId)
   }
 
+  "should delete user picture" in {
+    val userId: UUID = randomUUID()
+    val commandProcessor: CommandProcessor = mock[CommandProcessor]
+
+    checking {
+      oneOf(commandProcessor).validatedProcess(DeleteUserPicture, userId).willReturn(Right(()))
+    }
+
+    new DelegatingManagementApi(null, null, null, commandProcessor).deleteUserPicture(userId)
+  }
 }

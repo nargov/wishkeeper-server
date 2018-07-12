@@ -37,6 +37,8 @@ object Events {
 
   case class UserPictureSet(userId: UUID, pictureLink: String) extends UserEvent
 
+  case object UserPictureDeleted extends UserEvent
+
   case class FriendRequestSent(userId: UUID, to: UUID, id: Option[UUID] = None) extends UserEvent
 
   case class FriendRequestReceived(userId: UUID, from: UUID, id: Option[UUID] = None) extends UserEvent

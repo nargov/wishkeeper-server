@@ -1,13 +1,17 @@
 package co.wishkeeper.server.web
 
+import java.util.UUID
+
 import akka.actor.ActorSystem
 import akka.http.scaladsl.model.{HttpRequest, StatusCodes}
-import akka.http.scaladsl.server.Directives.{complete, get, path, pathPrefix, _}
+import akka.http.scaladsl.server.Directives._
+import akka.http.scaladsl.server._
 import akka.http.scaladsl.server.directives.{DebuggingDirectives, LoggingMagnet}
 import akka.http.scaladsl.server.{Route, RouteResult}
 import co.wishkeeper.json._
 import co.wishkeeper.server.api.ManagementApi
-import co.wishkeeper.server.messaging.{ClientRegistry, MemStateClientRegistry}
+import co.wishkeeper.server.messaging.ClientRegistry
+import co.wishkeeper.server.user.ValidationError
 import de.heikoseeberger.akkahttpcirce.FailFastCirceSupport._
 import io.circe.generic.extras.Configuration
 import io.circe.generic.extras.auto._
@@ -21,36 +25,57 @@ object ManagementRoute {
 
     val ws: Route = complete(WebSocketsStats(clientRegistry.connectedClients))
 
-    val stats: Route = pathPrefix("stats") {
-      ws
+    val stats: Route = pathPrefix("stats")(ws)
+
+    val userByFacebookId: Route = get {
+      pathPrefix("facebook" / """\d+""".r) { facebookId ⇒
+        managementApi.userIdFor(facebookId).map(complete(_)).getOrElse(complete(StatusCodes.NotFound))
+      }
+    }
+
+    val userByEmail: Route = get {
+      pathPrefix("email" / """.+@.+""".r / "id") { email =>
+        managementApi.userByEmail(email).map(complete(_)).getOrElse(complete(StatusCodes.NotFound))
+      }
+    }
+
+    val deletePicture: UUID => Route = userId => (pathPrefix("picture") & delete) {
+      managementApi.deleteUserPicture(userId).fold({case err: ValidationError => complete(StatusCodes.ServerError, err)}, complete(_))
+    }
+
+    val profile: UUID => Route = userId => pathPrefix("profile") {
+      get(complete(managementApi.profileFor(userId))) ~
+      deletePicture(userId)
+    }
+
+    val wishes: UUID => Route = userId => pathPrefix("wishes") {
+      get(complete(managementApi.wishesFor(userId)))
+    }
+
+    val resetFacebookFriends: UUID => Route = userId => pathPrefix("facebook-friends") {
+      delete {
+        managementApi.resetFacebookFriendsSeenFlag(userId)
+        complete(StatusCodes.OK)
+      }
+    }
+
+    val flags: UUID => Route = userId => pathPrefix("flags") {
+      resetFacebookFriends(userId)
+    }
+
+    val user: Route = pathPrefix(JavaUUID) { userId =>
+      profile(userId) ~
+        wishes(userId) ~
+        flags(userId)
     }
 
     DebuggingDirectives.logRequestResult(LoggingMagnet(_ => printer)) {
       pathPrefix("users") {
-        get {
-          path("facebook" / """\d+""".r) { facebookId ⇒
-            managementApi.userIdFor(facebookId).
-              map(complete(_)).
-              getOrElse(complete(StatusCodes.NotFound))
-          } ~
-            path("email" / """.+@.+""".r / "id") { email =>
-              managementApi.userByEmail(email).map(complete(_)).get
-            } ~
-            path(JavaUUID / "profile") { userId =>
-              complete(managementApi.profileFor(userId))
-            } ~
-            path(JavaUUID / "wishes") { userId =>
-              complete(managementApi.wishesFor(userId))
-            }
-        } ~
-          path(JavaUUID / "flags" / "facebook-friends") { userId =>
-            delete {
-              managementApi.resetFacebookFriendsSeenFlag(userId)
-              complete(StatusCodes.OK)
-            }
-          }
+        userByEmail ~
+          userByFacebookId ~
+          user
       } ~
-      stats
+        stats
     }
   }
 }

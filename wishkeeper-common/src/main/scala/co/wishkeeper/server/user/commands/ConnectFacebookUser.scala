@@ -30,18 +30,22 @@ case class SetFacebookUserInfo(age_range: Option[AgeRange] = None,
 
   override def process(user: User): List[UserEvent] = {
     val userId = user.id
+    val profile = user.userProfile
     List(
-      age_range.map(range => UserAgeRangeSet(userId, range.min, range.max)),
-      birthday.flatMap(SetFacebookUserInfo.getValidUserBirthdayEvent(userId, _)),
-      email.map(UserEmailSet(userId, _)),
-      gender.map(UserGenderSet(userId, _)),
-      locale.map(UserLocaleSet(userId, _)),
-      timezone.map(UserTimeZoneSet(userId, _)),
-      first_name.map(UserFirstNameSet(userId, _)),
-      last_name.map(UserLastNameSet(userId, _)),
-      name.map(UserNameSet(userId, _)),
-      picture.map(UserPictureSet(userId, _))).flatten
+      age_range.map(range => UserAgeRangeSet(userId, range.min, range.max)).filter(filterFor(profile.ageRange)),
+      birthday.flatMap(SetFacebookUserInfo.getValidUserBirthdayEvent(userId, _)).filter(filterFor(profile.birthday)),
+      email.map(UserEmailSet(userId, _)).filter(filterFor(profile.email)),
+      gender.map(UserGenderSet(userId, _)).filter(filterFor(profile.gender)),
+      locale.map(UserLocaleSet(userId, _)).filter(filterFor(profile.locale)),
+      timezone.map(UserTimeZoneSet(userId, _)).filter(filterFor(profile.timezone)),
+      first_name.map(UserFirstNameSet(userId, _)).filter(filterFor(profile.firstName)),
+      last_name.map(UserLastNameSet(userId, _)).filter(filterFor(profile.lastName)),
+      name.map(UserNameSet(userId, _)).filter(filterFor(profile.name)),
+      picture.map(UserPictureSet(userId, _)).filter(filterFor(profile.picture))
+    ).flatten
   }
+
+  private val filterFor: Option[_] => Any => Boolean = opt => _ => opt.isEmpty
 }
 
 object SetFacebookUserInfo {

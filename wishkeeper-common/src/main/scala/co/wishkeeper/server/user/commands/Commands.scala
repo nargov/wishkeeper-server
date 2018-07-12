@@ -3,7 +3,7 @@ package co.wishkeeper.server.user.commands
 import java.util.UUID
 
 import co.wishkeeper.server.Events._
-import co.wishkeeper.server.user.{NoChange, ValidationError}
+import co.wishkeeper.server.user.{NoChange, NoPictureToDelete, ValidationError}
 import co.wishkeeper.server.{FriendRequestStatus, User}
 
 trait UserCommand {
@@ -57,4 +57,11 @@ object SetDeviceNotificationId {
     override def validate(user: User, command: SetDeviceNotificationId): Either[ValidationError, Unit] =
       Either.cond(user.settings.deviceNotificationId != Option(command.id), (), NoChange)
   }
+}
+
+case object DeleteUserPicture extends UserCommand {
+  override def process(user: User): List[UserEvent] = UserPictureDeleted :: Nil
+
+  implicit val validator: UserCommandValidator[DeleteUserPicture.type] =
+    (user: User, _: DeleteUserPicture.type) => Either.cond(user.userProfile.picture.isDefined, (), NoPictureToDelete)
 }

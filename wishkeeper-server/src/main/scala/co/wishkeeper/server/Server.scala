@@ -4,6 +4,7 @@ import akka.actor.ActorSystem
 import akka.stream.ActorMaterializer
 import co.wishkeeper.json._
 import co.wishkeeper.server.api.{DelegatingManagementApi, DelegatingPublicApi, ManagementApi}
+import co.wishkeeper.server.events.processing.ImageUploadEventProcessor
 import co.wishkeeper.server.image.{GoogleCloudStorageImageStore, ImageStore}
 import co.wishkeeper.server.messaging.{FirebasePushNotifications, MemStateClientRegistry}
 import co.wishkeeper.server.notifications.{ExecutorNotificationsScheduler, ServerNotificationEventProcessor}
@@ -27,6 +28,10 @@ class WishkeeperServer {
 
   private val clientRegistry = new MemStateClientRegistry
 
+  private val fileAdapter = new JavaFileAdapter
+  private val wishImageStore: ImageStore = new GoogleCloudStorageImageStore(config.getString("wishkeeper.image-store.bucket-name"))
+  private val userImageStore: ImageStore = new GoogleCloudStorageImageStore(config.getString("wishkeeper.user-image-store.bucket-name"))
+
   private val userIdByFacebookIdProjection = new DataStoreUserIdByFacebookIdProjection(dataStore)
   private val pushNotifications = new FirebasePushNotifications
   private val notificationsScheduler = new ExecutorNotificationsScheduler(clientNotifier = clientRegistry, dataStore = dataStore,
@@ -45,12 +50,12 @@ class WishkeeperServer {
     notificationsProjection,
     friendRequestsProjection,
     new UserByEmailProjection(dataStore),
-    new ServerNotificationEventProcessor(clientRegistry, notificationsScheduler, dataStore, pushNotifications)
+    new ServerNotificationEventProcessor(clientRegistry, notificationsScheduler, dataStore, pushNotifications),
+    new ImageUploadEventProcessor(userImageStore, fileAdapter)
   ))
   private val userProfileProjection: UserProfileProjection = new ReplayingUserProfileProjection(dataStore)
-  private val imageStore: ImageStore = new GoogleCloudStorageImageStore(config.getString("wishkeeper.image-store.bucket-name"))
   private val publicApi = new DelegatingPublicApi(commandProcessor, dataStore, facebookConnector,
-    userProfileProjection, userFriendsProjection, notificationsProjection, imageStore)
+    userProfileProjection, userFriendsProjection, notificationsProjection, wishImageStore)
   private val managementApi: ManagementApi = new DelegatingManagementApi(userIdByFacebookIdProjection, userProfileProjection,
     dataStore, commandProcessor)
   private val webApi = new WebApi(publicApi, managementApi, clientRegistry)

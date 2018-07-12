@@ -7,6 +7,7 @@ import co.wishkeeper.server.FriendRequestStatus.{Approved, Pending}
 import co.wishkeeper.server.NotificationsData.{FriendRequestAcceptedNotification, FriendRequestNotification}
 import co.wishkeeper.server.user.events.NotificationEventHandlers._
 import co.wishkeeper.server.user.events.SettingsEventHandlers._
+import co.wishkeeper.server.user.events.ProfileEventHandlers._
 import co.wishkeeper.server.user.events.UserEventHandler
 import org.joda.time.DateTime
 
@@ -93,6 +94,7 @@ case class User(id: UUID,
     case UserEventInstant(n@WishReservedNotificationCreated(_, _, _), time) => handleEventWithHandler(n, time)
     case UserEventInstant(e@WishUnreservedNotificationCreated(_, _), time) => handleEventWithHandler(e, time)
     case UserEventInstant(e@DeviceNotificationIdSet(_), time) => handleEventWithHandler(e, time)
+    case UserEventInstant(e@UserPictureDeleted, time) => handleEventWithHandler(e, time)
     case _ => this
   }
 

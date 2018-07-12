@@ -375,6 +375,13 @@ class UserTest extends Specification with MatcherMacros with JMock with Notifica
     user.applyEvent(asEventInstant(DeviceNotificationIdSet(id))).settings.deviceNotificationId must beSome(id)
   }
 
+  "apply UserPictureDeleted" in new Context {
+    val pictureSet: UserEventInstant[UserEvent] = asEventInstant(UserPictureSet(user.id, "some link"))
+    val pictureDeleted: UserEventInstant[UserEvent] = asEventInstant(UserPictureDeleted)
+
+    user.applyEvent(pictureSet).applyEvent(pictureDeleted).userProfile.picture must beNone
+  }
+
   trait Context extends Scope {
     val user: User = User.createNew()
     val wish: Wish = Wish(randomUUID())

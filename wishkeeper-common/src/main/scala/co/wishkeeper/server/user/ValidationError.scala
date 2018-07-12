@@ -36,3 +36,7 @@ case class GrantWhenNotReserved(wishId: UUID, granter: UUID, reservedBy: Option[
 case object NoChange extends ValidationError{
   override val message: String = "Sets a field to the same value"
 }
+
+case object NoPictureToDelete extends ValidationError {
+  override val message: String = "User profile picture does not exist"
+}

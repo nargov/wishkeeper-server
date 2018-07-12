@@ -4,6 +4,7 @@ import java.util.UUID
 
 import co.wishkeeper.server.user.commands.SetFacebookUserInfo
 import co.wishkeeper.server.Events._
+import co.wishkeeper.server.UserTestHelper._
 import org.scalatest.{FlatSpec, Matchers}
 
 class SetFacebookUserInfoTest extends FlatSpec with Matchers {
@@ -82,6 +83,38 @@ class SetFacebookUserInfoTest extends FlatSpec with Matchers {
     val pictureLink = "http://my.user.photo"
     SetFacebookUserInfo(picture = Some(pictureLink)).process(User(userId)) should
       contain theSameElementsAs List(UserPictureSet(userId, pictureLink))
+  }
+
+  it should "create events only for data missing from the user account" in {
+    val existingEvents = EventsTestHelper.asEventInstants(List(
+      UserNameSet(userId, "name"),
+      UserFirstNameSet(userId, "first name"),
+      UserLastNameSet(userId, "last name"),
+      UserEmailSet(userId, "email"),
+      UserBirthdaySet(userId, "11/11/2011"),
+      UserAgeRangeSet(userId, Option(20), Option(30)),
+      UserGenderSet(userId, "Male"),
+      UserLocaleSet(userId, "US"),
+      UserTimeZoneSet(userId, -7)
+    ))
+
+    val firstName = "James"
+    val lastName = "McGuill"
+    val gender = "Male"
+    val locale = "en_US"
+    val name = firstName + " " + lastName
+    val timezone = -5
+    SetFacebookUserInfo(
+      Option(AgeRange(minAge, None)),
+      Option(birthday),
+      Option(email),
+      Option(firstName),
+      Option(lastName),
+      Option(name),
+      Option(gender),
+      Option(locale),
+      Option(timezone)
+    ).process(existingEvents.foldLeft(aUser)(_.applyEvent(_))) should be(empty)
   }
 
   val userId = UUID.randomUUID()
