@@ -1,7 +1,8 @@
 package co.wishkeeper.server.notifications
 
 import java.util.UUID
-import java.util.concurrent.{Callable, Executors, ScheduledExecutorService}
+import java.util.concurrent.atomic.AtomicReference
+import java.util.concurrent._
 
 import co.wishkeeper.server.messaging._
 import co.wishkeeper.server.{DataStore, Notification, PushNotification, User}
@@ -28,7 +29,7 @@ class ExecutorNotificationsScheduler(config: NotificationDelayConfig = Notificat
 
   private def toCallable[T]: (() => T) => Callable[T] = f => () => f()
 
-  def scheduleNotification(userId: UUID, notification: ServerNotification): Unit = {
+  override def scheduleNotification(userId: UUID, notification: ServerNotification): Unit = {
     scheduler.schedule(toCallable(() => {
       clientNotifier.sendTo(notification, userId)
     }), config.default.toMillis, MILLISECONDS)

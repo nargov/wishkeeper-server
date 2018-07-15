@@ -47,7 +47,7 @@ class ServerNotificationEventProcessor(notifier: ClientNotifier,
         scheduler.scheduleNotification(userId, NotificationsUpdated)
         schedulePushNotification(userId, user => {
           val wishName = user.wishes(n.wishId).name
-          WishUnreservedNotification(n.wishId, null, wishName = wishName)
+          WishUnreservedNotification(n.wishId, UuidHelper.dummyUUID, wishName = wishName)
         })
       case _ =>
     }
@@ -65,4 +65,8 @@ class ServerNotificationEventProcessor(notifier: ClientNotifier,
       scheduler.schedulePushNotification(deviceId, PushNotification(notificationCreator(user)))
     }
   }
+}
+
+object UuidHelper {
+  val dummyUUID = UUID.fromString("00000000-0000-0000-0000-000000000000")
 }
