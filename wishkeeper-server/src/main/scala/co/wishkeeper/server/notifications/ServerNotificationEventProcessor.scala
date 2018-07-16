@@ -28,14 +28,14 @@ class ServerNotificationEventProcessor(notifier: ClientNotifier,
         val user = User.replay(dataStore.userEvents(userId))
         user.settings.deviceNotificationId.foreach { deviceId =>
           val friendProfile = profileForNotification(User.replay(dataStore.userEvents(n.from)))
-          pushNotifications.send(deviceId, PushNotification(FriendRequestNotification(n.from, n.requestId, profile = friendProfile)))
+          pushNotifications.send(deviceId, PushNotification(userId, FriendRequestNotification(n.from, n.requestId, profile = friendProfile)))
         }
       case n: FriendRequestAcceptedNotificationCreated =>
         notifier.sendTo(NotificationsUpdated, userId)
         val user = User.replay(dataStore.userEvents(userId))
         user.settings.deviceNotificationId.foreach { deviceId =>
           val friendProfile = profileForNotification(User.replay(dataStore.userEvents(n.by)))
-          pushNotifications.send(deviceId, PushNotification(FriendRequestAcceptedNotification(n.by, n.requestId, profile = friendProfile)))
+          pushNotifications.send(deviceId, PushNotification(userId, FriendRequestAcceptedNotification(n.by, n.requestId, profile = friendProfile)))
         }
       case n: WishReservedNotificationCreated =>
         scheduler.scheduleNotification(userId, NotificationsUpdated)
@@ -62,7 +62,7 @@ class ServerNotificationEventProcessor(notifier: ClientNotifier,
   private def schedulePushNotification(userId: UUID, notificationCreator: User => NotificationData) = {
     val user = User.replay(dataStore.userEvents(userId))
     user.settings.deviceNotificationId.foreach { deviceId =>
-      scheduler.schedulePushNotification(deviceId, PushNotification(notificationCreator(user)))
+      scheduler.schedulePushNotification(deviceId, PushNotification(userId, notificationCreator(user)))
     }
   }
 }

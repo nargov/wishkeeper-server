@@ -55,10 +55,7 @@ class UserCommandProcessor(dataStore: DataStore, eventProcessors: List[EventProc
     }
   }
 
-  private def publishEvents(events: List[Event], userId: UUID): Unit = {
-    println("Publishing events: " + events.mkString)
-    events.foreach(publishEvent(_, userId))
-  }
+  private def publishEvents(events: List[Event], userId: UUID): Unit = events.foreach(publishEvent(_, userId))
 
   private def publishEvent(event: Event, userId: UUID): Unit = eventProcessors.foreach(processor =>
     processor.process(event, userId).foreach(newEvent => publishEvent(newEvent._2, newEvent._1)))

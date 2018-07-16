@@ -16,6 +16,8 @@ object UserTestHelper {
   def now = DateTime.now()
 
   implicit class TestUserOps(user: User) {
+    def withEvent(event: UserEvent) = user.applyEvent(asEventInstant(event))
+
     def withWish(id: UUID = UUID.randomUUID()): User =
       user.applyEvent(UserEventInstant(WishCreated(id, user.id, now), now))
 

@@ -5,7 +5,6 @@ import java.util.UUID
 import akka.actor.ActorSystem
 import akka.http.scaladsl.model.{HttpRequest, StatusCodes}
 import akka.http.scaladsl.server.Directives._
-import akka.http.scaladsl.server._
 import akka.http.scaladsl.server.directives.{DebuggingDirectives, LoggingMagnet}
 import akka.http.scaladsl.server.{Route, RouteResult}
 import co.wishkeeper.json._
@@ -40,12 +39,12 @@ object ManagementRoute {
     }
 
     val deletePicture: UUID => Route = userId => (pathPrefix("picture") & delete) {
-      managementApi.deleteUserPicture(userId).fold({case err: ValidationError => complete(StatusCodes.ServerError, err)}, complete(_))
+      managementApi.deleteUserPicture(userId).fold({ case err: ValidationError => complete(StatusCodes.ServerError, err) }, complete(_))
     }
 
     val profile: UUID => Route = userId => pathPrefix("profile") {
       get(complete(managementApi.profileFor(userId))) ~
-      deletePicture(userId)
+        deletePicture(userId)
     }
 
     val wishes: UUID => Route = userId => pathPrefix("wishes") {
@@ -63,10 +62,15 @@ object ManagementRoute {
       resetFacebookFriends(userId)
     }
 
+    val events: UUID => Route = userId => (pathPrefix("events") & get) {
+      complete(managementApi.userEvents(userId).map(e => (e.time, e.event)))
+    }
+
     val user: Route = pathPrefix(JavaUUID) { userId =>
       profile(userId) ~
         wishes(userId) ~
-        flags(userId)
+        flags(userId) ~
+        events(userId)
     }
 
     DebuggingDirectives.logRequestResult(LoggingMagnet(_ => printer)) {

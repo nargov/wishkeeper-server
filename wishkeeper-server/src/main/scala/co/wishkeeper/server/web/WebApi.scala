@@ -136,8 +136,17 @@ class WebApi(publicApi: PublicApi, managementApi: ManagementApi, clientRegistry:
     handleCommandResult(publicApi.setNotificationId(userId, notificationId))
   }
 
+  val markViewedNotification: (UUID, UUID) => Route = (userId, notificationId) => (pathPrefix("viewed") & post) {
+    handleCommandResult(publicApi.markNotificationAsViewed(userId, notificationId))
+  }
+
+  val notification: UUID => Route = userId => pathPrefix(JavaUUID) { notificationId =>
+    markViewedNotification(userId, notificationId)
+  }
+
   val notifications: UUID => Route = userId => pathPrefix("notifications") {
-    setNotificationId(userId)
+    setNotificationId(userId) ~
+      notification(userId)
   }
 
   val newUserRoute: Route =

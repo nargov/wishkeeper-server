@@ -40,3 +40,7 @@ case object NoChange extends ValidationError{
 case object NoPictureToDelete extends ValidationError {
   override val message: String = "User profile picture does not exist"
 }
+
+case class AlreadyViewed(id: UUID) extends ValidationError {
+  override val message: String = s"Notification [$id] already marked as viewed"
+}

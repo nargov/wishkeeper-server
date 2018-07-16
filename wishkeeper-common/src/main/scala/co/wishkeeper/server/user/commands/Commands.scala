@@ -3,7 +3,7 @@ package co.wishkeeper.server.user.commands
 import java.util.UUID
 
 import co.wishkeeper.server.Events._
-import co.wishkeeper.server.user.{NoChange, NoPictureToDelete, ValidationError}
+import co.wishkeeper.server.user.{AlreadyViewed, NoChange, NoPictureToDelete, ValidationError}
 import co.wishkeeper.server.{FriendRequestStatus, User}
 
 trait UserCommand {
@@ -43,6 +43,14 @@ object ChangeFriendRequestStatus {
 case object MarkAllNotificationsViewed extends UserCommand {
   override def process(user: User): List[UserEvent] =
     user.notifications.filterNot(_.viewed).map(notification => NotificationViewed(notification.id))
+}
+
+case class MarkNotificationViewed(id: UUID) extends UserCommand {
+  override def process(user: User): List[UserEvent] = NotificationViewed(id) :: Nil
+}
+object MarkNotificationViewed {
+  implicit val validator: UserCommandValidator[MarkNotificationViewed] = (user, event) => Either.cond(
+    user.notifications.exists(n => n.id == event.id && !n.viewed), (), AlreadyViewed(event.id))
 }
 
 case class RemoveFriend(friendId: UUID) extends UserCommand {

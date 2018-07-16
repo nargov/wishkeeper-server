@@ -76,7 +76,7 @@ class ServerNotificationEventProcessorTest extends Specification with JMock {
         withIncomingFriendRequest(friendId, requestId).list)
       allowing(dataStore).userEvents(friendId).willReturn(EventsList(friendId).withName(friendName).withFirstName(friendFirstName).
         withPic(friendPicture).list)
-      oneOf(pushNotifications).send(deviceToken, PushNotification(FriendRequestNotification(friendId, requestId, profile = Option(UserProfile(
+      oneOf(pushNotifications).send(deviceToken, PushNotification(userId, FriendRequestNotification(friendId, requestId, profile = Option(UserProfile(
         name = Option(friendName), firstName = Option(friendFirstName), picture = Option(friendPicture)
       )))))
     }
@@ -90,7 +90,7 @@ class ServerNotificationEventProcessorTest extends Specification with JMock {
       allowing(dataStore).userEvents(userId).willReturn(EventsList(userId).withDeviceId(deviceToken).withFriend(friendId, requestId).list)
       allowing(dataStore).userEvents(friendId).willReturn(EventsList(friendId).withName(friendName).withFirstName(friendFirstName).
         withPic(friendPicture).list)
-      oneOf(pushNotifications).send(deviceToken, PushNotification(FriendRequestAcceptedNotification(friendId, requestId,
+      oneOf(pushNotifications).send(deviceToken, PushNotification(userId, FriendRequestAcceptedNotification(friendId, requestId,
         profile = Option(UserProfile(name = Option(friendName), firstName = Option(friendFirstName), picture = Option(friendPicture))))))
     }
 

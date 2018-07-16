@@ -227,6 +227,16 @@ class DelegatingPublicApiTest extends Specification with JMock {
     api.setNotificationId(userId, notificationId)
   }
 
+  "marks a notification as read" in new LoggedInContext {
+    val notificationId = randomUUID()
+
+    checking {
+      oneOf(commandProcessor).validatedProcess(MarkNotificationViewed(notificationId), userId).willReturn(Right(()))
+    }
+
+    api.markNotificationAsViewed(userId, notificationId)
+  }
+
   def userWishesWith(wishId: UUID, wishName: String): Matcher[UserWishes] = contain(aWishWith(wishId, wishName)) ^^ {(_: UserWishes).wishes}
 
   def aWishWith(id: UUID, name: String): Matcher[Wish] = (wish: Wish) =>

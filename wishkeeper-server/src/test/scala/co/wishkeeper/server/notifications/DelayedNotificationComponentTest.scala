@@ -69,7 +69,7 @@ class DelayedNotificationComponentTest extends Specification with JMock {
     val event = WishReservedNotificationCreated(randomUUID(), randomUUID(), randomUUID())
 
     val wishName = "My Wish"
-    val pushNotification = PushNotification(WishReservedNotification(event.wishId, event.reserverId, wishName = Option(wishName)))
+    val pushNotification = PushNotification(userId, WishReservedNotification(event.wishId, event.reserverId, wishName = Option(wishName)))
 
     checking {
       allowing(dataStore).userEvents(userId).willReturn(EventsList(userId).withEvent(idSet).withWish(event.wishId, wishName).list)
@@ -89,7 +89,7 @@ class DelayedNotificationComponentTest extends Specification with JMock {
     val friendId = randomUUID()
     val event = WishUnreservedNotificationCreated(randomUUID(), wishId)
     val wishName = "Wish Name"
-    val pushNotification = PushNotification(WishUnreservedNotification(event.wishId, UuidHelper.dummyUUID, wishName = Option(wishName)))
+    val pushNotification = PushNotification(userId, WishUnreservedNotification(event.wishId, UuidHelper.dummyUUID, wishName = Option(wishName)))
 
     checking {
       allowing(dataStore).userEvents(userId).willReturn(EventsList(userId).withEvent(idSet).withReservedWish(wishId, wishName, friendId).list)

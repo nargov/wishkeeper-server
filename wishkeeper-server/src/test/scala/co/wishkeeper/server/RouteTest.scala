@@ -468,6 +468,18 @@ class RouteTest extends Specification with Specs2RouteTest with JMock {
         status must beEqualTo(StatusCodes.OK)
       }
     }
+
+    "mark notification as viewed" in new LoggedInUserContext {
+      val notificationId = randomUUID()
+
+      checking {
+        oneOf(publicApi).markNotificationAsViewed(userId, notificationId).willReturn(Right(()))
+      }
+
+      Post(s"/me/notifications/$notificationId/viewed").withHeaders(sessionIdHeader) ~> webApi.newUserRoute ~> check {
+        status must beEqualTo(StatusCodes.OK)
+      }
+    }
   }
 
   trait BaseContext extends Scope {

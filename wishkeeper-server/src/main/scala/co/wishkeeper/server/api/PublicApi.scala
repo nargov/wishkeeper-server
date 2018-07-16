@@ -20,6 +20,8 @@ import scala.util.Try
 
 trait PublicApi {
 
+  def markNotificationAsViewed(userId: UUID, notificationId: UUID): Either[Error, Unit]
+
   def setNotificationId(userId: UUID, notificationId: String): Either[Error, Unit]
 
   def sendFriendRequest(userId: UUID, request: SendFriendRequest): Either[Error, Unit]
@@ -251,4 +253,7 @@ class DelegatingPublicApi(commandProcessor: CommandProcessor,
 
   override def setNotificationId(userId: UUID, notificationId: String): Either[Error, Unit] =
     commandProcessor.validatedProcess(SetDeviceNotificationId(notificationId), userId)
+
+  override def markNotificationAsViewed(userId: UUID, notificationId: UUID): Either[Error, Unit] =
+    commandProcessor.validatedProcess(MarkNotificationViewed(notificationId), userId)
 }

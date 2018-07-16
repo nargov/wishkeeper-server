@@ -51,7 +51,7 @@ class WishkeeperServer {
     friendRequestsProjection,
     new UserByEmailProjection(dataStore),
     new ServerNotificationEventProcessor(clientRegistry, notificationsScheduler, dataStore, pushNotifications),
-    new ImageUploadEventProcessor(userImageStore, fileAdapter)
+    new ImageUploadEventProcessor(userImageStore, fileAdapter, dataStore)
   ))
   private val userProfileProjection: UserProfileProjection = new ReplayingUserProfileProjection(dataStore)
   private val publicApi = new DelegatingPublicApi(commandProcessor, dataStore, facebookConnector,
