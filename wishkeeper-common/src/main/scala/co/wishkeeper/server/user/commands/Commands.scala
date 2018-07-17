@@ -3,7 +3,7 @@ package co.wishkeeper.server.user.commands
 import java.util.UUID
 
 import co.wishkeeper.server.Events._
-import co.wishkeeper.server.user.{AlreadyViewed, NoChange, NoPictureToDelete, ValidationError}
+import co.wishkeeper.server.user._
 import co.wishkeeper.server.{FriendRequestStatus, User}
 
 trait UserCommand {
@@ -17,9 +17,13 @@ case class SendFriendRequest(friendId: UUID) extends UserCommand {
     else
       List(FriendRequestSent(user.id, friendId, Option(UUID.randomUUID())))
 }
+
 object SendFriendRequest {
   implicit val validator = new UserCommandValidator[SendFriendRequest] {
-    override def validate(user: User, command: SendFriendRequest): Either[ValidationError, Unit] = Right(())
+    override def validate(user: User, command: SendFriendRequest): Either[ValidationError, Unit] = {
+      if (user.friends.current.contains(command.friendId)) Left(AlreadyFriend(command.friendId))
+      else Right(())
+    }
   }
 }
 
@@ -36,6 +40,7 @@ case class ChangeFriendRequestStatus(requestId: UUID, status: FriendRequestStatu
       getOrElse(Nil)
   }
 }
+
 object ChangeFriendRequestStatus {
   implicit val validator: UserCommandValidator[ChangeFriendRequestStatus] = UserCommandValidator.Always
 }
@@ -48,6 +53,7 @@ case object MarkAllNotificationsViewed extends UserCommand {
 case class MarkNotificationViewed(id: UUID) extends UserCommand {
   override def process(user: User): List[UserEvent] = NotificationViewed(id) :: Nil
 }
+
 object MarkNotificationViewed {
   implicit val validator: UserCommandValidator[MarkNotificationViewed] = (user, event) => Either.cond(
     user.notifications.exists(n => n.id == event.id && !n.viewed), (), AlreadyViewed(event.id))
@@ -60,6 +66,7 @@ case class RemoveFriend(friendId: UUID) extends UserCommand {
 case class SetDeviceNotificationId(id: String) extends UserCommand {
   override def process(user: User): List[UserEvent] = DeviceNotificationIdSet(id) :: Nil
 }
+
 object SetDeviceNotificationId {
   implicit val validator = new UserCommandValidator[SetDeviceNotificationId] {
     override def validate(user: User, command: SetDeviceNotificationId): Either[ValidationError, Unit] =

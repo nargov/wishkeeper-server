@@ -5,10 +5,10 @@ import java.util.UUID.randomUUID
 
 import co.wishkeeper.server.Events._
 import co.wishkeeper.server.EventsTestHelper.EventsList
-import co.wishkeeper.server.{DataStore, FriendRequestStatus, PushNotification, UserProfile}
 import co.wishkeeper.server.FriendRequestStatus.Approved
 import co.wishkeeper.server.NotificationsData.{FriendRequestAcceptedNotification, FriendRequestNotification}
 import co.wishkeeper.server.messaging._
+import co.wishkeeper.server.{DataStore, PushNotification, UserProfile}
 import com.wixpress.common.specs2.JMock
 import org.specs2.mutable.Specification
 import org.specs2.specification.Scope
@@ -69,6 +69,7 @@ class ServerNotificationEventProcessorTest extends Specification with JMock {
   }
 
   "Send friend request notification through push" in new Context with Friend {
+    val notificationId: UUID = randomUUID()
 
     checking {
       ignoring(clientNotifier)
@@ -76,25 +77,27 @@ class ServerNotificationEventProcessorTest extends Specification with JMock {
         withIncomingFriendRequest(friendId, requestId).list)
       allowing(dataStore).userEvents(friendId).willReturn(EventsList(friendId).withName(friendName).withFirstName(friendFirstName).
         withPic(friendPicture).list)
-      oneOf(pushNotifications).send(deviceToken, PushNotification(userId, FriendRequestNotification(friendId, requestId, profile = Option(UserProfile(
+      oneOf(pushNotifications).send(deviceToken, PushNotification(userId, notificationId, FriendRequestNotification(friendId, requestId, profile = Option(UserProfile(
         name = Option(friendName), firstName = Option(friendFirstName), picture = Option(friendPicture)
       )))))
     }
 
-    processEvent(FriendRequestNotificationCreated(randomUUID(), userId, friendId, requestId))
+    processEvent(FriendRequestNotificationCreated(notificationId, userId, friendId, requestId))
   }
 
   "Send friend request accepted notification through push" in new Context with Friend {
+    val notificationId: UUID = randomUUID()
+
     checking {
       ignoring(clientNotifier)
       allowing(dataStore).userEvents(userId).willReturn(EventsList(userId).withDeviceId(deviceToken).withFriend(friendId, requestId).list)
       allowing(dataStore).userEvents(friendId).willReturn(EventsList(friendId).withName(friendName).withFirstName(friendFirstName).
         withPic(friendPicture).list)
-      oneOf(pushNotifications).send(deviceToken, PushNotification(userId, FriendRequestAcceptedNotification(friendId, requestId,
+      oneOf(pushNotifications).send(deviceToken, PushNotification(userId, notificationId, FriendRequestAcceptedNotification(friendId, requestId,
         profile = Option(UserProfile(name = Option(friendName), firstName = Option(friendFirstName), picture = Option(friendPicture))))))
     }
 
-    processEvent(FriendRequestAcceptedNotificationCreated(randomUUID(), userId, friendId, requestId))
+    processEvent(FriendRequestAcceptedNotificationCreated(notificationId, userId, friendId, requestId))
   }
 
   trait Friend {

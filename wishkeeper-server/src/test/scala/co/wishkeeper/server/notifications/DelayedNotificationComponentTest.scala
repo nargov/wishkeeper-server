@@ -66,10 +66,12 @@ class DelayedNotificationComponentTest extends Specification with JMock {
   }
 
   "Wish Reserved Notification should be sent through push channel" in new Context {
-    val event = WishReservedNotificationCreated(randomUUID(), randomUUID(), randomUUID())
+    val notificationId: UUID = randomUUID()
+    val event = WishReservedNotificationCreated(notificationId, randomUUID(), randomUUID())
 
     val wishName = "My Wish"
-    val pushNotification = PushNotification(userId, WishReservedNotification(event.wishId, event.reserverId, wishName = Option(wishName)))
+    val pushNotification = PushNotification(userId, notificationId,
+      WishReservedNotification(event.wishId, event.reserverId, wishName = Option(wishName)))
 
     checking {
       allowing(dataStore).userEvents(userId).willReturn(EventsList(userId).withEvent(idSet).withWish(event.wishId, wishName).list)
@@ -85,11 +87,13 @@ class DelayedNotificationComponentTest extends Specification with JMock {
   }
 
   "Wish Unreserved Notification should be sent after delay to push channel" in new Context {
+    val notificationId: UUID = randomUUID()
     val wishId = randomUUID()
     val friendId = randomUUID()
-    val event = WishUnreservedNotificationCreated(randomUUID(), wishId)
+    val event = WishUnreservedNotificationCreated(notificationId, wishId)
     val wishName = "Wish Name"
-    val pushNotification = PushNotification(userId, WishUnreservedNotification(event.wishId, UuidHelper.dummyUUID, wishName = Option(wishName)))
+    val pushNotification = PushNotification(userId, notificationId,
+      WishUnreservedNotification(event.wishId, UuidHelper.dummyUUID, wishName = Option(wishName)))
 
     checking {
       allowing(dataStore).userEvents(userId).willReturn(EventsList(userId).withEvent(idSet).withReservedWish(wishId, wishName, friendId).list)

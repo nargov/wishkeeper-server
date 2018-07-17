@@ -42,7 +42,7 @@ case class Notification(id: UUID, data: NotificationData, viewed: Boolean = fals
 
 case class UserNotifications(list: List[Notification], unread: Int)
 
-case class PushNotification(userId: UUID, data: NotificationData) {
+case class PushNotification(userId: UUID, notificationId: UUID, data: NotificationData) {
   import io.circe.generic.extras.auto._
   import io.circe.syntax._
   implicit val circeConfig = Configuration.default.withDefaults.withDiscriminator("type")

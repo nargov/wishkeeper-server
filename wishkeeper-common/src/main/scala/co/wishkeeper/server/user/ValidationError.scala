@@ -44,3 +44,7 @@ case object NoPictureToDelete extends ValidationError {
 case class AlreadyViewed(id: UUID) extends ValidationError {
   override val message: String = s"Notification [$id] already marked as viewed"
 }
+
+case class AlreadyFriend(friendId: UUID) extends ValidationError {
+  override val message: String = s"User [$friendId] is already a friend"
+}
