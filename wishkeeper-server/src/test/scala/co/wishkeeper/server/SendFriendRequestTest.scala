@@ -8,6 +8,7 @@ import co.wishkeeper.server.Events.{FriendRequestSent, UserEvent}
 import org.specs2.matcher.Matcher
 import org.specs2.mutable.Specification
 import UserTestHelper._
+import co.wishkeeper.server.user.{AlreadyFriend, ValidationError}
 import org.specs2.specification.Scope
 
 class SendFriendRequestTest extends Specification {
@@ -20,6 +21,10 @@ class SendFriendRequestTest extends Specification {
   "should not create an event if friend request for this friend already exists" in new Context {
     val user = aUser.withSentFriendRequest(randomUUID(), friendId)
     SendFriendRequest(friendId).process(user) must beEmpty
+  }
+
+  "Should fail validation if user is already a friend" in new Context {
+    SendFriendRequest.validator.validate(aUser.withFriend(friendId), SendFriendRequest(friendId)) should beLeft[ValidationError](AlreadyFriend(friendId))
   }
 
   trait Context extends Scope {
