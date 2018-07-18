@@ -12,7 +12,7 @@ class ImageUploadEventProcessor(imageStore: ImageStore, fileAdapter: FileAdapter
     event match {
       case UserPictureSet(_, url) if !url.startsWith(imageStore.imageLinkBase) =>
         val newImageId = UUID.randomUUID().toString
-        val pictureSetEvent = UserPictureSet(userId, imageStore.imageLinkBase + newImageId)
+        val pictureSetEvent = UserPictureSet(userId, imageStore.imageLinkBase + "/" + newImageId)
         fileAdapter.inputStreamFor(url)
           .map(in => {
             imageStore.save(ImageData(in, "image/png"), newImageId)
