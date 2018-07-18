@@ -69,6 +69,7 @@ class ImageUploadEventProcessorTest extends Specification with JMock {
 
   def aUserPictureSetEventWith(userId: UUID, prefix: String): Matcher[Event] = (e:Event) => e match {
     case UserPictureSet(id, link) => (userId == id && link.startsWith(prefix), "UserPictureSet event does not have required userId or prefix")
+    case _ => (false, "Not a UserPictureSet event")
   }
 
   def aUserPictureSetTupleEventWith(userId: UUID, prefix: String): Matcher[(UUID, Event)] = (t:(UUID,Event)) => t match {

@@ -128,8 +128,14 @@ class WebApi(publicApi: PublicApi, managementApi: ManagementApi, clientRegistry:
       handleCommandResult(publicApi.sendFriendRequest(userId, friendRequest))
     }
 
+  val removeFriend: UUID => Route = userId =>
+    (delete & pathPrefix(JavaUUID)) { friendId =>
+      handleCommandResult(publicApi.removeFriend(userId, friendId))
+    }
+
   val friends: UUID => Route = userId => pathPrefix("friends") {
-    sendFriendRequest(userId)
+    sendFriendRequest(userId) ~
+    removeFriend(userId)
   }
 
   val setNotificationId: UUID => Route = userId => (post & pathPrefix("id") & formField("id")) { notificationId =>

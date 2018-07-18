@@ -36,8 +36,6 @@ trait DataStore {
 
   def lastSequenceNum(userId: UUID): Option[Long]
 
-  def userEventsFor(userId: UUID): List[UserEvent]
-
   def userEvents(userId: UUID): List[UserEventInstant[_ <: UserEvent]]
 
   def connect(): Unit
@@ -103,8 +101,6 @@ class CassandraDataStore(dataStoreConfig: DataStoreConfig) extends DataStore {
     else
       None
   }
-
-  override def userEventsFor(userId: UUID): List[UserEvent] = userEvents(userId).map(_.event)
 
   override def userEvents(userId: UUID): List[UserEventInstant[_ <: UserEvent]] = {
     val resultSet: ResultSet = session.execute(selectUserEvents.bind().setUUID("userId", userId))

@@ -480,6 +480,17 @@ class RouteTest extends Specification with Specs2RouteTest with JMock {
         status must beEqualTo(StatusCodes.OK)
       }
     }
+
+    "Remove friend" in new LoggedInUserContext {
+
+      checking {
+        oneOf(publicApi).removeFriend(userId, friendId).willReturn(Right(()))
+      }
+
+      Delete(s"/me/friends/$friendId").withHeaders(sessionIdHeader) ~> webApi.newUserRoute ~> check {
+        status must beEqualTo(StatusCodes.OK)
+      }
+    }
   }
 
   trait BaseContext extends Scope {

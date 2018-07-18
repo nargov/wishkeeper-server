@@ -5,6 +5,7 @@ import java.util.UUID.randomUUID
 
 import co.wishkeeper.server.DataStore
 import co.wishkeeper.server.Events._
+import co.wishkeeper.server.EventsTestHelper.EventsList
 import co.wishkeeper.server.FriendRequestStatus.Approved
 import com.wixpress.common.specs2.JMock
 import org.joda.time.DateTime
@@ -27,7 +28,21 @@ class FriendRequestsEventProcessorTest extends Specification with JMock {
     assumeFriendPriorEventsExist()
 
     val expectedEvent = FriendRemoved(friendId, userId)
+    checking {
+      allowing(dataStore).userEvents(friendId).willReturn(EventsList(friendId).withFriend(userId).list)
+    }
     expectSavedEvent(expectedEvent)
+
+    notificationsProjection.process(FriendRemoved(userId, friendId), userId) must beEqualTo((friendId, expectedEvent) :: Nil)
+  }
+
+  "Not create a FriendRemoved event if not friends" in new Context {
+    assumeFriendPriorEventsExist()
+
+    val expectedEvent = FriendRemoved(friendId, userId)
+    checking {
+      allowing(dataStore).userEvents(friendId).willReturn(EventsList(friendId).list)
+    }
 
     notificationsProjection.process(FriendRemoved(userId, friendId), userId) must beEqualTo(Nil)
   }

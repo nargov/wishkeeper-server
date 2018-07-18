@@ -14,9 +14,10 @@ class CassandraDataStoreIT extends FlatSpec with Matchers with BeforeAndAfterAll
   val sessionId = randomUUID()
 
   it should "save a user event" in {
-    val event = UserConnected(userId, DateTime.now(), sessionId)
-    eventStore.saveUserEvents(userId, None, DateTime.now(), List(event))
-    eventStore.userEventsFor(userId) should contain(event)
+    val time = DateTime.now()
+    val event = UserConnected(userId, time, sessionId)
+    eventStore.saveUserEvents(userId, None, time, List(event))
+    eventStore.userEvents(userId) should contain(UserEventInstant(event, time))
   }
 
   it should "save a user session" in {

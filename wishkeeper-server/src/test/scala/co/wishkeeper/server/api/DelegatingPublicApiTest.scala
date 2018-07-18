@@ -237,6 +237,14 @@ class DelegatingPublicApiTest extends Specification with JMock {
     api.markNotificationAsViewed(userId, notificationId)
   }
 
+  "removes friend" in new LoggedInContext {
+    checking {
+      oneOf(commandProcessor).validatedProcess(RemoveFriend(friendId), userId).willReturn(Right(()))
+    }
+
+    api.removeFriend(userId, friendId)
+  }
+
   def userWishesWith(wishId: UUID, wishName: String): Matcher[UserWishes] = contain(aWishWith(wishId, wishName)) ^^ {(_: UserWishes).wishes}
 
   def aWishWith(id: UUID, name: String): Matcher[Wish] = (wish: Wish) =>

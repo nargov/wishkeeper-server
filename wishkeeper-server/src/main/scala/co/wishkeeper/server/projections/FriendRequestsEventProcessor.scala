@@ -4,7 +4,7 @@ import java.util.UUID
 
 import co.wishkeeper.server.CommandProcessor.retry
 import co.wishkeeper.server.Events._
-import co.wishkeeper.server.{DataStore, DbErrorEventsNotSaved, Error, EventProcessor}
+import co.wishkeeper.server.{DataStore, DbErrorEventsNotSaved, Error, EventProcessor, User}
 import org.joda.time.DateTime
 
 
@@ -16,8 +16,12 @@ class FriendRequestsEventProcessor(dataStore: DataStore) extends EventProcessor 
       Nil
     case FriendRemoved(_, friendId) =>
       val removed = FriendRemoved(friendId, userId)
-      saveEventFor(friendId, removed)
-      Nil
+      val friend = User.replay(dataStore.userEvents(friendId))
+      if(friend.hasFriend(userId)){
+        saveEventFor(friendId, removed)
+        (friendId, removed) :: Nil
+      }
+      else Nil
     case FriendRequestSent(sender, receiver, id) => id.flatMap { _ =>
       val newEvents = List(FriendRequestReceived(receiver, sender, id))
       saveEventFor(receiver, newEvents.head).map(_ => newEvents.map((receiver, _))).toOption

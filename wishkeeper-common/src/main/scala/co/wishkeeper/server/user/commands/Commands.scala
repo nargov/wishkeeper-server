@@ -21,7 +21,7 @@ case class SendFriendRequest(friendId: UUID) extends UserCommand {
 object SendFriendRequest {
   implicit val validator = new UserCommandValidator[SendFriendRequest] {
     override def validate(user: User, command: SendFriendRequest): Either[ValidationError, Unit] = {
-      if (user.friends.current.contains(command.friendId)) Left(AlreadyFriend(command.friendId))
+      if (user.hasFriend(command.friendId)) Left(AlreadyFriend(command.friendId))
       else Right(())
     }
   }
@@ -61,6 +61,9 @@ object MarkNotificationViewed {
 
 case class RemoveFriend(friendId: UUID) extends UserCommand {
   override def process(user: User): List[UserEvent] = FriendRemoved(user.id, friendId) :: Nil
+}
+object RemoveFriend{
+  implicit val validator: UserCommandValidator[RemoveFriend] = (user, event) => Either.cond(user.hasFriend(event.friendId), (), NotFriends)
 }
 
 case class SetDeviceNotificationId(id: String) extends UserCommand {
