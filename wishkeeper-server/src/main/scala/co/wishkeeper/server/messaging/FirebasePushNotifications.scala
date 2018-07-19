@@ -18,9 +18,8 @@ class FirebasePushNotifications extends PushNotifications {
   val logger = LoggerFactory.getLogger(classOf[PushNotifications])
 
   def send(deviceToken: String, notification: PushNotification): Try[String] = {
-    val androidConfig = AndroidConfig.builder().build()
+    val androidConfig = AndroidConfig.builder().setPriority(AndroidConfig.Priority.HIGH).build()
     val body = notification.toJson
-    logger.info("Sending push notification " + body) //TODO remove or change to reporter and add test
     val message = Message.builder().
       putData("body", body).
       setToken(deviceToken).
