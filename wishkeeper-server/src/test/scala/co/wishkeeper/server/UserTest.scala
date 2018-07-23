@@ -409,6 +409,3 @@ class UserTest extends Specification with MatcherMacros with JMock with Notifica
     (_: Wish).creationTime
   }
 }
-
-
-

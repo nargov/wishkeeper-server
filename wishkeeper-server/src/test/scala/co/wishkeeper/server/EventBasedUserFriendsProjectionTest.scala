@@ -127,11 +127,28 @@ class EventBasedUserFriendsProjectionTest(implicit ee: ExecutionEnv) extends Spe
     userFriendsProjection.friendsFor(userId).incoming must contain(anIncomingFriendRequestFrom(friendId, requestId))
   }
 
-  def aFriend(id: UUID): Matcher[Friend] = ===(id) ^^ {(_:Friend).userId}
+  "return friends in alphanumeric order" in new Context {
+    val friend = Friend(friendId, Option("T.J. Miller"))
+    val anotherFriend = Friend(randomUUID(), Option("Joe Miller"))
+    val namelessFriend = Friend(randomUUID())
+    val expectedList = anotherFriend :: friend :: namelessFriend :: Nil
+
+    checking {
+      allowing(dataStore).userEvents(userId).willReturn(EventsList(userId).withFriends(namelessFriend :: friend :: anotherFriend :: Nil).list)
+      expectedList.foreach { f =>
+        allowing(dataStore).userEvents(f.userId).willReturn(EventsList(f.userId).withName(f.name).list)
+      }
+    }
+
+    userFriendsProjection.friendsFor(userId).list must beEqualTo(expectedList)
+  }
+
+  def aFriend(id: UUID): Matcher[Friend] = ===(id) ^^ ((_: Friend).userId)
+
   def anIncomingFriendRequestFrom(friend: UUID, requestId: UUID): Matcher[IncomingFriendRequest] = (req: IncomingFriendRequest) =>
     (req.id == requestId && req.friend.userId == friend, s"Friend request mismatch. Expected request [$requestId] from [$friend] but got $req")
 
-  trait Context extends Scope{
+  trait Context extends Scope {
     val userFacebookId = "user-facebook-id"
     val accessToken = "access-token"
     val userId = randomUUID()
@@ -180,5 +197,5 @@ class EventBasedUserFriendsProjectionTest(implicit ee: ExecutionEnv) extends Spe
   }
 
   def aPotentialFriendWith(id: UUID, name: String): Matcher[PotentialFriend] =
-    (===(name) ^^ {(_:PotentialFriend).name}) and (===(id) ^^ {(_:PotentialFriend).userId})
+    (===(name) ^^ ((_: PotentialFriend).name)) and (===(id) ^^ ((_: PotentialFriend).userId))
 }

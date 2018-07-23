@@ -30,7 +30,6 @@ class ServerNotificationEventProcessorTest extends Specification with JMock {
   "Send friends list updated notification when friend request status changed" in new Context {
     checkingFriendsListUpdateNotificationSent()
 
-//    processEvent(FriendRequestStatusChanged(randomUUID(), randomUUID(), userId, Approved))
     val friendId: UUID = randomUUID()
     processor.process(FriendRequestStatusChanged(friendId, randomUUID(), userId, Approved), friendId)
   }

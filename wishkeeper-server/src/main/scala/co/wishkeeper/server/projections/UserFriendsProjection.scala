@@ -38,7 +38,7 @@ class EventBasedUserFriendsProjection(facebookConnector: FacebookConnector,
 
   override def friendsFor(userId: UUID): UserFriends = {
     val user = User.replay(dataStore.userEvents(userId))
-    val friends = user.friends.current.map(friendDetails)
+    val friends = user.friends.current.map(friendDetails).sorted(Friend.ordering)
     val requested = user.friends.sentRequests.map(userIdFromFriendRequest andThen friendDetails)
     val incoming = user.friends.receivedRequests.map(req => IncomingFriendRequest(req.id, friendDetails(req.from)))
     UserFriends(friends, requested = requested, incoming = incoming)
@@ -67,6 +67,16 @@ class EventBasedUserFriendsProjection(facebookConnector: FacebookConnector,
 
 
 case class Friend(userId: UUID, name: Option[String] = None, image: Option[String] = None, firstName: Option[String] = None)
+object Friend {
+  implicit val ordering = new Ordering[Friend]{
+    override def compare(x: Friend, y: Friend): Int = (x.name, y.name) match {
+      case (Some(xName), Some(yName)) => xName.compareTo(yName)
+      case (Some(_), None) => -1
+      case (None, Some(_)) => 1
+      case (None, None) => 0
+    }
+  }
+}
 
 case class IncomingFriendRequest(id: UUID, friend: Friend)
 

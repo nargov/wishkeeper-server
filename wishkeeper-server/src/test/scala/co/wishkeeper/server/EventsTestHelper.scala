@@ -5,6 +5,7 @@ import java.util.UUID.randomUUID
 
 import co.wishkeeper.server.Events._
 import co.wishkeeper.server.FriendRequestStatus.Approved
+import co.wishkeeper.server.projections.Friend
 import org.joda.time.DateTime
 
 object EventsTestHelper {
@@ -18,6 +19,9 @@ object EventsTestHelper {
 
   case class EventsList(userId: UUID, list: List[UserEventInstant[_ <: UserEvent]]) {
 
+    def withFriends(friends: Seq[Friend]): EventsList = friends.foldLeft(this)(_.withFriend(_))
+
+    def withFriend(friend: Friend): EventsList = withFriend(friend.userId)
 
     def withFriend(friendId: UUID, requestId: UUID = randomUUID()) = this.copy(list = list ++ asEventInstants(List(
       FriendRequestSent(userId, friendId, Option(requestId)),
@@ -30,7 +34,9 @@ object EventsTestHelper {
     def withIncomingFriendRequest(friendId: UUID, friendRequestId: UUID) =
       this.copy(list = list :+ asEventInstant(FriendRequestReceived(userId, friendId, Option(friendRequestId))))
 
-    def withName(name: String) = withEvent(UserNameSet(userId, name))
+    def withName(name: String): EventsList = withEvent(UserNameSet(userId, name))
+
+    def withName(name: Option[String]): EventsList = name.fold(this)(withName)
 
     def withFirstName(name: String) = withEvent(UserFirstNameSet(userId, name))
 

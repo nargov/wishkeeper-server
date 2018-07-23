@@ -1,7 +1,6 @@
 package co.wishkeeper.server.notifications
 
 import java.util.UUID
-import java.util.concurrent.atomic.AtomicReference
 import java.util.concurrent._
 
 import co.wishkeeper.server.messaging._
@@ -9,8 +8,8 @@ import co.wishkeeper.server.{DataStore, Notification, PushNotification, User}
 import org.joda.time
 import org.joda.time.DateTime
 
-import scala.concurrent.{ExecutionContext, Future}
 import scala.concurrent.duration._
+import scala.concurrent.{ExecutionContext, Future}
 import scala.util.{Success, Try}
 
 trait NotificationsScheduler {
