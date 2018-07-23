@@ -74,7 +74,11 @@ class DelayedNotificationComponentTest extends Specification with JMock {
       WishReservedNotification(event.wishId, event.reserverId, wishName = Option(wishName)))
 
     checking {
-      allowing(dataStore).userEvents(userId).willReturn(EventsList(userId).withEvent(idSet).withWish(event.wishId, wishName).list)
+      allowing(dataStore).userEvents(userId).willReturn(EventsList(userId).
+        withEvent(idSet).
+        withWish(event.wishId, wishName).
+        withReservedWishNotification(notificationId, event.wishId, event.reserverId).
+        list)
       oneOf(pushNotifications).send(idSet.id, pushNotification)
     }
 
@@ -96,7 +100,12 @@ class DelayedNotificationComponentTest extends Specification with JMock {
       WishUnreservedNotification(event.wishId, UuidHelper.dummyUUID, wishName = Option(wishName)))
 
     checking {
-      allowing(dataStore).userEvents(userId).willReturn(EventsList(userId).withEvent(idSet).withReservedWish(wishId, wishName, friendId).list)
+      allowing(dataStore).userEvents(userId).willReturn(EventsList(userId).
+        withEvent(idSet).
+        withReservedWish(wishId, wishName, friendId).
+        withReservedWishNotification(notificationId, wishId, friendId, DateTime.now().minusHours(1)).
+        withUnreservedWishNotification(notificationId, wishId, DateTime.now()).
+        list)
       oneOf(pushNotifications).send(idSet.id, pushNotification)
     }
 
@@ -106,6 +115,27 @@ class DelayedNotificationComponentTest extends Specification with JMock {
     scheduler.tick(config.default.toSeconds, SECONDS)
 
     assertGotNotificationsUpdated()
+  }
+
+  "Scheduled Wish Reserved Notification should not be sent if not relevant anymore" in new Context {
+    val notificationId: UUID = randomUUID()
+    val wishId = randomUUID()
+    val friendId = randomUUID()
+    val reserveEvent = WishReservedNotificationCreated(randomUUID(), wishId, friendId)
+    val unreserveEvent = WishUnreservedNotificationCreated(notificationId, wishId)
+
+    checking {
+      allowing(dataStore).userEvents(userId).willReturn(EventsList(userId).
+        withEvent(idSet).
+        withWish(wishId, "Some wish").
+        list)
+      never(pushNotifications).send(having(any), having(any))
+    }
+
+    serverNotificationEventProcessor.process(reserveEvent, userId)
+    serverNotificationEventProcessor.process(unreserveEvent, userId)
+
+    scheduler.tick(config.default.toSeconds + 1, SECONDS)
   }
 
 

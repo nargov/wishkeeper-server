@@ -15,7 +15,7 @@ import scala.util.{Success, Try}
 trait NotificationsScheduler {
   def scheduleNotification(userId: UUID, notification: ServerNotification): Unit
 
-  def schedulePushNotification(deviceId: String, notification: PushNotification): Future[Try[String]]
+  def schedulePushNotification(deviceId: String, notification: PushNotification, shouldSend: () => Boolean = () => true): Future[Try[String]]
 }
 
 class ExecutorNotificationsScheduler(config: NotificationDelayConfig = NotificationDelayConfig(),
@@ -34,11 +34,16 @@ class ExecutorNotificationsScheduler(config: NotificationDelayConfig = Notificat
     }), config.default.toMillis, MILLISECONDS)
   }
 
-  override def schedulePushNotification(deviceId: String, notification: PushNotification): Future[Try[String]] =
+  override def schedulePushNotification(deviceId: String, notification: PushNotification, shouldSend: () => Boolean): Future[Try[String]] =
     Future {
-      scheduler.schedule(toCallable(() => pushNotifications.send(deviceId, notification)), config.default.toMillis, MILLISECONDS).get()
+      scheduler.schedule(
+        toCallable(() =>
+          if (shouldSend())
+            pushNotifications.send(deviceId, notification)
+          else
+            Success("")
+        ), config.default.toMillis, MILLISECONDS).get()
     }
-
 
   object NotificationOrdering extends Ordering[Notification] {
     override def compare(x: Notification, y: Notification): Int = x.time.compareTo(y.time)
@@ -63,7 +68,8 @@ class ExecutorNotificationsScheduler(config: NotificationDelayConfig = Notificat
 object NoOpNotificationsScheduler extends NotificationsScheduler {
   override def scheduleNotification(userId: UUID, notification: ServerNotification): Unit = {}
 
-  override def schedulePushNotification(deviceId: String, notification: PushNotification): Future[Try[String]] = Future.successful(Success(""))
+  override def schedulePushNotification(deviceId: String, notification: PushNotification, shouldSend: () => Boolean): Future[Try[String]] =
+    Future.successful(Success(""))
 }
 
 case class NotificationDelayConfig(default: Duration = 5.minutes)

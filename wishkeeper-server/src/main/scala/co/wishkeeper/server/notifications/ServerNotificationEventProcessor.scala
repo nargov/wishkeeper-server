@@ -39,16 +39,24 @@ class ServerNotificationEventProcessor(notifier: ClientNotifier,
         }
       case n: WishReservedNotificationCreated =>
         scheduler.scheduleNotification(userId, NotificationsUpdated)
-        schedulePushNotification(userId, user => {
-          val wishName = user.wishes(n.wishId).name
-          WishReservedNotification(n.wishId, n.reserverId, wishName = wishName)
-        }, n.id)
+        schedulePushNotification(
+          userId,
+          user => {
+            val wishName = user.wishes(n.wishId).name
+            WishReservedNotification(n.wishId, n.reserverId, wishName = wishName)
+          },
+          n.id,
+          notificationStillExists(userId, n.id))
       case n: WishUnreservedNotificationCreated =>
         scheduler.scheduleNotification(userId, NotificationsUpdated)
-        schedulePushNotification(userId, user => {
-          val wishName = user.wishes(n.wishId).name
-          WishUnreservedNotification(n.wishId, UuidHelper.dummyUUID, wishName = wishName)
-        }, n.id)
+        schedulePushNotification(
+          userId,
+          user => {
+            val wishName = user.wishes(n.wishId).name
+            WishUnreservedNotification(n.wishId, UuidHelper.dummyUUID, wishName = wishName)
+          },
+          n.id,
+          notificationStillExists(userId, n.id))
       case _ =>
     }
     Nil
@@ -59,10 +67,14 @@ class ServerNotificationEventProcessor(notifier: ClientNotifier,
     Option(UserProfile(name = profile.name, firstName = profile.firstName, picture = profile.picture))
   }
 
-  private def schedulePushNotification(userId: UUID, notificationCreator: User => NotificationData, notificationId: UUID) = {
+  private val notificationStillExists: (UUID, UUID) => () => Boolean = (userId, notificationId) => () =>
+    User.replay(dataStore.userEvents(userId)).notifications.exists(_.id == notificationId)
+
+  private def schedulePushNotification(userId: UUID, createNotification: User => NotificationData,
+                                       notificationId: UUID, shouldSend: () => Boolean) = {
     val user = User.replay(dataStore.userEvents(userId))
-    user.settings.deviceNotificationId.foreach { deviceId =>
-      scheduler.schedulePushNotification(deviceId, PushNotification(userId, notificationId, notificationCreator(user)))
+    user.settings.deviceNotificationId.map { deviceId =>
+      scheduler.schedulePushNotification(deviceId, PushNotification(userId, notificationId, createNotification(user)), shouldSend)
     }
   }
 }
