@@ -128,13 +128,17 @@ class EventBasedUserFriendsProjectionTest(implicit ee: ExecutionEnv) extends Spe
   }
 
   "return friends in alphanumeric order" in new Context {
-    val friend = Friend(friendId, Option("T.J. Miller"))
-    val anotherFriend = Friend(randomUUID(), Option("Joe Miller"))
+    val friend1 = Friend(friendId, Option("Be"))
+    val friend2 = Friend(randomUUID(), Option("Aa"))
+    val friend3 = Friend(randomUUID(), Option("Ad"))
+    val friend4 = Friend(randomUUID(), Option("ac"))
+    val friend5 = Friend(randomUUID(), Option("ab"))
     val namelessFriend = Friend(randomUUID())
-    val expectedList = anotherFriend :: friend :: namelessFriend :: Nil
+    val friends = namelessFriend :: friend1 :: friend2 :: friend3 :: friend4 :: friend5 :: Nil
+    val expectedList = friend2 :: friend5 :: friend4 :: friend3 :: friend1 :: namelessFriend :: Nil
 
     checking {
-      allowing(dataStore).userEvents(userId).willReturn(EventsList(userId).withFriends(namelessFriend :: friend :: anotherFriend :: Nil).list)
+      allowing(dataStore).userEvents(userId).willReturn(EventsList(userId).withFriends(friends).list)
       expectedList.foreach { f =>
         allowing(dataStore).userEvents(f.userId).willReturn(EventsList(f.userId).withName(f.name).list)
       }

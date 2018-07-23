@@ -70,7 +70,7 @@ case class Friend(userId: UUID, name: Option[String] = None, image: Option[Strin
 object Friend {
   implicit val ordering = new Ordering[Friend]{
     override def compare(x: Friend, y: Friend): Int = (x.name, y.name) match {
-      case (Some(xName), Some(yName)) => xName.compareTo(yName)
+      case (Some(xName), Some(yName)) => xName.compareToIgnoreCase(yName)
       case (Some(_), None) => -1
       case (None, Some(_)) => 1
       case (None, None) => 0
