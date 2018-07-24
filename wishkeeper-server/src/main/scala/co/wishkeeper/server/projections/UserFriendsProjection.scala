@@ -64,7 +64,7 @@ class EventBasedUserFriendsProjection(facebookConnector: FacebookConnector,
       potentialMutual.map(_.asRequestedFriend)).sorted(Friend.ordering)
 
     if (userFriends.current.contains(friendId))
-      UserFriends(marked, mutualFriends, potentialMutual)
+      UserFriends(onlyFriendFriends, mutualFriends, potentialMutual, all = marked)
     else
       UserFriends(Nil, mutualFriends, Nil)
   }
@@ -103,6 +103,7 @@ object UserRelation {
 
 case class IncomingFriendRequest(id: UUID, friend: Friend)
 
-case class UserFriends(list: List[Friend], mutual: List[Friend] = Nil, requested: List[Friend] = Nil, incoming: List[IncomingFriendRequest] = Nil) {
+case class UserFriends(list: List[Friend], mutual: List[Friend] = Nil, requested: List[Friend] = Nil, incoming: List[IncomingFriendRequest] = Nil,
+                       all: List[Friend] = Nil) {
   def excluding(friendId: UUID) = copy(list = list.filterNot(_.userId == friendId))
 }
