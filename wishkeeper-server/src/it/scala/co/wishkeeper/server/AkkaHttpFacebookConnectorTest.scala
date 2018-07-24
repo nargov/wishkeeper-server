@@ -11,13 +11,14 @@ import org.specs2.matcher.Matcher
 import org.specs2.mutable.Specification
 import org.specs2.specification.{AfterAll, Scope}
 
+import scala.concurrent.ExecutionContext
 import scala.concurrent.duration._
 
 class AkkaHttpFacebookConnectorTest extends Specification with AfterAll {
   sequential
 
-  implicit val executionEnv: ExecutionEnv = ExecutionEnv.fromExecutionContext(ExecutionEnv.createExecutionContext(
-    Executors.newCachedThreadPool(), verbose = false, println))
+  implicit val executionEnv: ExecutionEnv = ExecutionEnv.fromExecutionContext(
+    ExecutionContext.fromExecutorService(Executors.newCachedThreadPool(), _.printStackTrace()))
 
   implicit val system = ActorSystem("test-system",
     ConfigFactory.load().withValue("akka.http.host-connection-pool.max-open-requests", ConfigValueFactory.fromAnyRef(64)))

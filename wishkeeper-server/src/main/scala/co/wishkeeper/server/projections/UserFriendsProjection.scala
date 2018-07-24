@@ -2,6 +2,7 @@ package co.wishkeeper.server.projections
 
 import java.util.UUID
 
+import co.wishkeeper.server.projections.UserRelation.{DirectFriend, RequestedFriend}
 import co.wishkeeper.server.{DataStore, FacebookConnector, FriendRequest, User}
 
 import scala.concurrent.{ExecutionContext, Future}
@@ -31,7 +32,7 @@ class EventBasedUserFriendsProjection(facebookConnector: FacebookConnector,
     eventualFacebookFriends.map { facebookFriends =>
       val facebookIdsToUserIds = userIdByFacebookId.get(facebookFriends.map(_.id))
       facebookIdsToUserIds.filterNot(existingOrRequestedFriend).map {
-        case (fbId, id) => PotentialFriend(id, facebookFriends.find(_.id == fbId).get.name, s"https://graph.facebook.com/v2.9/$fbId/picture") //TODO replace image
+        case (fbId, id) => PotentialFriend(id, facebookFriends.find(_.id == fbId).get.name, s"https://graph.facebook.com/v2.9/$fbId/picture")
       }.toList
     }
   }
@@ -58,17 +59,29 @@ class EventBasedUserFriendsProjection(facebookConnector: FacebookConnector,
     val friendFriends = friendsFor(friendId)
     val (mutualFriends, friends) = friendFriends.list.partition(friend => userCurrentFriends.contains(friend.userId))
     val (potentialMutual, onlyFriendFriends) = friends.partition(friend => sentFriendRequests.exists(_.userId == friend.userId))
+    val marked = (onlyFriendFriends.filterNot(_.userId == userId) ++
+      mutualFriends.map(_.asDirectFriend) ++
+      potentialMutual.map(_.asRequestedFriend)).sorted(Friend.ordering)
+
     if (userFriends.current.contains(friendId))
-      UserFriends(onlyFriendFriends, mutualFriends, potentialMutual)
+      UserFriends(marked, mutualFriends, potentialMutual)
     else
       UserFriends(Nil, mutualFriends, Nil)
   }
 }
 
 
-case class Friend(userId: UUID, name: Option[String] = None, image: Option[String] = None, firstName: Option[String] = None)
+case class Friend(userId: UUID, name: Option[String] = None, image: Option[String] = None, firstName: Option[String] = None,
+                  relation: Option[UserRelation] = None) {
+  def asDirectFriend = copy(relation = Option(DirectFriend))
+
+  def asRequestedFriend = copy(relation = Option(RequestedFriend))
+
+  def named(name: String) = copy(name = Option(name))
+}
+
 object Friend {
-  implicit val ordering = new Ordering[Friend]{
+  implicit val ordering = new Ordering[Friend] {
     override def compare(x: Friend, y: Friend): Int = (x.name, y.name) match {
       case (Some(xName), Some(yName)) => xName.compareToIgnoreCase(yName)
       case (Some(_), None) => -1
@@ -76,6 +89,16 @@ object Friend {
       case (None, None) => 0
     }
   }
+}
+
+sealed trait UserRelation
+
+object UserRelation {
+
+  case object DirectFriend extends UserRelation
+
+  case object RequestedFriend extends UserRelation
+
 }
 
 case class IncomingFriendRequest(id: UUID, friend: Friend)

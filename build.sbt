@@ -1,7 +1,7 @@
 val circeVersion = "0.9.3"
 val dockerTestKitVersion = "0.9.0"
 val logbackVersion = "1.2.1"
-val specs2Version = "3.9.5"
+val specs2Version = "4.2.0"
 
 val scalaVer = "2.12.5"
 
