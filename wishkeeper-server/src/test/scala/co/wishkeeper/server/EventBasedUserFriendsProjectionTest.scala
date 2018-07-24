@@ -109,7 +109,7 @@ class EventBasedUserFriendsProjectionTest(implicit ee: ExecutionEnv) extends Spe
       allowing(dataStore).userEvents(nonMutualFriend).willReturn(EventsList(nonMutualFriend).list)
     }
 
-    userFriendsProjection.friendsFor(friendId, userId) must beEqualTo(UserFriends(Nil, List(Friend(mutualFriendId)), Nil))
+    userFriendsProjection.friendsFor(friendId, userId).mutual must containTheSameElementsAs(List(Friend(mutualFriendId)))
   }
 
   "return friends for which friend request exists" in new Context {
@@ -180,6 +180,20 @@ class EventBasedUserFriendsProjectionTest(implicit ee: ExecutionEnv) extends Spe
 
     val friends = userFriendsProjection.friendsFor(friendId, userId)
     friends.all must beEqualTo(expectedFriends)
+  }
+
+  "return only mutual friends if not direct friend" in new Context {
+    val mutualFriendId = randomUUID()
+    val nonMutualFriend = randomUUID()
+
+    checking {
+      allowing(dataStore).userEvents(userId).willReturn(EventsList(userId).withFriend(mutualFriendId).list)
+      allowing(dataStore).userEvents(friendId).willReturn(EventsList(friendId).withFriend(mutualFriendId).withFriend(nonMutualFriend).list)
+      allowing(dataStore).userEvents(mutualFriendId).willReturn(EventsList(mutualFriendId).withFriend(userId).withFriend(friendId).list)
+      allowing(dataStore).userEvents(nonMutualFriend).willReturn(EventsList(nonMutualFriend).list)
+    }
+
+    userFriendsProjection.friendsFor(friendId, userId).all must containTheSameElementsAs(List(Friend(mutualFriendId).asDirectFriend))
   }
 
   def aFriend(id: UUID): Matcher[Friend] = ===(id) ^^ ((_: Friend).userId)

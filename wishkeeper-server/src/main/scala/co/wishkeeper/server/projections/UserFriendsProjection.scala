@@ -66,7 +66,7 @@ class EventBasedUserFriendsProjection(facebookConnector: FacebookConnector,
     if (userFriends.current.contains(friendId))
       UserFriends(onlyFriendFriends, mutualFriends, potentialMutual, all = marked)
     else
-      UserFriends(Nil, mutualFriends, Nil)
+      UserFriends(Nil, mutualFriends, Nil, all = mutualFriends.map(_.asDirectFriend))
   }
 }
 
