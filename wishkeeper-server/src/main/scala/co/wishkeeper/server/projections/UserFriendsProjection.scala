@@ -2,7 +2,7 @@ package co.wishkeeper.server.projections
 
 import java.util.UUID
 
-import co.wishkeeper.server.projections.UserRelation.{DirectFriend, RequestedFriend}
+import co.wishkeeper.server.projections.UserRelation.{DirectFriend, IncomingRequest, RequestedFriend}
 import co.wishkeeper.server.{DataStore, FacebookConnector, FriendRequest, User}
 
 import scala.concurrent.{ExecutionContext, Future}
@@ -42,7 +42,7 @@ class EventBasedUserFriendsProjection(facebookConnector: FacebookConnector,
     val friends = user.friends.current.map(friendDetails).sorted(Friend.ordering)
     val requested = user.friends.sentRequests.map(userIdFromFriendRequest andThen friendDetails)
     val incoming = user.friends.receivedRequests.map(req => IncomingFriendRequest(req.id, friendDetails(req.from)))
-    UserFriends(friends, requested = requested, incoming = incoming)
+    UserFriends(friends, requested = requested, incoming = incoming, all = friends.map(_.asDirectFriend))
   }
 
   private val userIdFromFriendRequest: FriendRequest => UUID = _.userId
@@ -77,6 +77,8 @@ case class Friend(userId: UUID, name: Option[String] = None, image: Option[Strin
 
   def asRequestedFriend = copy(relation = Option(RequestedFriend))
 
+  def asIncomingRequestFriend(id: UUID) = copy(relation = Option(IncomingRequest(id)))
+
   def named(name: String) = copy(name = Option(name))
 }
 
@@ -99,6 +101,7 @@ object UserRelation {
 
   case object RequestedFriend extends UserRelation
 
+  case class IncomingRequest(id: UUID) extends UserRelation
 }
 
 case class IncomingFriendRequest(id: UUID, friend: Friend)

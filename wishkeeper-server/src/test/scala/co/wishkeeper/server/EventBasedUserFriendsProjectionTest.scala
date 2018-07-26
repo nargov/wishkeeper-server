@@ -32,7 +32,8 @@ class EventBasedUserFriendsProjectionTest(implicit ee: ExecutionEnv) extends Spe
   }
 
   "return a list of current friends" in new Context {
-    val userFriends = UserFriends(Friend(friendId, Some(name), Some(image)) :: Nil)
+    val friends: List[Friend] = Friend(friendId, Some(name), Some(image)) :: Nil
+    val userFriends = UserFriends(friends, all = friends.map(_.asDirectFriend))
 
     assumingExistingFriend()
 
@@ -118,7 +119,8 @@ class EventBasedUserFriendsProjectionTest(implicit ee: ExecutionEnv) extends Spe
       allowing(dataStore).userEvents(friendId).willReturn(EventsList(friendId).list)
     }
 
-    userFriendsProjection.friendsFor(userId).requested must contain(aFriend(friendId))
+    val friends: UserFriends = userFriendsProjection.friendsFor(userId)
+    friends.requested must contain(aFriend(friendId))
   }
 
   "return friends that sent friend request to user" in new Context {
@@ -127,16 +129,17 @@ class EventBasedUserFriendsProjectionTest(implicit ee: ExecutionEnv) extends Spe
       allowing(dataStore).userEvents(friendId).willReturn(EventsList(friendId).list)
     }
 
-    userFriendsProjection.friendsFor(userId).incoming must contain(anIncomingFriendRequestFrom(friendId, requestId))
+    val friends: UserFriends = userFriendsProjection.friendsFor(userId)
+    friends.incoming must contain(anIncomingFriendRequestFrom(friendId, requestId))
   }
 
   "return friends in alphanumeric order" in new Context {
-    val friend1 = Friend(friendId).named("Be")
-    val friend2 = Friend(randomUUID()).named("Aa")
-    val friend3 = Friend(randomUUID()).named("Ad")
-    val friend4 = Friend(randomUUID()).named("ac")
-    val friend5 = Friend(randomUUID()).named("ab")
-    val namelessFriend = Friend(randomUUID())
+    val friend1 = Friend(friendId).named("Be").asDirectFriend
+    val friend2 = Friend(randomUUID()).named("Aa").asDirectFriend
+    val friend3 = Friend(randomUUID()).named("Ad").asDirectFriend
+    val friend4 = Friend(randomUUID()).named("ac").asDirectFriend
+    val friend5 = Friend(randomUUID()).named("ab").asDirectFriend
+    val namelessFriend = Friend(randomUUID()).asDirectFriend
     val friends = namelessFriend :: friend1 :: friend2 :: friend3 :: friend4 :: friend5 :: Nil
     val expectedList = friend2 :: friend5 :: friend4 :: friend3 :: friend1 :: namelessFriend :: Nil
 
@@ -147,7 +150,9 @@ class EventBasedUserFriendsProjectionTest(implicit ee: ExecutionEnv) extends Spe
       }
     }
 
-    userFriendsProjection.friendsFor(userId).list must beEqualTo(expectedList)
+    val userFriends: UserFriends = userFriendsProjection.friendsFor(userId)
+    userFriends.list.map(_.userId) must beEqualTo(expectedList.map(_.userId))
+    userFriends.all must beEqualTo(expectedList)
   }
 
   "return friend friends in alphanumeric order" in new Context {
