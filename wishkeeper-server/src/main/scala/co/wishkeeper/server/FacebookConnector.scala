@@ -69,7 +69,7 @@ class AkkaHttpFacebookConnector(appId: String, appSecret: String)
   }
 }
 
-case class FacebookFriendsResult(data: List[FacebookFriend], paging: Option[FacebookPaging], summary: FacebookSummary)
+case class FacebookFriendsResult(data: List[FacebookFriend], paging: Option[FacebookPaging], summary: Option[FacebookSummary])
 
 case class FacebookFriend(name: String, id: String)
 

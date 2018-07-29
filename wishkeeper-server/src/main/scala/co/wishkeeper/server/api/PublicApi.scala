@@ -7,13 +7,14 @@ import java.util.UUID
 
 import akka.actor.ActorSystem
 import akka.stream.ActorMaterializer
-import co.wishkeeper.server.user.commands._
 import co.wishkeeper.server.FriendRequestStatus.{Approved, Ignored}
 import co.wishkeeper.server.WishStatus.{Active, Reserved, WishStatus}
 import co.wishkeeper.server._
 import co.wishkeeper.server.image._
 import co.wishkeeper.server.projections._
+import co.wishkeeper.server.user.commands._
 import co.wishkeeper.server.user.{NotFriends, ValidationError, WishNotFound}
+import com.google.common.net.UrlEscapers
 
 import scala.concurrent.{ExecutionContext, Future}
 import scala.util.Try
@@ -112,9 +113,10 @@ class DelegatingPublicApi(commandProcessor: CommandProcessor,
 
   override def uploadImage(url: String, imageMetadata: ImageMetadata, wishId: UUID, sessionId: UUID): Try[Unit] = {
     Try {
-      val connection = new URL(url).openConnection()
+      val escapedUrl = UrlEscapers.urlFragmentEscaper().escape(url)
+      val connection = new URL(escapedUrl).openConnection()
       connection.setRequestProperty("User-Agent",
-        "Mozilla/5.0 (Windows NT 6.4; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/41.0.2225.0 Safari/537.36")
+        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/60.0.3112.113 Safari/537.36")
       connection.connect()
       connection
     }.flatMap(con => uploadImage(con.getInputStream, imageMetadata, wishId, sessionId))
