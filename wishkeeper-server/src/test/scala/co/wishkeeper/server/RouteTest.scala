@@ -14,6 +14,7 @@ import co.wishkeeper.server.api.{ManagementApi, PublicApi}
 import co.wishkeeper.server.image.ImageMetadata
 import co.wishkeeper.server.messaging.MemStateClientRegistry
 import co.wishkeeper.server.projections.{Friend, PotentialFriend, UserFriends}
+import co.wishkeeper.server.search.{SearchQuery, UserSearchResults}
 import co.wishkeeper.server.user.commands.{ConnectFacebookUser, SendFriendRequest, SetFlagFacebookFriendsListSeen}
 import co.wishkeeper.server.user.{InvalidStatusChange, NotFriends, ValidationError, WishNotFound}
 import co.wishkeeper.server.web.{ManagementRoute, WebApi}
@@ -482,13 +483,26 @@ class RouteTest extends Specification with Specs2RouteTest with JMock {
     }
 
     "Remove friend" in new LoggedInUserContext {
-
       checking {
         oneOf(publicApi).removeFriend(userId, friendId).willReturn(Right(()))
       }
 
       Delete(s"/me/friends/$friendId").withHeaders(sessionIdHeader) ~> webApi.newUserRoute ~> check {
         status must beEqualTo(StatusCodes.OK)
+      }
+    }
+
+    "Search user" in new LoggedInUserContext {
+      val query = SearchQuery("abc")
+      val results = UserSearchResults(Nil)
+
+      checking {
+        oneOf(publicApi).searchUser(query).willReturn(Right(results))
+      }
+
+      Post(s"/search", query).withHeaders(sessionIdHeader) ~> webApi.newUserRoute ~> check {
+        status must beEqualTo(StatusCodes.OK)
+        responseAs[UserSearchResults] must beEqualTo(results)
       }
     }
   }

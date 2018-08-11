@@ -68,6 +68,19 @@ class DataStoreTestHelper extends Matchers {
          |)
        """.stripMargin
     )
+
+    session.execute(
+      s"""
+         |create table if not exists ${CassandraDataStore.userByNameTable} (
+         | userId UUID,
+         | name text,
+         | picture text,
+         | first_name text,
+         | last_name text,
+         | PRIMARY KEY(userId)
+         |)
+       """.stripMargin
+    )
   }
 }
 

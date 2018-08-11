@@ -3,15 +3,21 @@ package co.wishkeeper.server
 import java.util.UUID.randomUUID
 
 import co.wishkeeper.DataStoreTestHelper
-import co.wishkeeper.server.Events.UserConnected
+import co.wishkeeper.server.Events.{UserConnected, UserNameSet}
+import co.wishkeeper.server.EventsTestHelper.EventsList
 import org.joda.time.DateTime
 import org.scalatest.{BeforeAndAfterAll, FlatSpec, Matchers}
 
 class CassandraDataStoreIT extends FlatSpec with Matchers with BeforeAndAfterAll {
 
-  var eventStore: DataStore = _
+  var eventStore: CassandraDataStore = _
   val userId = randomUUID()
   val sessionId = randomUUID()
+
+  val firstName = "Joe"
+  val lastName = "Shmoe"
+  val name = firstName + " " + lastName
+  val picture = Option("Picture")
 
   it should "save a user event" in {
     val time = DateTime.now()
@@ -57,6 +63,45 @@ class CassandraDataStoreIT extends FlatSpec with Matchers with BeforeAndAfterAll
     val email = "zaphod@beeblebrox.com"
     eventStore.saveUserByEmail(email, userId)
     eventStore.userByEmail(email) shouldBe Some(userId)
+  }
+
+  it should "Save a user by name" in {
+    val expectedRow = UserNameSearchRow(userId, name, picture, Option(firstName), Option(lastName))
+
+    eventStore.saveUserByName(expectedRow)
+    eventStore.userNames() should contain(expectedRow)
+  }
+
+  it should "Save a user by name without picture" in {
+    val initialRow = UserNameSearchRow(userId, name, picture, Option(firstName), Option(lastName))
+    val expectedRow = initialRow.copy(picture = None)
+
+    eventStore.saveUserByName(initialRow) shouldBe true
+    eventStore.saveUserByName(expectedRow) shouldBe true
+    eventStore.userNames() should contain(expectedRow)
+  }
+
+  it should "Save multiple users by name" in {
+    val expectedRows = List(
+      UserNameSearchRow(userId, name, picture, Option(firstName), Option(lastName)),
+      UserNameSearchRow(randomUUID(), "Roger Wilco", Option("roger's pic"), Option("Roger"), Option("Wilco"))
+    )
+
+    eventStore.saveUserByName(expectedRows)
+    eventStore.userNames() should contain allElementsOf expectedRows
+  }
+
+  it should "Return all user events of given types" in {
+    val user1Events = EventsList(randomUUID()).withName("Joe").withWish(randomUUID(), "wish")
+    val user2Events = EventsList(randomUUID()).withName("Bob").withFriend(randomUUID()).withPic("pic")
+
+    (user1Events :: user2Events :: Nil).foreach(events =>
+      eventStore.saveUserEvents(events.userId, eventStore.lastSequenceNum(events.userId), DateTime.now(), events.list.map(_.event)) shouldBe true)
+
+    eventStore.allUserEvents(classOf[UserNameSet]).map(i => (i.userId, i.event)).toList should contain allElementsOf List(
+      (user1Events.userId, UserNameSet(user1Events.userId, "Joe")),
+      (user2Events.userId, UserNameSet(user2Events.userId, "Bob"))
+    )
   }
 
   val dataStoreTestHelper = DataStoreTestHelper()

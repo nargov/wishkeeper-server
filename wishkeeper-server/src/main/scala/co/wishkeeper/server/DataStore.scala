@@ -18,6 +18,14 @@ import scala.collection.JavaConverters._
 
 trait DataStore {
 
+  def allUserEvents(eventTypes: Class[_ <: UserEvent]*): Iterator[UserEventInstance[_ <: UserEvent]]
+
+  def userNames(): List[UserNameSearchRow]
+
+  def saveUserByName(userByNameRow: UserNameSearchRow): Boolean
+
+  def saveUserByName(rows: List[UserNameSearchRow]): Boolean
+
   def userByEmail(email: String): Option[UUID]
 
   def saveUserByEmail(email: String, userId: UUID): Boolean
@@ -68,6 +76,11 @@ class CassandraDataStore(dataStoreConfig: DataStoreConfig) extends DataStore {
   private lazy val selectUsersByFacebookIds = session.prepare(s"select facebookId, userId from $userByFacebookId where facebookId in :idList")
   private lazy val insertUserByEmail = session.prepare(s"insert into $userByEmailTable (email, userId) values (:email, :userId) if not exists")
   private lazy val selectUserByEmail = session.prepare(s"select userId from $userByEmailTable where email = :email")
+  private lazy val insertUserByName = session.prepare(
+    s"""insert into $userByNameTable (userId, name, picture, first_name, last_name)
+       |values (:userId, :name, :picture, :firstName, :lastName)""".stripMargin)
+  private lazy val selectAllNamesToUserIds = session.prepare(s"select * from $userByNameTable")
+  private lazy val selectAllUserEvents = session.prepare(s"select * from $userEventsTable")
 
 
   override def saveUserEvents(userId: UUID, lastSeqNum: Option[Long], time: DateTime, events: Seq[UserEvent]): Boolean = {
@@ -118,6 +131,11 @@ class CassandraDataStore(dataStoreConfig: DataStoreConfig) extends DataStore {
     }
   }
 
+  private val rowToEventInstance: Row => UserEventInstance[_ <: UserEvent] = row => {
+    val instant = rowToEventInstant(row)
+    UserEventInstance(row.getUUID("userId"), instant.event, instant.time)
+  }
+
   override def userBySession(sessionId: UUID): Option[UUID] = {
     val result = session.execute(selectUserSession.bind().setUUID("sessionId", sessionId))
     if (result.getAvailableWithoutFetching > 0) {
@@ -161,9 +179,45 @@ class CassandraDataStore(dataStoreConfig: DataStoreConfig) extends DataStore {
   }
 
   override def saveUserByEmail(email: String, userId: UUID): Boolean = {
-    session.execute(insertUserByEmail.bind().setString("email", email).setUUID("userId", userId))
-    true
+    session.execute(insertUserByEmail.bind().setString("email", email).setUUID("userId", userId)).wasApplied()
   }
+
+  private def bindInsertUserByName(userByNameRow: UserNameSearchRow) = {
+    insertUserByName.bind()
+      .setUUID("userId", userByNameRow.userId)
+      .setString("name", userByNameRow.name)
+      .setString("picture", userByNameRow.picture.orNull)
+      .setString("firstName", userByNameRow.firstName.orNull)
+      .setString("lastName", userByNameRow.lastName.orNull)
+  }
+
+  override def saveUserByName(userByNameRow: UserNameSearchRow): Boolean = {
+    val statement = bindInsertUserByName(userByNameRow)
+    session.execute(statement).wasApplied()
+  }
+
+  override def saveUserByName(rows: List[UserNameSearchRow]): Boolean = {
+    val batch = new BatchStatement()
+    rows.foreach(row => batch.add(bindInsertUserByName(row)))
+    session.execute(batch).wasApplied()
+  }
+
+  override def userNames(): List[UserNameSearchRow] = {
+    session.execute(selectAllNamesToUserIds.bind()).asScala.map(row =>
+      UserNameSearchRow(
+        userId = row.getUUID("userId"),
+        name = row.getString("name"),
+        picture = Option(row.getString("picture")),
+        firstName = Option(row.getString("first_name")),
+        lastName = Option(row.getString("last_name"))
+      )).toList
+  }
+
+  override def allUserEvents(eventTypes: Class[_ <: UserEvent]*): Iterator[UserEventInstance[_ <: UserEvent]] = {
+    session.execute(selectAllUserEvents.bind()).iterator().asScala.map(rowToEventInstance).
+      filter(instant => eventTypes.contains(instant.event.getClass))
+  }
+
 
   override def close(): Unit = {
     session.close()
@@ -181,4 +235,8 @@ object CassandraDataStore {
   val userByFacebookId: String = keyspace + ".user_by_facebook_id"
   val userSession: String = keyspace + ".user_session"
   val userByEmailTable: String = keyspace + ".user_by_email"
+  val userByNameTable: String = keyspace + ".user_by_name"
 }
+
+case class UserNameSearchRow(userId: UUID, name: String, picture: Option[String] = None, firstName: Option[String] = None,
+                             lastName: Option[String] = None)

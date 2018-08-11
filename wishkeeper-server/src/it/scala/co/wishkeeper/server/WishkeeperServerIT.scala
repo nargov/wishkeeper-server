@@ -5,7 +5,6 @@ import java.util.UUID.randomUUID
 
 import akka.http.scaladsl.Http
 import akka.http.scaladsl.model.StatusCodes
-import akka.http.scaladsl.model.headers.RawHeader
 import akka.http.scaladsl.model.ws.{Message, TextMessage, WebSocketRequest, WebSocketUpgradeResponse}
 import akka.stream.scaladsl.{Flow, Keep, Sink, Source}
 import co.wishkeeper.DataStoreTestHelper
@@ -14,9 +13,10 @@ import co.wishkeeper.server.FriendRequestStatus.Pending
 import co.wishkeeper.server.HttpTestKit._
 import co.wishkeeper.server.NotificationsData.{FriendRequestAcceptedNotification, FriendRequestNotification}
 import co.wishkeeper.server.projections.PotentialFriend
-import co.wishkeeper.server.user.commands.{ConnectFacebookUser, SendFriendRequest, SetWishDetails}
-import co.wishkeeper.server.web.{WebApi, WebSocketsStats}
+import co.wishkeeper.server.search.{SearchQuery, UserSearchResult, UserSearchResults}
+import co.wishkeeper.server.user.commands.{ConnectFacebookUser, SendFriendRequest, SetFacebookUserInfo, SetWishDetails}
 import co.wishkeeper.server.web.WebApi.sessionIdHeader
+import co.wishkeeper.server.web.{WebApi, WebSocketsStats}
 import co.wishkeeper.test.utils.WishMatchers
 import io.circe.generic.extras.Configuration
 import io.circe.generic.extras.auto._
@@ -150,6 +150,28 @@ class WishkeeperServerIT(implicit ee: ExecutionEnv) extends Specification with B
     Post(s"$usersEndpoint/friends/request", SendFriendRequest(user2Id), Map(sessionIdHeader -> user1SessionId)) must beOk
 
     queue.pull() must beSome[Message].await
+  }
+
+  "Search for a user by name" in new Context {
+    val connectRequests: Seq[ConnectFacebookUser] = testUsers.map(user => ConnectFacebookUser(user.id, user.access_token, randomUUID()))
+    val user1Connect :: user2Connect :: Nil = connectRequests
+    Future.sequence(connectRequests.map(Post.async(s"$usersEndpoint/connect/facebook", _))) must forall(beOk).await(20, 0.5.seconds)
+    val user1SessionId: String = user1Connect.sessionId.toString
+
+    val profile: UserProfile = testUsers.head.userProfile.get
+    val secondUserProfile = testUsers.tail.head.userProfile.get
+    val name = profile.name.get
+    val (firstName, lastName) = name.splitAt(name.indexOf(" "))
+    val testUserNamePrefix: String = firstName.take(3)
+    val headers = Map(sessionIdHeader -> user1SessionId)
+    val userId = Get(s"$baseUrl/me/id", headers).to[UUID]
+
+    Post(s"$baseUrl/users/profile/facebook", SetFacebookUserInfo(name = profile.name, picture = profile.picture), headers)
+    Post(s"$baseUrl/users/profile/facebook", SetFacebookUserInfo(name = secondUserProfile.name, picture = secondUserProfile.picture),
+      Map(sessionIdHeader -> user2Connect.sessionId.toString))
+
+    val results: UserSearchResults = Post(s"$baseUrl/search/user", SearchQuery(testUserNamePrefix), headers).to[UserSearchResults]
+    results.users must contain(UserSearchResult(userId, name, profile.picture))
   }
 
   trait Context extends Scope with BeforeAfter {

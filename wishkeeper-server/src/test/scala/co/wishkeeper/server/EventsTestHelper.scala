@@ -13,7 +13,11 @@ object EventsTestHelper {
 
   def asEventInstants(events: List[UserEvent]): List[UserEventInstant[_ <: UserEvent]] = events.map(asEventInstant(_))
 
+  def asEventInstances(events: List[(UUID, UserEvent)]): List[UserEventInstance[_ <: UserEvent]] = events.map(e => asEventInstance(e._1, e._2))
+
   def asEventInstant(event: UserEvent, time: DateTime = DateTime.now().minusDays(1)) = UserEventInstant(event, time)
+
+  def asEventInstance(userId: UUID, event: UserEvent, time: DateTime = DateTime.now.minusDays(1)) = UserEventInstance(userId, event, time)
 
   def anEventsListFor(userId: UUID) = EventsList(userId)
 
@@ -39,6 +43,8 @@ object EventsTestHelper {
     def withName(name: Option[String]): EventsList = name.fold(this)(withName)
 
     def withFirstName(name: String) = withEvent(UserFirstNameSet(userId, name))
+
+    def withLastName(name: String) = withEvent(UserLastNameSet(userId, name))
 
     def withWish(id: UUID, name: String) = this.copy(list = list ++ asEventInstants(List(
       WishCreated(id, userId, DateTime.now().minusDays(1)),

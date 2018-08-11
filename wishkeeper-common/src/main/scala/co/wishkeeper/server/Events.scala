@@ -90,3 +90,5 @@ object Events {
 }
 
 case class UserEventInstant[E <: UserEvent](event: E, time: DateTime)
+
+case class UserEventInstance[E <: UserEvent](userId: UUID, event: E, time: DateTime)

@@ -11,6 +11,7 @@ import co.wishkeeper.server.NotificationsData.{FriendRequestNotification, Notifi
 import co.wishkeeper.server.WishStatus.WishStatus
 import co.wishkeeper.server._
 import co.wishkeeper.server.projections._
+import co.wishkeeper.server.search.SimpleScanUserSearchProjection
 import co.wishkeeper.server.user.{NotFriends, ValidationError, WishNotFound}
 import com.wixpress.common.specs2.JMock
 import org.joda.time.DateTime
@@ -260,9 +261,10 @@ class DelegatingPublicApiTest extends Specification with JMock {
     val notificationsProjection = mock[NotificationsProjection]
     val commandProcessor = mock[CommandProcessor]
     val userFriendsProjection: UserFriendsProjection = mock[UserFriendsProjection]
+    val searchProjection = new SimpleScanUserSearchProjection(dataStore)
     val userProfileProjection: UserProfileProjection = new ReplayingUserProfileProjection(dataStore)
     val api: PublicApi = new DelegatingPublicApi(commandProcessor, dataStore, null, userProfileProjection, userFriendsProjection,
-      notificationsProjection, null)(null, null, null)
+      notificationsProjection, searchProjection, null)(null, null, null)
     val friendId: UUID = randomUUID()
     val friendRequestId = randomUUID()
     val notificationData = FriendRequestNotification(friendId, friendRequestId)

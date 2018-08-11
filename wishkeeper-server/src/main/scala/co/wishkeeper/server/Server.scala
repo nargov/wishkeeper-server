@@ -9,6 +9,7 @@ import co.wishkeeper.server.image.{GoogleCloudStorageImageStore, ImageStore}
 import co.wishkeeper.server.messaging.{FirebasePushNotifications, MemStateClientRegistry}
 import co.wishkeeper.server.notifications.{ExecutorNotificationsScheduler, ServerNotificationEventProcessor}
 import co.wishkeeper.server.projections._
+import co.wishkeeper.server.search.SimpleScanUserSearchProjection
 import co.wishkeeper.server.web.WebApi
 import com.typesafe.config.ConfigFactory
 
@@ -44,6 +45,7 @@ class WishkeeperServer {
 
   private val friendRequestsProjection = new FriendRequestsEventProcessor(dataStore)
   private val userFriendsProjection = new EventBasedUserFriendsProjection(facebookConnector, userIdByFacebookIdProjection, dataStore)
+  private val userSearchProjection = new SimpleScanUserSearchProjection(dataStore)
 
   private val commandProcessor: CommandProcessor = new UserCommandProcessor(dataStore, List(
     userIdByFacebookIdProjection,
@@ -51,11 +53,12 @@ class WishkeeperServer {
     friendRequestsProjection,
     new UserByEmailProjection(dataStore),
     new ServerNotificationEventProcessor(clientRegistry, notificationsScheduler, dataStore, pushNotifications),
-    new ImageUploadEventProcessor(userImageStore, fileAdapter, dataStore)
+    new ImageUploadEventProcessor(userImageStore, fileAdapter, dataStore),
+    userSearchProjection
   ))
   private val userProfileProjection: UserProfileProjection = new ReplayingUserProfileProjection(dataStore)
   private val publicApi = new DelegatingPublicApi(commandProcessor, dataStore, facebookConnector,
-    userProfileProjection, userFriendsProjection, notificationsProjection, wishImageStore)
+    userProfileProjection, userFriendsProjection, notificationsProjection, userSearchProjection, wishImageStore)
   private val managementApi: ManagementApi = new DelegatingManagementApi(userIdByFacebookIdProjection, userProfileProjection,
     dataStore, commandProcessor)
   private val webApi = new WebApi(publicApi, managementApi, clientRegistry)

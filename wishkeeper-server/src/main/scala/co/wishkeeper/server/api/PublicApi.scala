@@ -12,6 +12,7 @@ import co.wishkeeper.server.WishStatus.{Active, Reserved, WishStatus}
 import co.wishkeeper.server._
 import co.wishkeeper.server.image._
 import co.wishkeeper.server.projections._
+import co.wishkeeper.server.search.{SearchQuery, UserSearchProjection, UserSearchResults}
 import co.wishkeeper.server.user.commands._
 import co.wishkeeper.server.user.{NotFriends, ValidationError, WishNotFound}
 import com.google.common.net.UrlEscapers
@@ -78,6 +79,8 @@ trait PublicApi {
   def deleteWishImage(sessionId: UUID, wishId: UUID): Unit
 
   def userIdForSession(sessionId: UUID): Option[UUID]
+
+  def searchUser(query: SearchQuery): Either[Error, UserSearchResults]
 }
 
 class DelegatingPublicApi(commandProcessor: CommandProcessor,
@@ -86,6 +89,7 @@ class DelegatingPublicApi(commandProcessor: CommandProcessor,
                           userProfileProjection: UserProfileProjection,
                           userFriendsProjection: UserFriendsProjection,
                           notificationsProjection: NotificationsProjection,
+                          searchProjection: UserSearchProjection,
                           imageStore: ImageStore)
                          (implicit actorSystem: ActorSystem, ec: ExecutionContext, am: ActorMaterializer) extends PublicApi {
 
@@ -262,4 +266,6 @@ class DelegatingPublicApi(commandProcessor: CommandProcessor,
     commandProcessor.validatedProcess(MarkNotificationViewed(notificationId), userId)
 
   override def removeFriend(userId: UUID, friendId: UUID): Either[Error, Unit] = commandProcessor.validatedProcess(RemoveFriend(friendId), userId)
+
+  override def searchUser(search: SearchQuery): Either[Error, UserSearchResults] = Right(searchProjection.byName(search.query))
 }
