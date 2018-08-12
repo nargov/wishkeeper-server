@@ -158,7 +158,7 @@ class WebApi(publicApi: PublicApi, managementApi: ManagementApi, clientRegistry:
 
   val search: UUID => Route = userId => pathPrefix("search") {
     entity(as[SearchQuery]) { query =>
-      publicApi.searchUser(query).fold(handleErrors, complete(_))
+      publicApi.searchUser(userId, query).fold(handleErrors, complete(_))
     }
   }
 

@@ -3,7 +3,8 @@ package co.wishkeeper.server.api
 import java.util.UUID
 import java.util.UUID.randomUUID
 
-import co.wishkeeper.server.CommandProcessor
+import co.wishkeeper.server.search.UserSearchProjection
+import co.wishkeeper.server.{CommandProcessor, DataStore}
 import co.wishkeeper.server.user.commands.{DeleteUserPicture, SetFlagFacebookFriendsListSeen}
 import com.wixpress.common.specs2.JMock
 import org.specs2.mutable.Specification
@@ -18,7 +19,8 @@ class DelegatingManagementApiTest extends Specification with JMock {
       oneOf(commandProcessor).process(SetFlagFacebookFriendsListSeen(false), userId)
     }
 
-    new DelegatingManagementApi(null, null, null, commandProcessor).resetFacebookFriendsSeenFlag(userId)
+    new DelegatingManagementApi(null, null, null, commandProcessor, null)
+      .resetFacebookFriendsSeenFlag(userId)
   }
 
   "should delete user picture" in {
@@ -29,6 +31,18 @@ class DelegatingManagementApiTest extends Specification with JMock {
       oneOf(commandProcessor).validatedProcess(DeleteUserPicture, userId).willReturn(Right(()))
     }
 
-    new DelegatingManagementApi(null, null, null, commandProcessor).deleteUserPicture(userId)
+    new DelegatingManagementApi(null, null, null, commandProcessor, null)
+      .deleteUserPicture(userId)
+  }
+
+  "should rebuild user search view" in {
+    val searchProjection = mock[UserSearchProjection]
+
+    checking {
+      oneOf(searchProjection).rebuild()
+    }
+
+    new DelegatingManagementApi(null, null, null, null, searchProjection)
+      .rebuildUserSearch()
   }
 }

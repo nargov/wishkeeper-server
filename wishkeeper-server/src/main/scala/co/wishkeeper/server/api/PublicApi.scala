@@ -80,7 +80,7 @@ trait PublicApi {
 
   def userIdForSession(sessionId: UUID): Option[UUID]
 
-  def searchUser(query: SearchQuery): Either[Error, UserSearchResults]
+  def searchUser(userId: UUID, query: SearchQuery): Either[Error, UserSearchResults]
 }
 
 class DelegatingPublicApi(commandProcessor: CommandProcessor,
@@ -267,5 +267,5 @@ class DelegatingPublicApi(commandProcessor: CommandProcessor,
 
   override def removeFriend(userId: UUID, friendId: UUID): Either[Error, Unit] = commandProcessor.validatedProcess(RemoveFriend(friendId), userId)
 
-  override def searchUser(search: SearchQuery): Either[Error, UserSearchResults] = Right(searchProjection.byName(search.query))
+  override def searchUser(userId: UUID, search: SearchQuery): Either[Error, UserSearchResults] = Right(searchProjection.byName(userId, search.query))
 }

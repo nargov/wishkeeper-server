@@ -4,8 +4,8 @@ import java.util.UUID
 import java.util.UUID.randomUUID
 
 import co.wishkeeper.server.Events._
-import co.wishkeeper.server.EventsTestHelper.{EventsList, asEventInstances, asEventInstants}
-import co.wishkeeper.server.{DataStore, EventsTestHelper, UserNameSearchRow}
+import co.wishkeeper.server.EventsTestHelper.{EventsList, asEventInstances}
+import co.wishkeeper.server.{DataStore, UserNameSearchRow}
 import com.wixpress.common.specs2.JMock
 import org.specs2.matcher.Matcher
 import org.specs2.mutable.Specification
@@ -14,23 +14,23 @@ import org.specs2.specification.Scope
 class SimpleScanUserSearchProjectionTest extends Specification with JMock {
   "User Search Projection" should {
     "return users matching query" in new Context {
-      searchProjection.byName("Joe").users must contain(exactly(aUser(joeId)))
+      searchFor("Joe") must contain(exactly(aUser(joeId)))
     }
 
     "return matches ignoring case" in new Context {
-      searchProjection.byName("joe").users must contain(exactly(aUser(joeId)))
+      searchFor("joe") must contain(exactly(aUser(joeId)))
     }
 
     "return multiple matches" in new Context {
-      searchProjection.byName("jo").users must contain(exactly(aUser(joeId), aUser(jonathanId), aUser(bobbyboobriId)))
+      searchFor("jo")must contain(exactly(aUser(joeId), aUser(jonathanId), aUser(bobbyboobriId)))
     }
 
     "return first name matches before last name matches" in new Context {
-      searchProjection.byName("bri").users must contain(exactly(aUser(brianId), aUser(bobbyboobriId), aUser(bobbyId)).inOrder)
+      searchFor("bri") must contain(exactly(aUser(brianId), aUser(bobbyboobriId), aUser(bobbyId)).inOrder)
     }
 
     "return last name matches before full name matches" in new Context {
-      searchProjection.byName("ay").users must contain(exactly(aUser(brianId), aUser(philId)).inOrder)
+      searchFor("ay") must contain(exactly(aUser(brianId), aUser(philId)).inOrder)
     }
 
     "Save a user's name for search" in new Context {
@@ -125,13 +125,19 @@ class SimpleScanUserSearchProjectionTest extends Specification with JMock {
     }
 
     "return matches for multiple query terms" in new Context {
-      searchProjection.byName("bb jo").users must contain(exactly(aUser(bobbyboobriId)))
+      searchFor("bb jo") must contain(exactly(aUser(bobbyboobriId)))
+    }
+
+    "Return a users's details and whether is direct friend" in new Context {
+      searchFor("bb jo") must contain(exactly(
+        UserSearchResult(bobbyboobriId, "Bobbyboobri Jones", firstName = Option("Bobbyboobri"), isDirectFriend = true)))
     }
   }
 
   def aUser(id: UUID): Matcher[UserSearchResult] = ===(id) ^^ ((_: UserSearchResult).userId)
 
   trait Context extends Scope {
+    val userId = randomUUID()
     val joeId = randomUUID()
     val bobbyId = randomUUID()
     val bobbyboobriId = randomUUID()
@@ -142,6 +148,10 @@ class SimpleScanUserSearchProjectionTest extends Specification with JMock {
     val searchProjection = new SimpleScanUserSearchProjection(dataStore)
     val joeFullName = "Joe Satriani"
 
+    def searchFor(term: String): List[UserSearchResult] = {
+      searchProjection.byName(userId, term).users
+    }
+
     checking {
       allowing(dataStore).userNames().willReturn(List(
         UserNameSearchRow(joeId, joeFullName, Option("Joe's picture"), Option("Joe"), Option("Satriani")),
@@ -151,6 +161,7 @@ class SimpleScanUserSearchProjectionTest extends Specification with JMock {
         UserNameSearchRow(brianId, "Brian May", Option("Brian's pic"), Option("Brian"), Option("May")),
         UserNameSearchRow(philId, "Phil Ayer", None, Option("Phil"), None)
       ))
+      allowing(dataStore).userEvents(userId).willReturn(EventsList(userId).withFriend(bobbyboobriId).list)
     }
   }
 

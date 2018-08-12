@@ -6,8 +6,11 @@ import co.wishkeeper.server.Events.UserEvent
 import co.wishkeeper.server.user.commands.{DeleteUserPicture, SetFlagFacebookFriendsListSeen}
 import co.wishkeeper.server._
 import co.wishkeeper.server.projections.{UserIdByFacebookIdProjection, UserProfileProjection}
+import co.wishkeeper.server.search.UserSearchProjection
 
 trait ManagementApi {
+  def rebuildUserSearch(): Unit
+
   def userIdFor(facebookId: String): Option[UUID]
 
   def profileFor(userId: UUID): UserProfile
@@ -26,7 +29,8 @@ trait ManagementApi {
 class DelegatingManagementApi(userIdByFacebookIdProjection: UserIdByFacebookIdProjection,
                               userProfileProjection: UserProfileProjection,
                               dataStore: DataStore,
-                              commandProcessor: CommandProcessor) extends ManagementApi {
+                              commandProcessor: CommandProcessor,
+                              userSearchProjection: UserSearchProjection) extends ManagementApi {
 
 
   override def userByEmail(email: String): Option[UUID] = dataStore.userByEmail(email)
@@ -42,4 +46,6 @@ class DelegatingManagementApi(userIdByFacebookIdProjection: UserIdByFacebookIdPr
   override def userEvents(userId: UUID): List[UserEventInstant[_ <: UserEvent]] = dataStore.userEvents(userId)
 
   override def deleteUserPicture(userId: UUID): Either[Error, Unit] = commandProcessor.validatedProcess(DeleteUserPicture, userId)
+
+  override def rebuildUserSearch(): Unit = userSearchProjection.rebuild()
 }

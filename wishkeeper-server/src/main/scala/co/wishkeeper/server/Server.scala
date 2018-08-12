@@ -60,7 +60,7 @@ class WishkeeperServer {
   private val publicApi = new DelegatingPublicApi(commandProcessor, dataStore, facebookConnector,
     userProfileProjection, userFriendsProjection, notificationsProjection, userSearchProjection, wishImageStore)
   private val managementApi: ManagementApi = new DelegatingManagementApi(userIdByFacebookIdProjection, userProfileProjection,
-    dataStore, commandProcessor)
+    dataStore, commandProcessor, userSearchProjection)
   private val webApi = new WebApi(publicApi, managementApi, clientRegistry)
 
   def start(): Unit = {

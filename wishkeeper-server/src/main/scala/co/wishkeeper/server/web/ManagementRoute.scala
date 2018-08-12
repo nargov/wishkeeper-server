@@ -73,13 +73,25 @@ object ManagementRoute {
         events(userId)
     }
 
+    val search: Route = pathPrefix("search") {
+      pathPrefix("rebuild") {
+        managementApi.rebuildUserSearch()
+        complete(StatusCodes.OK)
+      }
+    }
+
+    val views: Route = pathPrefix("views") {
+      search
+    }
+
     DebuggingDirectives.logRequestResult(LoggingMagnet(_ => printer)) {
       pathPrefix("users") {
         userByEmail ~
           userByFacebookId ~
           user
       } ~
-        stats
+        stats ~
+      views
     }
   }
 }

@@ -6,7 +6,9 @@ import co.wishkeeper.server.Events._
 import co.wishkeeper.server._
 
 trait UserSearchProjection {
-  def byName(query: String): UserSearchResults
+  def byName(userId: UUID, query: String): UserSearchResults
+
+  def rebuild(): Unit
 }
 
 class SimpleScanUserSearchProjection(dataStore: DataStore) extends UserSearchProjection with EventProcessor {
@@ -27,13 +29,18 @@ class SimpleScanUserSearchProjection(dataStore: DataStore) extends UserSearchPro
     dataStore.saveUserByName(rows)
   }
 
-  def byName(query: String): UserSearchResults = {
+  def byName(userId: UUID, query: String): UserSearchResults = {
+    val friends = User.replay(dataStore.userEvents(userId)).friends.current.toSet
     val searchTerms = query.toLowerCase().split("\\s")
     val matches = dataStore.userNames().foldLeft[List[(UserNameSearchRow, Int)]](Nil) {
       case (list, row) if searchTerms.forall(s => row.name.toLowerCase().contains(s)) => list :+ (row, calcRank(row, searchTerms))
       case (list, _) => list
     }
-    UserSearchResults(matches.sortBy(-_._2).map { case (row, _) => UserSearchResult(row.userId, row.name, row.picture) })
+    UserSearchResults(matches.sortBy(-_._2).map {
+      case (row, _) =>
+        val resultUserId = row.userId
+        UserSearchResult(resultUserId, row.name, row.picture, row.firstName, friends.contains(resultUserId))
+    })
   }
 
   private def calcRank(row: UserNameSearchRow, terms: Array[String]): Int = terms.map(calcRank(row, _)).sum

@@ -92,6 +92,16 @@ class RouteTest extends Specification with Specs2RouteTest with JMock {
         handled should beTrue
       }
     }
+
+    "Rebuild user search view" in new ManagementContext {
+      checking {
+        oneOf(managementApi).rebuildUserSearch()
+      }
+
+      Post(s"/views/search/rebuild") ~> managementRoute ~> check {
+        handled should beTrue
+      }
+    }
   }
 
   "Route" should {
@@ -497,7 +507,7 @@ class RouteTest extends Specification with Specs2RouteTest with JMock {
       val results = UserSearchResults(Nil)
 
       checking {
-        oneOf(publicApi).searchUser(query).willReturn(Right(results))
+        oneOf(publicApi).searchUser(userId, query).willReturn(Right(results))
       }
 
       Post(s"/search", query).withHeaders(sessionIdHeader) ~> webApi.newUserRoute ~> check {
