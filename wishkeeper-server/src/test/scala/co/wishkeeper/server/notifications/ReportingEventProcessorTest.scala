@@ -13,10 +13,10 @@ import co.wishkeeper.server.reporting.Reporter
 import com.wixpress.common.specs2.JMock
 import org.jmock.lib.concurrent.DeterministicScheduler
 import org.joda.time.DateTime
-import org.specs2.mutable.Specification
+import org.specs2.mutable.Spec
 import org.specs2.specification.Scope
 
-class ReportingEventProcessorTest extends Specification with JMock {
+class ReportingEventProcessorTest extends Spec with JMock {
   "report new user" in new Context {
     val userConnected = UserConnected(userId, sessionId = randomUUID())
     val events = EventsList(userId, userConnected.time)
@@ -106,15 +106,15 @@ class ReportingEventProcessorTest extends Specification with JMock {
 
   "Not report user connection if not new user" in new Context {
     val userConnected = UserConnected(userId, sessionId = randomUUID())
-    val events = EventsList(userId)
+    val events = EventsList(userId, DateTime.now().minusDays(1))
 
     checking {
       never(reporter).report(having(any[UserFirstConnection]))
-      allowing(dataStore).userEvents(userId).will(returnValue(events.withEvent(UserConnected(userId, sessionId = randomUUID())).withName(userName).list))
+      allowing(dataStore).userEvents(userId).will(returnValue(events.list))
     }
 
     processor.process(userConnected, userId)
-    scheduler.runUntilIdle()
+    scheduler.tick(delaySeconds, SECONDS)
   }
 
   trait Context extends Scope {
