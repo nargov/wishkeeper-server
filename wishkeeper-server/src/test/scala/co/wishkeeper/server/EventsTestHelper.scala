@@ -9,7 +9,7 @@ import co.wishkeeper.server.projections.Friend
 import org.joda.time.DateTime
 
 object EventsTestHelper {
-  def userConnectEvent(userId: UUID) = UserConnected(userId, DateTime.now(), randomUUID())
+  def userConnectEvent(userId: UUID, time: DateTime = DateTime.now()) = UserConnected(userId, time, randomUUID())
 
   def asEventInstants(events: List[UserEvent]): List[UserEventInstant[_ <: UserEvent]] = events.map(asEventInstant(_))
 
@@ -75,7 +75,7 @@ object EventsTestHelper {
   }
 
   object EventsList {
-    def apply(userId: UUID): EventsList = EventsList(userId, asEventInstants(List(userConnectEvent(userId))))
+    def apply(userId: UUID, created: DateTime = DateTime.now()): EventsList = EventsList(userId, asEventInstants(List(userConnectEvent(userId, created))))
   }
 
 }

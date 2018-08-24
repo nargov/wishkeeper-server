@@ -19,7 +19,8 @@ case class User(id: UUID,
                 flags: Flags = Flags(),
                 notifications: List[Notification] = Nil,
                 pendingNotifications: List[Notification] = Nil,
-                settings: Settings = Settings()) {
+                settings: Settings = Settings(),
+                created: DateTime = DateTime.now()) {
 
 
   def applyEvent[E <: UserEvent](event: UserEventInstant[E]): User = event match {
@@ -120,8 +121,8 @@ case class User(id: UUID,
 object User {
   def replay(events: List[UserEventInstant[_ <: UserEvent]]): User = {
     events.headOption.map {
-      case UserEventInstant(UserConnected(userId, _, _), _) =>
-        events.foldLeft(User(userId))((user, instant) => user.applyEvent(instant))
+      case UserEventInstant(UserConnected(userId, time, _), _) =>
+        events.foldLeft(User(userId, created = time))((user, instant) => user.applyEvent(instant))
     }.getOrElse(throw new IllegalArgumentException("Event stream does not begin with UserConnected"))
   }
 

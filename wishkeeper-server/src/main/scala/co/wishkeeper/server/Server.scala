@@ -7,8 +7,9 @@ import co.wishkeeper.server.api.{DelegatingManagementApi, DelegatingPublicApi, M
 import co.wishkeeper.server.events.processing.ImageUploadEventProcessor
 import co.wishkeeper.server.image.{GoogleCloudStorageImageStore, ImageStore}
 import co.wishkeeper.server.messaging.{FirebasePushNotifications, MemStateClientRegistry}
-import co.wishkeeper.server.notifications.{ExecutorNotificationsScheduler, ServerNotificationEventProcessor}
+import co.wishkeeper.server.notifications.{ExecutorNotificationsScheduler, ReportingEventProcessor, ServerNotificationEventProcessor}
 import co.wishkeeper.server.projections._
+import co.wishkeeper.server.reporting.{NoOpReporter, Reporter, SlackBotReporter}
 import co.wishkeeper.server.search.SimpleScanUserSearchProjection
 import co.wishkeeper.server.web.WebApi
 import com.typesafe.config.ConfigFactory
@@ -47,6 +48,14 @@ class WishkeeperServer {
   private val userFriendsProjection = new EventBasedUserFriendsProjection(facebookConnector, userIdByFacebookIdProjection, dataStore)
   private val userSearchProjection = new SimpleScanUserSearchProjection(dataStore)
 
+  private val slackUrlConfigKey = "wishkeeper.slack.url"
+  private val reporter: Reporter = {
+    if(config.hasPath(slackUrlConfigKey))
+      new SlackBotReporter(config.getString(slackUrlConfigKey))
+    else
+      NoOpReporter
+  }
+
   private val commandProcessor: CommandProcessor = new UserCommandProcessor(dataStore, List(
     userIdByFacebookIdProjection,
     notificationsProjection,
@@ -54,7 +63,8 @@ class WishkeeperServer {
     new UserByEmailProjection(dataStore),
     new ServerNotificationEventProcessor(clientRegistry, notificationsScheduler, dataStore, pushNotifications),
     new ImageUploadEventProcessor(userImageStore, fileAdapter, dataStore),
-    userSearchProjection
+    userSearchProjection,
+    new ReportingEventProcessor(reporter, dataStore)
   ))
   private val userProfileProjection: UserProfileProjection = new ReplayingUserProfileProjection(dataStore)
   private val publicApi = new DelegatingPublicApi(commandProcessor, dataStore, facebookConnector,
