@@ -80,11 +80,12 @@ class UserTest extends Specification with MatcherMacros with JMock with Notifica
 
   "Recreate from Events" in new Context {
     val name = "Joe"
+    val time: DateTime = DateTime.now()
     val events = List(
-      UserEventInstant(UserConnected(user.id, DateTime.now(), randomUUID()), DateTime.now()),
-      UserEventInstant(UserNameSet(user.id, name), DateTime.now())
+      UserEventInstant(UserConnected(user.id, time, randomUUID()), time),
+      UserEventInstant(UserNameSet(user.id, name), time)
     )
-    User.replay(events) must beEqualTo(User(user.id, UserProfile(name = Option(name))))
+    User.replay(events) must beEqualTo(User(user.id, created = time, userProfile = UserProfile(name = Option(name))))
   }
 
   "throw exception if first event is not UserConnected" in {
