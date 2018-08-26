@@ -10,7 +10,7 @@ import co.wishkeeper.server.messaging._
 class ServerNotificationEventProcessor(notifier: ClientNotifier,
                                        scheduler: NotificationsScheduler,
                                        dataStore: DataStore,
-                                       pushNotifications: PushNotifications)
+                                       pushNotifications: PushNotificationSender)
   extends EventProcessor {
 
   override def process(event: Events.Event, userId: UUID): List[(UUID, Event)] = {

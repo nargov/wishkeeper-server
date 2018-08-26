@@ -84,6 +84,18 @@ object ManagementRoute {
       search
     }
 
+    val resubscribeAll = pathPrefix("resub") {
+      complete(managementApi.resubscribePeriodicWakeup())
+    }
+
+    val periodicWakeup = pathPrefix("periodic") {
+      resubscribeAll
+    }
+
+    val subscriptions = pathPrefix("subs") {
+      periodicWakeup
+    }
+
     DebuggingDirectives.logRequestResult(LoggingMagnet(_ => printer)) {
       pathPrefix("users") {
         userByEmail ~
@@ -91,7 +103,8 @@ object ManagementRoute {
           user
       } ~
         stats ~
-      views
+      views ~
+      subscriptions
     }
   }
 }

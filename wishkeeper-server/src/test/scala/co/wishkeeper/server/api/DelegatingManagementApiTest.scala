@@ -19,7 +19,7 @@ class DelegatingManagementApiTest extends Specification with JMock {
       oneOf(commandProcessor).process(SetFlagFacebookFriendsListSeen(false), userId)
     }
 
-    new DelegatingManagementApi(null, null, null, commandProcessor, null)
+    new DelegatingManagementApi(null, null, null, commandProcessor, null, null)
       .resetFacebookFriendsSeenFlag(userId)
   }
 
@@ -31,18 +31,7 @@ class DelegatingManagementApiTest extends Specification with JMock {
       oneOf(commandProcessor).validatedProcess(DeleteUserPicture, userId).willReturn(Right(()))
     }
 
-    new DelegatingManagementApi(null, null, null, commandProcessor, null)
+    new DelegatingManagementApi(null, null, null, commandProcessor, null, null)
       .deleteUserPicture(userId)
-  }
-
-  "should rebuild user search view" in {
-    val searchProjection = mock[UserSearchProjection]
-
-    checking {
-      oneOf(searchProjection).rebuild()
-    }
-
-    new DelegatingManagementApi(null, null, null, null, searchProjection)
-      .rebuildUserSearch()
   }
 }

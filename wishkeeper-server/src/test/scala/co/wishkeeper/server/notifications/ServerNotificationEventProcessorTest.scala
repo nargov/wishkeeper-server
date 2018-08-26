@@ -111,7 +111,7 @@ class ServerNotificationEventProcessorTest extends Specification with JMock {
     val deviceToken = "id"
     val clientNotifier = mock[ClientNotifier]
     val dataStore = mock[DataStore]
-    val pushNotifications = mock[PushNotifications]
+    val pushNotifications = mock[PushNotificationSender]
     val processor = new ServerNotificationEventProcessor(clientNotifier, NoOpNotificationsScheduler, dataStore, pushNotifications)
     val userId = randomUUID()
 

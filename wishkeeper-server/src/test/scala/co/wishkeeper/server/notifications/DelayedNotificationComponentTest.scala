@@ -7,12 +7,13 @@ import java.util.concurrent.atomic.AtomicReference
 
 import co.wishkeeper.server.Events.{DeviceNotificationIdSet, WishReservedNotificationCreated, WishUnreservedNotificationCreated}
 import co.wishkeeper.server.EventsTestHelper.EventsList
-import co.wishkeeper.server.NotificationsData.{WishReservedNotification, WishUnreservedNotification}
-import co.wishkeeper.server.messaging.{MemStateClientRegistry, NotificationsUpdated, PushNotifications, ServerNotification}
-import co.wishkeeper.server.{DataStore, PushNotification}
+import co.wishkeeper.server.NotificationsData.{NotificationData, PeriodicWakeup, WishReservedNotification, WishUnreservedNotification}
+import co.wishkeeper.server.messaging.{MemStateClientRegistry, NotificationsUpdated, PushNotificationSender, ServerNotification}
+import co.wishkeeper.server.{BroadcastNotification, DataStore, PushNotification}
 import com.wixpress.common.specs2.JMock
 import org.jmock.lib.concurrent.DeterministicScheduler
 import org.joda.time.DateTime
+import org.specs2.matcher.Matcher
 import org.specs2.mutable.Specification
 import org.specs2.specification.Scope
 
@@ -138,10 +139,22 @@ class DelayedNotificationComponentTest extends Specification with JMock {
     scheduler.tick(config.default.toSeconds + 1, SECONDS)
   }
 
+  "Send periodic wakeup" in new Context {
+    checking {
+      oneOf(pushNotifications).sendToTopic(having(===(PushNotificationSender.periodicWakeup)), having(aPeriodicWakeup))
+    }
+
+    scheduler.tick(config.periodic.toHours, HOURS)
+  }
+
+  def aPeriodicWakeup: Matcher[BroadcastNotification] = (notification: BroadcastNotification) => notification match {
+    case BroadcastNotification(_, d@PeriodicWakeup) => (true, "is a Periodic Wakeup")
+    case _ => (false, "is not a PeriodicWakeup")
+  }
 
   trait Context extends Scope {
     val dataStore = mock[DataStore]
-    val pushNotifications = mock[PushNotifications]
+    val pushNotifications = mock[PushNotificationSender]
     val scheduler = new DeterministicScheduler
     val clientRegistry = new MemStateClientRegistry()
     val config = NotificationDelayConfig(default = 5.seconds)

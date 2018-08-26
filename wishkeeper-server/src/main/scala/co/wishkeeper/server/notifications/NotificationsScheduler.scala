@@ -3,8 +3,8 @@ package co.wishkeeper.server.notifications
 import java.util.UUID
 import java.util.concurrent._
 
+import co.wishkeeper.server._
 import co.wishkeeper.server.messaging._
-import co.wishkeeper.server.{DataStore, Notification, PushNotification, User}
 import org.joda.time
 import org.joda.time.DateTime
 
@@ -22,11 +22,20 @@ class ExecutorNotificationsScheduler(config: NotificationDelayConfig = Notificat
                                      scheduler: ScheduledExecutorService = Executors.newScheduledThreadPool(10),
                                      clientNotifier: ClientNotifier,
                                      dataStore: DataStore,
-                                     pushNotifications: PushNotifications) extends NotificationsScheduler {
+                                     pushNotifications: PushNotificationSender) extends NotificationsScheduler {
 
   implicit val ec = ExecutionContext.fromExecutorService(scheduler)
 
   private def toCallable[T]: (() => T) => Callable[T] = f => () => f()
+
+  private val periodicWakeup = {
+    val now = DateTime.now()
+    scheduler.scheduleAtFixedRate(
+      () => pushNotifications.sendToTopic(PushNotificationSender.periodicWakeup, BroadcastNotifications.periodicWakeup),
+//      ((60 - now.minuteOfHour().get) * 60) + (60 - now.secondOfMinute().get), 1.hour.toSeconds, SECONDS
+      0, 10.seconds.toSeconds, SECONDS
+    )
+  }
 
   override def scheduleNotification(userId: UUID, notification: ServerNotification): Unit = {
     scheduler.schedule(toCallable(() => {
@@ -72,4 +81,4 @@ object NoOpNotificationsScheduler extends NotificationsScheduler {
     Future.successful(Success(""))
 }
 
-case class NotificationDelayConfig(default: Duration = 5.minutes)
+case class NotificationDelayConfig(default: Duration = 5.minutes, periodic: Duration = 1.hour)

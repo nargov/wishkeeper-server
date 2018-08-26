@@ -3,6 +3,7 @@ package co.wishkeeper.server
 import java.util.UUID
 import java.util.UUID.randomUUID
 
+import akka.actor.ActorSystem
 import akka.http.scaladsl.model.ContentTypes.`application/json`
 import akka.http.scaladsl.model._
 import akka.http.scaladsl.model.headers._
@@ -13,7 +14,7 @@ import co.wishkeeper.server.WishStatus.Deleted
 import co.wishkeeper.server.api.{ManagementApi, PublicApi}
 import co.wishkeeper.server.image.ImageMetadata
 import co.wishkeeper.server.messaging.MemStateClientRegistry
-import co.wishkeeper.server.projections.{Friend, PotentialFriend, UserFriends}
+import co.wishkeeper.server.projections.{Friend, FriendBirthdaysResult, PotentialFriend, UserFriends}
 import co.wishkeeper.server.search.{SearchQuery, UserSearchResults}
 import co.wishkeeper.server.user.commands.{ConnectFacebookUser, SendFriendRequest, SetFlagFacebookFriendsListSeen}
 import co.wishkeeper.server.user.{InvalidStatusChange, NotFriends, ValidationError, WishNotFound}
@@ -99,6 +100,16 @@ class RouteTest extends Specification with Specs2RouteTest with JMock {
       }
 
       Post(s"/views/search/rebuild") ~> managementRoute ~> check {
+        handled should beTrue
+      }
+    }
+
+    "Subscribe all known devices to periodic wakeup topic" in new ManagementContext {
+      checking {
+        oneOf(managementApi).resubscribePeriodicWakeup()
+      }
+
+      Post(s"/subs/periodic/resub") ~> managementRoute ~> check {
         handled should beTrue
       }
     }
@@ -513,6 +524,18 @@ class RouteTest extends Specification with Specs2RouteTest with JMock {
       Post(s"/search", query).withHeaders(sessionIdHeader) ~> webApi.newUserRoute ~> check {
         status must beEqualTo(StatusCodes.OK)
         responseAs[UserSearchResults] must beEqualTo(results)
+      }
+    }
+
+    "Get friends that have their birthday today" in new LoggedInUserContext {
+      val result = FriendBirthdaysResult(List(Friend(friendId)))
+
+      checking {
+        oneOf(publicApi).friendsBornToday(userId).willReturn(Right(result))
+      }
+
+      Get(s"/me/friends/birthday-today").withHeaders(sessionIdHeader) ~> webApi.newUserRoute ~> check {
+        responseAs[FriendBirthdaysResult] must beEqualTo(result)
       }
     }
   }

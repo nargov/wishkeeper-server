@@ -6,8 +6,8 @@ import co.wishkeeper.json._
 import co.wishkeeper.server.api.{DelegatingManagementApi, DelegatingPublicApi, ManagementApi}
 import co.wishkeeper.server.events.processing.ImageUploadEventProcessor
 import co.wishkeeper.server.image.{GoogleCloudStorageImageStore, ImageStore}
-import co.wishkeeper.server.messaging.{FirebasePushNotifications, MemStateClientRegistry}
-import co.wishkeeper.server.notifications.{ExecutorNotificationsScheduler, ReportingEventProcessor, ServerNotificationEventProcessor}
+import co.wishkeeper.server.messaging.{FirebaseConfig, FirebasePushNotificationSender, MemStateClientRegistry}
+import co.wishkeeper.server.notifications.{DeviceIdEventProcessor, ExecutorNotificationsScheduler, ReportingEventProcessor, ServerNotificationEventProcessor}
 import co.wishkeeper.server.projections._
 import co.wishkeeper.server.reporting.{NoOpReporter, Reporter, SlackBotReporter}
 import co.wishkeeper.server.search.SimpleScanUserSearchProjection
@@ -35,7 +35,7 @@ class WishkeeperServer {
   private val userImageStore: ImageStore = new GoogleCloudStorageImageStore(config.getString("wishkeeper.user-image-store.bucket-name"))
 
   private val userIdByFacebookIdProjection = new DataStoreUserIdByFacebookIdProjection(dataStore)
-  private val pushNotifications = new FirebasePushNotifications
+  private val pushNotifications = new FirebasePushNotificationSender(config = FirebaseConfig(config.getString("wishkeeper.fcm.key")))
   private val notificationsScheduler = new ExecutorNotificationsScheduler(clientNotifier = clientRegistry, dataStore = dataStore,
     pushNotifications = pushNotifications)
   private val notificationsProjection = new DataStoreNotificationsProjection(dataStore)
@@ -47,6 +47,7 @@ class WishkeeperServer {
   private val friendRequestsProjection = new FriendRequestsEventProcessor(dataStore)
   private val userFriendsProjection = new EventBasedUserFriendsProjection(facebookConnector, userIdByFacebookIdProjection, dataStore)
   private val userSearchProjection = new SimpleScanUserSearchProjection(dataStore)
+  private val deviceIdEventProcessor = new DeviceIdEventProcessor(pushNotifications, dataStore)
 
   private val slackUrlConfigKey = "wishkeeper.slack.url"
   private val reporter: Reporter = {
@@ -64,13 +65,14 @@ class WishkeeperServer {
     new ServerNotificationEventProcessor(clientRegistry, notificationsScheduler, dataStore, pushNotifications),
     new ImageUploadEventProcessor(userImageStore, fileAdapter, dataStore),
     userSearchProjection,
-    new ReportingEventProcessor(reporter, dataStore)
+    new ReportingEventProcessor(reporter, dataStore),
+    deviceIdEventProcessor
   ))
   private val userProfileProjection: UserProfileProjection = new ReplayingUserProfileProjection(dataStore)
   private val publicApi = new DelegatingPublicApi(commandProcessor, dataStore, facebookConnector,
     userProfileProjection, userFriendsProjection, notificationsProjection, userSearchProjection, wishImageStore)
   private val managementApi: ManagementApi = new DelegatingManagementApi(userIdByFacebookIdProjection, userProfileProjection,
-    dataStore, commandProcessor, userSearchProjection)
+    dataStore, commandProcessor, userSearchProjection, deviceIdEventProcessor)
   private val webApi = new WebApi(publicApi, managementApi, clientRegistry)
 
   def start(): Unit = {

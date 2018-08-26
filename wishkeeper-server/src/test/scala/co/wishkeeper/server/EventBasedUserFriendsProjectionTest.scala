@@ -6,8 +6,11 @@ import java.util.UUID.randomUUID
 import co.wishkeeper.server.Events._
 import co.wishkeeper.server.EventsTestHelper.{EventsList, asEventInstants, userConnectEvent}
 import co.wishkeeper.server.FriendRequestStatus.Approved
+import co.wishkeeper.server.projections.UserRelation.DirectFriend
 import co.wishkeeper.server.projections._
 import com.wixpress.common.specs2.JMock
+import org.joda.time.DateTime
+import org.joda.time.format.DateTimeFormat
 import org.specs2.concurrent.ExecutionEnv
 import org.specs2.matcher.Matcher
 import org.specs2.mutable.Specification
@@ -199,6 +202,23 @@ class EventBasedUserFriendsProjectionTest(implicit ee: ExecutionEnv) extends Spe
     }
 
     userFriendsProjection.friendsFor(friendId, userId).all must containTheSameElementsAs(List(Friend(mutualFriendId).asDirectFriend))
+  }
+
+  "returns friends that have their birthday today" in new Context {
+    val roger = Friend(friendId, Option("Roger Rabbit"), Option("roger image"), relation = Option(DirectFriend))
+    val billy = Friend(randomUUID(), Option("Billy Kid"), Option("billy image"), relation = Option(DirectFriend))
+    val friendsBornToday = List(roger)
+    val friendsBornOtherDays = List(billy)
+    val allFriends = friendsBornToday ++ friendsBornOtherDays
+
+    checking {
+      allowing(dataStore).userEvents(userId).willReturn(EventsList(userId).withFriends(allFriends).list)
+      allowing(dataStore).userEvents(friendId).willReturn(EventsList(friendId).withName(roger.name).withPic(roger.image.get).withBirthday("04/13/1970").list)
+      allowing(dataStore).userEvents(billy.userId).willReturn(EventsList(billy.userId).withName(billy.name).withBirthday("07/22/1980").list)
+    }
+
+    val today: DateTime = DateTime.parse("04/13/2018", DateTimeFormat.shortDate())
+    userFriendsProjection.friendsBornToday(userId, today) must beRight(FriendBirthdaysResult(friendsBornToday))
   }
 
   def aFriend(id: UUID): Matcher[Friend] = ===(id) ^^ ((_: Friend).userId)

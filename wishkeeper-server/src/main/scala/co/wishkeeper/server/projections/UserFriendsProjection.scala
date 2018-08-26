@@ -4,10 +4,15 @@ import java.util.UUID
 
 import co.wishkeeper.server.projections.UserRelation.{DirectFriend, IncomingRequest, RequestedFriend}
 import co.wishkeeper.server.{DataStore, FacebookConnector, FriendRequest, User}
+import org.joda.time.DateTime
+import co.wishkeeper.server.Error
+import org.joda.time.format.DateTimeFormat
 
 import scala.concurrent.{ExecutionContext, Future}
 
 trait UserFriendsProjection {
+
+  def friendsBornToday(userId: UUID, date: DateTime = DateTime.now()): Either[Error, FriendBirthdaysResult]
 
   def potentialFacebookFriends(userId: UUID, accessToken: String): Future[List[PotentialFriend]]
 
@@ -68,6 +73,17 @@ class EventBasedUserFriendsProjection(facebookConnector: FacebookConnector,
     else
       UserFriends(Nil, mutualFriends, Nil, all = mutualFriends.map(_.asDirectFriend))
   }
+
+  override def friendsBornToday(userId: UUID, date: DateTime = DateTime.now()): Either[Error, FriendBirthdaysResult] = {
+    val friendIds: List[UUID] = User.replay(dataStore.userEvents(userId)).friends.current
+    val friends = friendIds.map(friendId => User.replay(dataStore.userEvents(friendId)))
+    val bornToday = friends.filter(_.userProfile.birthday.exists(dateStr => {
+      val birthDate = DateTime.parse(dateStr, DateTimeFormat.shortDate())
+      birthDate.monthOfYear() == date.monthOfYear() && birthDate.dayOfMonth() == date.dayOfMonth()
+    }))
+    Right(FriendBirthdaysResult(bornToday.map(friend =>
+      Friend(friend.id, friend.userProfile.name, friend.userProfile.picture, friend.userProfile.firstName, Option(DirectFriend)))))
+  }
 }
 
 
@@ -92,6 +108,8 @@ object Friend {
     }
   }
 }
+
+case class FriendBirthdaysResult(friends: List[Friend])
 
 sealed trait UserRelation
 

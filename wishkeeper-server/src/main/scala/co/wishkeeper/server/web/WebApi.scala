@@ -21,7 +21,7 @@ import co.wishkeeper.server.Error
 import co.wishkeeper.server.api.{ManagementApi, PublicApi}
 import co.wishkeeper.server.image.ImageMetadata
 import co.wishkeeper.server.messaging.ClientRegistry
-import co.wishkeeper.server.search.{SearchQuery, UserSearchResults}
+import co.wishkeeper.server.search.SearchQuery
 import co.wishkeeper.server.user.commands._
 import co.wishkeeper.server.user.{InvalidStatusChange, NotFriends, ValidationError, WishNotFound}
 import co.wishkeeper.server.web.WebApi.{imageDimensionsHeader, sessionIdHeader}
@@ -134,9 +134,15 @@ class WebApi(publicApi: PublicApi, managementApi: ManagementApi, clientRegistry:
       handleCommandResult(publicApi.removeFriend(userId, friendId))
     }
 
+  val birthdayToday: UUID => Route = userId =>
+    (get & pathPrefix("birthday-today")) {
+      publicApi.friendsBornToday(userId).fold(handleErrors, result => complete(result))
+    }
+
   val friends: UUID => Route = userId => pathPrefix("friends") {
     sendFriendRequest(userId) ~
-      removeFriend(userId)
+      removeFriend(userId) ~
+      birthdayToday(userId)
   }
 
   val setNotificationId: UUID => Route = userId => (post & pathPrefix("id") & formField("id")) { notificationId =>

@@ -72,6 +72,8 @@ object EventsTestHelper {
     def withPic(link: String) = this.copy(list = list :+ asEventInstant(UserPictureSet(userId, link)))
 
     def withDeviceId(id: String) = withEvent(DeviceNotificationIdSet(id))
+
+    def withBirthday(day: String) = withEvent(UserBirthdaySet(userId, day))
   }
 
   object EventsList {
