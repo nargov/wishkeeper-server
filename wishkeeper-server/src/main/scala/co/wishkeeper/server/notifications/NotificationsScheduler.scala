@@ -32,8 +32,7 @@ class ExecutorNotificationsScheduler(config: NotificationDelayConfig = Notificat
     val now = DateTime.now()
     scheduler.scheduleAtFixedRate(
       () => pushNotifications.sendToTopic(PushNotificationSender.periodicWakeup, BroadcastNotifications.periodicWakeup),
-//      ((60 - now.minuteOfHour().get) * 60) + (60 - now.secondOfMinute().get), 1.hour.toSeconds, SECONDS
-      0, 10.seconds.toSeconds, SECONDS
+      ((60 - now.minuteOfHour().get) * 60) + (60 - now.secondOfMinute().get), 1.hour.toSeconds, SECONDS
     )
   }
 
