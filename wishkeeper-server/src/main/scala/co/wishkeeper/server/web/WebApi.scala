@@ -168,13 +168,24 @@ class WebApi(publicApi: PublicApi, managementApi: ManagementApi, clientRegistry:
     }
   }
 
+  val setName: UUID => Route = userId => (pathPrefix("name") & post) {
+    entity(as[SetUserName]) { setUserName =>
+      handleCommandResult(publicApi.setUserName(userId, setUserName))
+    }
+  }
+
+  val profile: UUID => Route = userId => pathPrefix("profile") {
+    setName(userId)
+  }
+
   val newUserRoute: Route =
     userIdFromSessionHeader { userId =>
       pathPrefix("me") {
         wishes(userId) ~
           friends(userId) ~
           myId(userId) ~
-          notifications(userId)
+          notifications(userId) ~
+          profile(userId)
       } ~
         pathPrefix(JavaUUID) { friendId =>
           friendWishes(userId, friendId)

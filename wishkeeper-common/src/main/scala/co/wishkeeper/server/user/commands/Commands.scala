@@ -83,3 +83,14 @@ case object DeleteUserPicture extends UserCommand {
   implicit val validator: UserCommandValidator[DeleteUserPicture.type] =
     (user: User, _: DeleteUserPicture.type) => Either.cond(user.userProfile.picture.isDefined, (), NoPictureToDelete)
 }
+
+case class SetUserName(firstName: Option[String], lastName: Option[String]) extends UserCommand {
+  override def process(user: User): List[UserEvent] = List(
+    UserFirstNameSet(user.id, firstName.getOrElse("")),
+    UserLastNameSet(user.id, lastName.getOrElse("")),
+    UserNameSet(user.id, s"${firstName.getOrElse("")} ${lastName.getOrElse("")}".trim)
+  )
+}
+object SetUserName {
+  implicit val validator: UserCommandValidator[SetUserName] = UserCommandValidator.Always
+}

@@ -22,6 +22,8 @@ import scala.util.Try
 
 trait PublicApi {
 
+  def setUserName(userId: UUID, setUserName: SetUserName): Either[Error, Unit]
+
   def friendsBornToday(userId: UUID): Either[Error, FriendBirthdaysResult]
 
   def removeFriend(userId: UUID, friendId: UUID): Either[Error, Unit]
@@ -272,4 +274,6 @@ class DelegatingPublicApi(commandProcessor: CommandProcessor,
   override def searchUser(userId: UUID, search: SearchQuery): Either[Error, UserSearchResults] = Right(searchProjection.byName(userId, search.query))
 
   override def friendsBornToday(userId: UUID): Either[Error, FriendBirthdaysResult] = userFriendsProjection.friendsBornToday(userId)
+
+  override def setUserName(userId: UUID, setUserName: SetUserName): Either[Error, Unit] = commandProcessor.validatedProcess(setUserName, userId)
 }
