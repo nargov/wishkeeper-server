@@ -41,4 +41,4 @@ class GoogleCloudStorageImageStore(bucket: String) extends ImageStore {
 
 
 
-case class ImageMetadata(contentType: String, fileName: String, width: Int, height: Int)
+case class ImageMetadata(contentType: String, fileName: String, width: Int = 0, height: Int = 0)

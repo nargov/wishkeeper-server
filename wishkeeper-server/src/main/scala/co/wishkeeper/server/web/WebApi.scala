@@ -174,8 +174,16 @@ class WebApi(publicApi: PublicApi, managementApi: ManagementApi, clientRegistry:
     }
   }
 
+  val setPicture: UUID => Route = userId => (pathPrefix("picture") & post) {
+    fileUpload("file") { case (metadata, byteSource) =>
+      val inputStream = byteSource.runWith(StreamConverters.asInputStream())
+      handleCommandResult(publicApi.uploadProfileImage(inputStream, ImageMetadata(metadata.contentType.value, metadata.fileName), userId))
+    }
+  }
+
   val profile: UUID => Route = userId => pathPrefix("profile") {
-    setName(userId)
+    setName(userId) ~
+      setPicture(userId)
   }
 
   val newUserRoute: Route =

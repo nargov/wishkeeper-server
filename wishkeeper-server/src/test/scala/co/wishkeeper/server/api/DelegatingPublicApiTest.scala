@@ -1,5 +1,6 @@
 package co.wishkeeper.server.api
 
+import java.io.ByteArrayInputStream
 import java.util.UUID
 import java.util.UUID.randomUUID
 
@@ -10,6 +11,7 @@ import co.wishkeeper.server.FriendRequestStatus.{Approved, Ignored}
 import co.wishkeeper.server.NotificationsData.{FriendRequestNotification, NotificationData}
 import co.wishkeeper.server.WishStatus.WishStatus
 import co.wishkeeper.server._
+import co.wishkeeper.server.image.{ImageData, ImageMetadata, ImageStore}
 import co.wishkeeper.server.projections._
 import co.wishkeeper.server.search.SimpleScanUserSearchProjection
 import co.wishkeeper.server.user.{NotFriends, ValidationError, WishNotFound}
@@ -18,6 +20,8 @@ import org.joda.time.DateTime
 import org.specs2.matcher.Matcher
 import org.specs2.mutable.Specification
 import org.specs2.specification.Scope
+
+import scala.tools.nsc.interpreter.InputStream
 
 class DelegatingPublicApiTest extends Specification with JMock {
 
@@ -246,6 +250,17 @@ class DelegatingPublicApiTest extends Specification with JMock {
     api.removeFriend(userId, friendId)
   }
 
+  "upload user profile image" in new LoggedInContext {
+    val imageMetadata = ImageMetadata("image/jpeg", "file-name")
+    val inputStream = new ByteArrayInputStream(Array[Byte](1))
+
+    checking {
+      oneOf(userImageStore).save(ImageData(inputStream, imageMetadata.contentType), imageMetadata.fileName)
+    }
+
+    api.uploadProfileImage(inputStream, imageMetadata, userId)
+  }
+
   def userWishesWith(wishId: UUID, wishName: String): Matcher[UserWishes] = contain(aWishWith(wishId, wishName)) ^^ {(_: UserWishes).wishes}
 
   def aWishWith(id: UUID, name: String): Matcher[Wish] = (wish: Wish) =>
@@ -263,8 +278,9 @@ class DelegatingPublicApiTest extends Specification with JMock {
     val userFriendsProjection: UserFriendsProjection = mock[UserFriendsProjection]
     val searchProjection = new SimpleScanUserSearchProjection(dataStore)
     val userProfileProjection: UserProfileProjection = new ReplayingUserProfileProjection(dataStore)
+    val userImageStore = mock[ImageStore]
     val api: PublicApi = new DelegatingPublicApi(commandProcessor, dataStore, null, userProfileProjection, userFriendsProjection,
-      notificationsProjection, searchProjection, null)(null, null, null)
+      notificationsProjection, searchProjection, null, userImageStore)(null, null, null)
     val friendId: UUID = randomUUID()
     val friendRequestId = randomUUID()
     val notificationData = FriendRequestNotification(friendId, friendRequestId)

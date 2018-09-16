@@ -94,3 +94,10 @@ case class SetUserName(firstName: Option[String], lastName: Option[String]) exte
 object SetUserName {
   implicit val validator: UserCommandValidator[SetUserName] = UserCommandValidator.Always
 }
+
+case class SetUserPicture(url: String) extends UserCommand {
+  override def process(user: User): List[UserEvent] = UserPictureSet(user.id, url) :: Nil
+}
+object SetUserPicture {
+  implicit val validator: UserCommandValidator[SetUserPicture] = UserCommandValidator.Always
+}

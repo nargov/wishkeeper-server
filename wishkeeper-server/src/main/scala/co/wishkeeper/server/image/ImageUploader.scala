@@ -6,14 +6,14 @@ import java.util.concurrent.{Executors, ThreadFactory}
 
 import akka.actor.ActorSystem
 import akka.stream.ActorMaterializer
-import co.wishkeeper.server.{ImageLink, ImageLinks, ImageProcessor}
+import co.wishkeeper.server.{Error, ImageLink, ImageLinks, ImageProcessor}
 import org.slf4j.LoggerFactory
 
 import scala.concurrent.duration._
 import scala.concurrent.{Await, ExecutionContext, Future}
 
-class WishImages(imageStore: ImageStore, imageProcessor: ImageProcessor, maxUploadThreads: Int = 20)
-                (implicit actorSystem: ActorSystem, am: ActorMaterializer) {
+class ImageUploader(imageStore: ImageStore, imageProcessor: ImageProcessor, maxUploadThreads: Int = 20)
+                   (implicit actorSystem: ActorSystem, am: ActorMaterializer) {
 
   private implicit val ec = ExecutionContext.fromExecutorService(Executors.newFixedThreadPool(maxUploadThreads, new ThreadFactory {
     private val threadIdCounter = new AtomicInteger(0)
@@ -22,9 +22,12 @@ class WishImages(imageStore: ImageStore, imageProcessor: ImageProcessor, maxUplo
 
   private val log = LoggerFactory.getLogger(getClass)
 
-  def uploadImageAndResizedCopies(imageMetadata: ImageMetadata, origFile: Path, timeout: Duration = 2.minutes): ImageLinks = {
+
+  def uploadImageAndResizedCopies(imageMetadata: ImageMetadata, origFile: Path, timeout: Duration = 2.minutes,
+                                  toImageStore: ImageStore = imageStore): ImageLinks = {
+
     log.debug(s"Image Metadata: $imageMetadata")
-    val sizesAndExtensions = (".full", imageMetadata.width) :: WishImages.sizeExtensions
+    val sizesAndExtensions = (".full", imageMetadata.width) :: ImageUploader.sizeExtensions
 
     val eventualLinks: List[Future[ImageLink]] = sizesAndExtensions.filter {
       case (_, width) => width <= imageMetadata.width
@@ -52,7 +55,7 @@ class WishImages(imageStore: ImageStore, imageProcessor: ImageProcessor, maxUplo
   }
 }
 
-object WishImages {
+object ImageUploader {
   val sizeExtensions = List(
     (".fhd", 1080),
     (".hfhd", 540),

@@ -22,6 +22,8 @@ import scala.util.Try
 
 trait PublicApi {
 
+  def uploadProfileImage(inputStream: InputStream, metadata: ImageMetadata, userId: UUID): Either[Error, Unit]
+
   def setUserName(userId: UUID, setUserName: SetUserName): Either[Error, Unit]
 
   def friendsBornToday(userId: UUID): Either[Error, FriendBirthdaysResult]
@@ -94,10 +96,11 @@ class DelegatingPublicApi(commandProcessor: CommandProcessor,
                           userFriendsProjection: UserFriendsProjection,
                           notificationsProjection: NotificationsProjection,
                           searchProjection: UserSearchProjection,
-                          imageStore: ImageStore)
+                          imageStore: ImageStore,
+                          userImageStore: ImageStore)
                          (implicit actorSystem: ActorSystem, ec: ExecutionContext, am: ActorMaterializer) extends PublicApi {
 
-  private val wishImages = new WishImages(imageStore, new ScrimageImageProcessor)
+  private val imageUploader = new ImageUploader(imageStore, new ScrimageImageProcessor)
 
   override def deleteWish(userId: UUID, wishId: UUID): Either[Error, Unit] = commandProcessor.validatedProcess(DeleteWish(wishId), userId)
 
@@ -108,15 +111,18 @@ class DelegatingPublicApi(commandProcessor: CommandProcessor,
 
   override def uploadImage(inputStream: InputStream, imageMetadata: ImageMetadata, wishId: UUID, sessionId: UUID): Try[Unit] = {
     withValidSession(sessionId) { userId =>
-      Try {
-        val origFile = uploadedFilePath(imageMetadata)
-        Files.copy(inputStream, origFile) //todo move to adapter
-
-        val imageLinks = wishImages.uploadImageAndResizedCopies(imageMetadata, origFile)
+      upload(inputStream, imageMetadata).map(imageLinks => {
         val setWishDetailsEvent = SetWishDetails(Wish(wishId, image = Option(imageLinks)))
         commandProcessor.process(setWishDetailsEvent, userId)
-      }
+      })
     }
+  }
+
+  private def upload(inputStream: InputStream, imageMetadata: ImageMetadata, imageStore: Option[ImageStore] = None) = Try {
+    val origFile = uploadedFilePath(imageMetadata)
+    Files.copy(inputStream, origFile) //TODO move to adapter
+    imageStore.fold(imageUploader.uploadImageAndResizedCopies(imageMetadata, origFile))(store =>
+      imageUploader.uploadImageAndResizedCopies(imageMetadata, origFile, toImageStore = store))
   }
 
   override def uploadImage(url: String, imageMetadata: ImageMetadata, wishId: UUID, sessionId: UUID): Try[Unit] = {
@@ -276,4 +282,12 @@ class DelegatingPublicApi(commandProcessor: CommandProcessor,
   override def friendsBornToday(userId: UUID): Either[Error, FriendBirthdaysResult] = userFriendsProjection.friendsBornToday(userId)
 
   override def setUserName(userId: UUID, setUserName: SetUserName): Either[Error, Unit] = commandProcessor.validatedProcess(setUserName, userId)
+
+  override def uploadProfileImage(inputStream: InputStream, metadata: ImageMetadata, userId: UUID): Either[Error, Unit] = {
+    Try {
+      userImageStore.save(ImageData(inputStream, metadata.contentType), metadata.fileName)
+    }.toEither.left.map[Error](t => GeneralError(t.getMessage)).flatMap { _ =>
+      commandProcessor.validatedProcess(SetUserPicture(userImageStore.imageLinkBase + "/" + metadata.fileName), userId)
+    }
+  }
 }

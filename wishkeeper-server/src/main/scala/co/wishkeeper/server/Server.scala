@@ -70,7 +70,7 @@ class WishkeeperServer {
   ))
   private val userProfileProjection: UserProfileProjection = new ReplayingUserProfileProjection(dataStore)
   private val publicApi = new DelegatingPublicApi(commandProcessor, dataStore, facebookConnector,
-    userProfileProjection, userFriendsProjection, notificationsProjection, userSearchProjection, wishImageStore)
+    userProfileProjection, userFriendsProjection, notificationsProjection, userSearchProjection, wishImageStore, userImageStore)
   private val managementApi: ManagementApi = new DelegatingManagementApi(userIdByFacebookIdProjection, userProfileProjection,
     dataStore, commandProcessor, userSearchProjection, deviceIdEventProcessor)
   private val webApi = new WebApi(publicApi, managementApi, clientRegistry)
