@@ -5,6 +5,7 @@ import java.util.UUID
 import co.wishkeeper.server.Events._
 import co.wishkeeper.server.user._
 import co.wishkeeper.server.{FriendRequestStatus, User}
+import io.circe.Encoder
 
 trait UserCommand {
   def process(user: User): List[UserEvent]
@@ -100,4 +101,11 @@ case class SetUserPicture(url: String) extends UserCommand {
 }
 object SetUserPicture {
   implicit val validator: UserCommandValidator[SetUserPicture] = UserCommandValidator.Always
+}
+
+case class SetGender(gender: Gender, customGender: Option[String], genderPronoun: Option[GenderPronoun]) extends UserCommand {
+  override def process(user: User): List[UserEvent] = UserGenderSet2(gender, customGender, genderPronoun) :: Nil
+}
+object SetGender {
+  implicit val validator: UserCommandValidator[SetGender] = UserCommandValidator.Always
 }

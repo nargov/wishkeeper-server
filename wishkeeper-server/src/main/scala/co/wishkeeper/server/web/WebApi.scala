@@ -181,9 +181,16 @@ class WebApi(publicApi: PublicApi, managementApi: ManagementApi, clientRegistry:
     }
   }
 
+  val setGender: UUID => Route = userId => (pathPrefix("gender") & post) {
+    entity(as[SetGender]) { setGender =>
+      handleCommandResult(publicApi.setGender(setGender, userId))
+    }
+  }
+
   val profile: UUID => Route = userId => pathPrefix("profile") {
     setName(userId) ~
-      setPicture(userId)
+      setPicture(userId) ~
+      setGender(userId)
   }
 
   val newUserRoute: Route =

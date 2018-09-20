@@ -15,8 +15,8 @@ import co.wishkeeper.server.image.ImageMetadata
 import co.wishkeeper.server.messaging.MemStateClientRegistry
 import co.wishkeeper.server.projections.{Friend, FriendBirthdaysResult, PotentialFriend, UserFriends}
 import co.wishkeeper.server.search.{SearchQuery, UserSearchResults}
-import co.wishkeeper.server.user.commands.{ConnectFacebookUser, SendFriendRequest, SetFlagFacebookFriendsListSeen, SetUserName}
-import co.wishkeeper.server.user.{InvalidStatusChange, NotFriends, ValidationError, WishNotFound}
+import co.wishkeeper.server.user._
+import co.wishkeeper.server.user.commands._
 import co.wishkeeper.server.web.{ManagementRoute, WebApi}
 import com.wixpress.common.specs2.JMock
 import de.heikoseeberger.akkahttpcirce.FailFastCirceSupport._
@@ -547,10 +547,26 @@ class RouteTest extends Specification with Specs2RouteTest with JMock {
         oneOf(publicApi).setUserName(userId, setUserName).willReturn(Right(()))
       }
 
-      Post(s"/me/profile/name")
+      Post("/me/profile/name")
         .withEntity(HttpEntity(ContentTypes.`application/json`, setUserName.asJson.noSpaces))
         .withHeaders(sessionIdHeader) ~> webApi.newUserRoute ~> check {
 
+        handled must beTrue
+        status must beEqualTo(StatusCodes.OK)
+      }
+    }
+
+    "Save gender" in new LoggedInUserContext {
+      val setGender = SetGender(Gender.Custom, Option("Non-Binary"), Option(GenderPronoun.Neutral))
+
+      checking {
+        oneOf(publicApi).setGender(setGender, userId).willReturn(Right(()))
+      }
+
+      val json: String = setGender.asJson.noSpaces
+      Post("/me/profile/gender")
+        .withEntity(ContentTypes.`application/json`, json)
+        .withHeaders(sessionIdHeader) ~> webApi.newUserRoute ~> check {
         handled must beTrue
         status must beEqualTo(StatusCodes.OK)
       }

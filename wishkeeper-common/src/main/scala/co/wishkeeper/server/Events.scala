@@ -3,6 +3,7 @@ package co.wishkeeper.server
 import java.util.UUID
 
 import co.wishkeeper.server.Events.UserEvent
+import co.wishkeeper.server.user.{Gender, GenderPronoun}
 import org.joda.time.DateTime
 
 object Events {
@@ -30,6 +31,8 @@ object Events {
   case class UserLocaleSet(userId: UUID, locale: String) extends UserEvent
 
   case class UserGenderSet(userId: UUID, gender: String) extends UserEvent
+
+  case class UserGenderSet2(gender: Gender, customGender: Option[String], genderPronoun: Option[GenderPronoun]) extends UserEvent
 
   case class UserTimeZoneSet(userId: UUID, timezone: Int) extends UserEvent
 

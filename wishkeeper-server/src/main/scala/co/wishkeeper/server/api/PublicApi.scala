@@ -22,6 +22,8 @@ import scala.util.Try
 
 trait PublicApi {
 
+  def setGender(setGender: SetGender, userId: UUID): Either[Error, Unit]
+
   def uploadProfileImage(inputStream: InputStream, metadata: ImageMetadata, userId: UUID): Either[Error, Unit]
 
   def setUserName(userId: UUID, setUserName: SetUserName): Either[Error, Unit]
@@ -290,4 +292,6 @@ class DelegatingPublicApi(commandProcessor: CommandProcessor,
       commandProcessor.validatedProcess(SetUserPicture(userImageStore.imageLinkBase + "/" + metadata.fileName), userId)
     }
   }
+
+  override def setGender(setGender: SetGender, userId: UUID): Either[Error, Unit] = commandProcessor.validatedProcess(setGender, userId)
 }

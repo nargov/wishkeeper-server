@@ -9,6 +9,7 @@ import co.wishkeeper.server.FriendRequestStatus.Approved
 import co.wishkeeper.server.NotificationsData.{FriendRequestNotification, WishReservedNotification, WishUnreservedNotification}
 import co.wishkeeper.server.UserTestHelper._
 import co.wishkeeper.server.WishStatus.WishStatus
+import co.wishkeeper.server.user.{Gender, GenderPronoun}
 import co.wishkeeper.test.utils.WishMatchers._
 import com.wixpress.common.specs2.JMock
 import org.joda.time.DateTime
@@ -381,6 +382,13 @@ class UserTest extends Specification with MatcherMacros with JMock with Notifica
     val pictureDeleted: UserEventInstant[UserEvent] = asEventInstant(UserPictureDeleted)
 
     user.applyEvent(pictureSet).applyEvent(pictureDeleted).userProfile.picture must beNone
+  }
+
+  "apply UserGenderSet2" in new Context {
+    val genderSet = UserGenderSet2(Gender.Custom, Option("Meat Popsicle"), Option(GenderPronoun.Neutral))
+    user.applyEvent(asEventInstant(genderSet)).userProfile.genderData must beSome(
+      GenderData(Gender.Custom, Option("Meat Popsicle"), Option(GenderPronoun.Neutral))
+    )
   }
 
   trait Context extends Scope {

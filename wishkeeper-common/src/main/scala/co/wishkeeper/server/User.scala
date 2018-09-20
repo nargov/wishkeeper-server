@@ -96,6 +96,7 @@ case class User(id: UUID,
     case UserEventInstant(e@WishUnreservedNotificationCreated(_, _), time) => handleEventWithHandler(e, time)
     case UserEventInstant(e@DeviceNotificationIdSet(_), time) => handleEventWithHandler(e, time)
     case UserEventInstant(e@UserPictureDeleted, time) => handleEventWithHandler(e, time)
+    case UserEventInstant(e@UserGenderSet2(_, _, _), time) => handleEventWithHandler[UserGenderSet2](e, time)
     case _ => this
   }
 

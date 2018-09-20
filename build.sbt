@@ -15,7 +15,7 @@ lazy val artifactory = Some("Artifactory Realm" at "http://ci-artifacts.wishkeep
 lazy val commonSettings = Seq(
   organization := "co.wishkeeper",
   scalaVersion := scalaVer,
-  scalacOptions ++= Seq("-deprecation", "-feature"),
+  scalacOptions ++= Seq("-deprecation", "-feature", "-Ypartial-unification"),
 
   resolvers +=
     "Artifactory" at "http://ci-artifacts.wishkeeper.co:8081/artifactory/sbt-release/",
@@ -34,7 +34,7 @@ lazy val commonSettings = Seq(
     "com.wix" %% "specs2-jmock" % "1.2.0" % Test
   ),
 
-  libraryDependencies += "org.typelevel" %% "cats" % "0.9.0",
+  libraryDependencies += "org.typelevel" %% "cats-core" % "1.3.1",
 
   libraryDependencies ++= Seq(
     "io.circe" %% "circe-core",
