@@ -6,7 +6,6 @@ import java.nio.file.{Files, Path, Paths}
 import java.util.UUID
 
 import akka.actor.ActorSystem
-import akka.http.scaladsl.server.Route
 import akka.stream.ActorMaterializer
 import co.wishkeeper.server.FriendRequestStatus.{Approved, Ignored}
 import co.wishkeeper.server.WishStatus.{Active, Reserved, WishStatus}
@@ -17,11 +16,16 @@ import co.wishkeeper.server.search.{SearchQuery, UserSearchProjection, UserSearc
 import co.wishkeeper.server.user.commands._
 import co.wishkeeper.server.user.{NotFriends, ValidationError, WishNotFound}
 import com.google.common.net.UrlEscapers
+import org.joda.time.LocalDate
 
 import scala.concurrent.{ExecutionContext, Future}
 import scala.util.Try
 
 trait PublicApi {
+
+  def setAnniversary(userId: UUID, date: LocalDate): Either[Error, Unit]
+
+  def setBirthday(userId: UUID, date: LocalDate): Either[Error, Unit]
 
   def getGeneralSettings(userId: UUID): Either[Error, GeneralSettings]
 
@@ -304,4 +308,8 @@ class DelegatingPublicApi(commandProcessor: CommandProcessor,
     commandProcessor.validatedProcess(SetGeneralSettings(newSettings), userId)
 
   override def getGeneralSettings(userId: UUID): Either[Error, GeneralSettings] = Right(User.replay(dataStore.userEvents(userId)).settings.general)
+
+  override def setBirthday(userId: UUID, date: LocalDate): Either[Error, Unit] = commandProcessor.validatedProcess(SetUserBirthday(date), userId)
+
+  override def setAnniversary(userId: UUID, date: LocalDate): Either[Error, Unit] = commandProcessor.validatedProcess(SetAnniversary(date), userId)
 }

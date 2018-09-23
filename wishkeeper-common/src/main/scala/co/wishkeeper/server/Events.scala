@@ -4,7 +4,7 @@ import java.util.UUID
 
 import co.wishkeeper.server.Events.UserEvent
 import co.wishkeeper.server.user.{Gender, GenderPronoun}
-import org.joda.time.DateTime
+import org.joda.time.{DateTime, LocalDate}
 
 object Events {
 
@@ -25,6 +25,8 @@ object Events {
   case class UserNameSet(userId: UUID, name: String) extends UserEvent
 
   case class UserBirthdaySet(userId: UUID, birthday: String) extends UserEvent
+
+  case class UserAnniversarySet(date: String) extends UserEvent
 
   case class UserEmailSet(userId: UUID, email: String) extends UserEvent
 

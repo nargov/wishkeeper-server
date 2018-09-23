@@ -23,6 +23,8 @@ import de.heikoseeberger.akkahttpcirce.FailFastCirceSupport._
 import io.circe.generic.extras.Configuration
 import io.circe.generic.extras.auto._
 import io.circe.syntax._
+import org.joda.time
+import org.joda.time.LocalDate
 import org.specs2.matcher.Matcher
 import org.specs2.mutable.Specification
 import org.specs2.specification.Scope
@@ -581,6 +583,34 @@ class RouteTest extends Specification with Specs2RouteTest with JMock {
 
       Post("/me/settings/general")
         .withEntity(ContentTypes.`application/json`, newSettings.asJson.noSpaces)
+        .withHeaders(sessionIdHeader) ~> webApi.newUserRoute ~> check {
+        status must beEqualTo(StatusCodes.OK)
+      }
+    }
+
+    "Set Birthday" in new LoggedInUserContext {
+      val date = new LocalDate(1950, 4, 7)
+
+      checking {
+        oneOf(publicApi).setBirthday(userId, date).willReturn(Right(()))
+      }
+
+      Post("/me/profile/birthday")
+        .withEntity(formContentType, "date=1950-04-07")
+        .withHeaders(sessionIdHeader) ~> webApi.newUserRoute ~> check {
+        status must beEqualTo(StatusCodes.OK)
+      }
+    }
+
+    "Set Anniversary" in new LoggedInUserContext {
+      val date = new LocalDate(1950, 8, 6)
+
+      checking {
+        oneOf(publicApi).setAnniversary(userId, date).willReturn(Right(()))
+      }
+
+      Post("/me/profile/anniversary")
+        .withEntity(formContentType, "date=1950-08-06")
         .withHeaders(sessionIdHeader) ~> webApi.newUserRoute ~> check {
         status must beEqualTo(StatusCodes.OK)
       }

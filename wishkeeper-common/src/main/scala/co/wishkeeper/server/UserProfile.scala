@@ -14,7 +14,8 @@ case class UserProfile(socialData: Option[SocialData] = None,
                        timezone: Option[Int] = None,
                        picture: Option[String] = None,
                        wishStats: WishStats = WishStats(),
-                       genderData: Option[GenderData] = None)
+                       genderData: Option[GenderData] = None,
+                       anniversary: Option[String] = None)
 
 case class SocialData(facebookId: Option[String])
 

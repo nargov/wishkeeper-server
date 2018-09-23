@@ -99,6 +99,7 @@ case class User(id: UUID,
     case UserEventInstant(e@UserGenderSet2(_, _, _), time) => handleEventWithHandler(e, time)
     case UserEventInstant(e@GeneralSettingPushNotificationEnabledSet(_), time) => handleEventWithHandler(e, time)
     case UserEventInstant(e@GeneralSettingVibrateEnabledSet(_), time) => handleEventWithHandler(e, time)
+    case UserEventInstant(e@UserAnniversarySet(_), time) => handleEventWithHandler(e, time)
     case _ => this
   }
 

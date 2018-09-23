@@ -5,6 +5,7 @@ import java.util.UUID
 import co.wishkeeper.server.Events._
 import co.wishkeeper.server.user._
 import co.wishkeeper.server.{FriendRequestStatus, GeneralSettings, User}
+import org.joda.time.LocalDate
 
 trait UserCommand {
   def process(user: User): List[UserEvent]
@@ -129,4 +130,18 @@ case class SetGeneralSettings(generalSettings: GeneralSettings) extends UserComm
 }
 object SetGeneralSettings {
   implicit val validator: UserCommandValidator[SetGeneralSettings] = UserCommandValidator.Always
+}
+
+case class SetUserBirthday(birthday: LocalDate) extends UserCommand {
+  override def process(user: User): List[UserEvent] = UserBirthdaySet(user.id, birthday.toString("MM/dd/yyyy")) :: Nil
+}
+object SetUserBirthday {
+  implicit val validator: UserCommandValidator[SetUserBirthday] = UserCommandValidator.Always
+}
+
+case class SetAnniversary(anniversary: LocalDate) extends UserCommand {
+  override def process(user: User): List[UserEvent] = UserAnniversarySet(anniversary.toString("MM/dd/yyyy")) :: Nil
+}
+object SetAnniversary {
+  implicit val validator: UserCommandValidator[SetAnniversary] = UserCommandValidator.Always
 }

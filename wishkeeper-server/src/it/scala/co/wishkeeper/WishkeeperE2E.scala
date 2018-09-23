@@ -79,7 +79,7 @@ class WishkeeperE2E extends AsyncFlatSpec with Matchers with BeforeAndAfterAll w
         val response = Http().singleRequest(HttpRequest().withUri(s"http://localhost:${WebApi.defaultManagementPort}/users/$userId/profile"))
         whenReady(response) { res =>
           whenReady(Unmarshal(res.entity).to[UserProfile]) { profile =>
-            inside(profile) { case UserProfile(_, _, birthday, email, _, _, name, gender, locale, _, _, _, _) =>
+            inside(profile) { case UserProfile(_, _, birthday, email, _, _, name, gender, locale, _, _, _, _, _) =>
               birthday shouldBe testUserProfile.value.birthday
               email shouldBe testUserProfile.value.email
               name shouldBe testUserProfile.value.name

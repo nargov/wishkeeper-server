@@ -17,7 +17,6 @@ import akka.stream.scaladsl.{Flow, Sink, Source, SourceQueueWithComplete, Stream
 import akka.stream.{ActorMaterializer, OverflowStrategy}
 import akka.util.Timeout
 import co.wishkeeper.json._
-import co.wishkeeper.server.{Error, GeneralSettings}
 import co.wishkeeper.server.api.{ManagementApi, PublicApi}
 import co.wishkeeper.server.image.ImageMetadata
 import co.wishkeeper.server.messaging.ClientRegistry
@@ -25,9 +24,12 @@ import co.wishkeeper.server.search.SearchQuery
 import co.wishkeeper.server.user.commands._
 import co.wishkeeper.server.user.{InvalidStatusChange, NotFriends, ValidationError, WishNotFound}
 import co.wishkeeper.server.web.WebApi.{imageDimensionsHeader, sessionIdHeader}
+import co.wishkeeper.server.{Error, GeneralError, GeneralSettings}
 import de.heikoseeberger.akkahttpcirce.FailFastCirceSupport._
 import io.circe.generic.extras.Configuration
 import io.circe.generic.extras.auto._
+import org.joda.time.LocalDate
+import org.joda.time.format.DateTimeFormat
 
 import scala.concurrent.duration._
 import scala.concurrent.{ExecutionContextExecutor, Future}
@@ -187,19 +189,37 @@ class WebApi(publicApi: PublicApi, managementApi: ManagementApi, clientRegistry:
     }
   }
 
+  val setBirthday: UUID => Route = userId => (pathPrefix("birthday") & post) {
+    formField('date) { birthday =>
+      handleCommandResult(
+        Try(LocalDate.parse(birthday, DateTimeFormat.forPattern("yyyy-MM-dd"))).toEither.left.map(err => GeneralError(err.getMessage))
+          .flatMap(publicApi.setBirthday(userId, _)))
+    }
+  }
+
+  val setAnniversary: UUID => Route = userId => (pathPrefix("anniversary") & post) {
+    formField('date) { birthday =>
+      handleCommandResult(
+        Try(LocalDate.parse(birthday, DateTimeFormat.forPattern("yyyy-MM-dd"))).toEither.left.map(err => GeneralError(err.getMessage))
+          .flatMap(publicApi.setAnniversary(userId, _)))
+    }
+  }
+
   val profile: UUID => Route = userId => pathPrefix("profile") {
     setName(userId) ~
       setPicture(userId) ~
-      setGender(userId)
+      setGender(userId) ~
+      setBirthday(userId) ~
+      setAnniversary(userId)
   }
 
   val generalSettings: UUID => Route = userId => pathPrefix("general") {
     (post & entity(as[GeneralSettings])) { settings =>
       handleCommandResult(publicApi.setGeneralSettings(userId, settings))
     } ~
-    get {
-      publicApi.getGeneralSettings(userId).fold(handleErrors, complete(_))
-    }
+      get {
+        publicApi.getGeneralSettings(userId).fold(handleErrors, complete(_))
+      }
   }
 
   val settings: UUID => Route = userId => pathPrefix("settings") {

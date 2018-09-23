@@ -399,6 +399,11 @@ class UserTest extends Specification with MatcherMacros with JMock with Notifica
     user.applyEvent(asEventInstant(GeneralSettingVibrateEnabledSet(false))).settings.general.vibrate must beFalse
   }
 
+  "apply UserAnniversarySet" in new Context {
+    val date = "03/04/2000"
+    user.applyEvent(asEventInstant(UserAnniversarySet(date))).userProfile.anniversary must beSome(date)
+  }
+
   trait Context extends Scope {
     val user: User = User.createNew()
     val wish: Wish = Wish(randomUUID())
