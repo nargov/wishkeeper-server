@@ -90,6 +90,9 @@ object Events {
 
   case class DeviceNotificationIdSet(id: String) extends UserEvent
 
+  case class GeneralSettingPushNotificationEnabledSet(enabled: Boolean) extends UserEvent
+
+  case class GeneralSettingVibrateEnabledSet(enabled: Boolean) extends UserEvent
 }
 
 case class UserEventInstant[E <: UserEvent](event: E, time: DateTime)

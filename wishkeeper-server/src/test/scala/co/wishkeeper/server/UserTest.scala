@@ -391,6 +391,14 @@ class UserTest extends Specification with MatcherMacros with JMock with Notifica
     )
   }
 
+  "apply GeneralSettingPushNotificationEnabledSet" in new Context {
+    user.applyEvent(asEventInstant(GeneralSettingPushNotificationEnabledSet(false))).settings.general.pushNotificationsEnabled must beFalse
+  }
+
+  "apply GeneralSettingVibrateEnabledSet" in new Context {
+    user.applyEvent(asEventInstant(GeneralSettingVibrateEnabledSet(false))).settings.general.vibrate must beFalse
+  }
+
   trait Context extends Scope {
     val user: User = User.createNew()
     val wish: Wish = Wish(randomUUID())

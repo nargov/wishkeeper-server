@@ -4,8 +4,7 @@ import java.util.UUID
 
 import co.wishkeeper.server.Events._
 import co.wishkeeper.server.user._
-import co.wishkeeper.server.{FriendRequestStatus, User}
-import io.circe.Encoder
+import co.wishkeeper.server.{FriendRequestStatus, GeneralSettings, User}
 
 trait UserCommand {
   def process(user: User): List[UserEvent]
@@ -63,7 +62,8 @@ object MarkNotificationViewed {
 case class RemoveFriend(friendId: UUID) extends UserCommand {
   override def process(user: User): List[UserEvent] = FriendRemoved(user.id, friendId) :: Nil
 }
-object RemoveFriend{
+
+object RemoveFriend {
   implicit val validator: UserCommandValidator[RemoveFriend] = (user, event) => Either.cond(user.hasFriend(event.friendId), (), NotFriends)
 }
 
@@ -92,6 +92,7 @@ case class SetUserName(firstName: Option[String], lastName: Option[String]) exte
     UserNameSet(user.id, s"${firstName.getOrElse("")} ${lastName.getOrElse("")}".trim)
   )
 }
+
 object SetUserName {
   implicit val validator: UserCommandValidator[SetUserName] = UserCommandValidator.Always
 }
@@ -99,6 +100,7 @@ object SetUserName {
 case class SetUserPicture(url: String) extends UserCommand {
   override def process(user: User): List[UserEvent] = UserPictureSet(user.id, url) :: Nil
 }
+
 object SetUserPicture {
   implicit val validator: UserCommandValidator[SetUserPicture] = UserCommandValidator.Always
 }
@@ -106,6 +108,25 @@ object SetUserPicture {
 case class SetGender(gender: Gender, customGender: Option[String], genderPronoun: Option[GenderPronoun]) extends UserCommand {
   override def process(user: User): List[UserEvent] = UserGenderSet2(gender, customGender, genderPronoun) :: Nil
 }
+
 object SetGender {
   implicit val validator: UserCommandValidator[SetGender] = UserCommandValidator.Always
+}
+
+case class SetGeneralSettings(generalSettings: GeneralSettings) extends UserCommand {
+  override def process(user: User): List[UserEvent] = {
+    val settings = user.settings.general
+    val pushEnabled: List[UserEvent] = if (settings.pushNotificationsEnabled != generalSettings.pushNotificationsEnabled)
+      GeneralSettingPushNotificationEnabledSet(generalSettings.pushNotificationsEnabled) :: Nil
+    else Nil
+
+    val vibrateEnabled: List[UserEvent] = if (settings.vibrate != generalSettings.vibrate)
+      GeneralSettingVibrateEnabledSet(generalSettings.vibrate) :: Nil
+      else Nil
+
+    pushEnabled ++ vibrateEnabled
+  }
+}
+object SetGeneralSettings {
+  implicit val validator: UserCommandValidator[SetGeneralSettings] = UserCommandValidator.Always
 }

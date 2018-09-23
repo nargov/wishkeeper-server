@@ -17,7 +17,7 @@ import akka.stream.scaladsl.{Flow, Sink, Source, SourceQueueWithComplete, Stream
 import akka.stream.{ActorMaterializer, OverflowStrategy}
 import akka.util.Timeout
 import co.wishkeeper.json._
-import co.wishkeeper.server.Error
+import co.wishkeeper.server.{Error, GeneralSettings}
 import co.wishkeeper.server.api.{ManagementApi, PublicApi}
 import co.wishkeeper.server.image.ImageMetadata
 import co.wishkeeper.server.messaging.ClientRegistry
@@ -193,6 +193,19 @@ class WebApi(publicApi: PublicApi, managementApi: ManagementApi, clientRegistry:
       setGender(userId)
   }
 
+  val generalSettings: UUID => Route = userId => pathPrefix("general") {
+    (post & entity(as[GeneralSettings])) { settings =>
+      handleCommandResult(publicApi.setGeneralSettings(userId, settings))
+    } ~
+    get {
+      publicApi.getGeneralSettings(userId).fold(handleErrors, complete(_))
+    }
+  }
+
+  val settings: UUID => Route = userId => pathPrefix("settings") {
+    generalSettings(userId)
+  }
+
   val newUserRoute: Route =
     userIdFromSessionHeader { userId =>
       pathPrefix("me") {
@@ -200,7 +213,8 @@ class WebApi(publicApi: PublicApi, managementApi: ManagementApi, clientRegistry:
           friends(userId) ~
           myId(userId) ~
           notifications(userId) ~
-          profile(userId)
+          profile(userId) ~
+          settings(userId)
       } ~
         pathPrefix(JavaUUID) { friendId =>
           friendWishes(userId, friendId)

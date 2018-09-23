@@ -6,6 +6,7 @@ import java.nio.file.{Files, Path, Paths}
 import java.util.UUID
 
 import akka.actor.ActorSystem
+import akka.http.scaladsl.server.Route
 import akka.stream.ActorMaterializer
 import co.wishkeeper.server.FriendRequestStatus.{Approved, Ignored}
 import co.wishkeeper.server.WishStatus.{Active, Reserved, WishStatus}
@@ -21,6 +22,10 @@ import scala.concurrent.{ExecutionContext, Future}
 import scala.util.Try
 
 trait PublicApi {
+
+  def getGeneralSettings(userId: UUID): Either[Error, GeneralSettings]
+
+  def setGeneralSettings(userId: UUID, newSettings: GeneralSettings): Either[Error, Unit]
 
   def setGender(setGender: SetGender, userId: UUID): Either[Error, Unit]
 
@@ -294,4 +299,9 @@ class DelegatingPublicApi(commandProcessor: CommandProcessor,
   }
 
   override def setGender(setGender: SetGender, userId: UUID): Either[Error, Unit] = commandProcessor.validatedProcess(setGender, userId)
+
+  override def setGeneralSettings(userId: UUID, newSettings: GeneralSettings): Either[Error, Unit] =
+    commandProcessor.validatedProcess(SetGeneralSettings(newSettings), userId)
+
+  override def getGeneralSettings(userId: UUID): Either[Error, GeneralSettings] = Right(User.replay(dataStore.userEvents(userId)).settings.general)
 }

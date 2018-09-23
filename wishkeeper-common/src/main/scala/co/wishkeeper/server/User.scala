@@ -96,7 +96,9 @@ case class User(id: UUID,
     case UserEventInstant(e@WishUnreservedNotificationCreated(_, _), time) => handleEventWithHandler(e, time)
     case UserEventInstant(e@DeviceNotificationIdSet(_), time) => handleEventWithHandler(e, time)
     case UserEventInstant(e@UserPictureDeleted, time) => handleEventWithHandler(e, time)
-    case UserEventInstant(e@UserGenderSet2(_, _, _), time) => handleEventWithHandler[UserGenderSet2](e, time)
+    case UserEventInstant(e@UserGenderSet2(_, _, _), time) => handleEventWithHandler(e, time)
+    case UserEventInstant(e@GeneralSettingPushNotificationEnabledSet(_), time) => handleEventWithHandler(e, time)
+    case UserEventInstant(e@GeneralSettingVibrateEnabledSet(_), time) => handleEventWithHandler(e, time)
     case _ => this
   }
 
@@ -136,4 +138,6 @@ case class Friends(current: List[UUID] = Nil,
 
 case class Flags(seenFacebookFriendsList: Boolean = false)
 
-case class Settings(deviceNotificationId: Option[String] = None)
+case class Settings(deviceNotificationId: Option[String] = None, general: GeneralSettings = GeneralSettings())
+
+case class GeneralSettings(pushNotificationsEnabled: Boolean = true, vibrate: Boolean = true)

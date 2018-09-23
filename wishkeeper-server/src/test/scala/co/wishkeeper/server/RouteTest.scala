@@ -571,6 +571,20 @@ class RouteTest extends Specification with Specs2RouteTest with JMock {
         status must beEqualTo(StatusCodes.OK)
       }
     }
+
+    "Toggle push notifications" in new LoggedInUserContext {
+      val newSettings = GeneralSettings(pushNotificationsEnabled = false, vibrate = false)
+
+      checking {
+        oneOf(publicApi).setGeneralSettings(userId, newSettings).willReturn(Right(()))
+      }
+
+      Post("/me/settings/general")
+        .withEntity(ContentTypes.`application/json`, newSettings.asJson.noSpaces)
+        .withHeaders(sessionIdHeader) ~> webApi.newUserRoute ~> check {
+        status must beEqualTo(StatusCodes.OK)
+      }
+    }
   }
 
   trait BaseContext extends Scope {
