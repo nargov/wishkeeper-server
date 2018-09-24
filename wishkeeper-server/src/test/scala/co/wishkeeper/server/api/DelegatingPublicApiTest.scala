@@ -255,7 +255,9 @@ class DelegatingPublicApiTest extends Specification with JMock {
     val inputStream = new ByteArrayInputStream(Array[Byte](1))
 
     checking {
+      allowing(userImageStore).imageLinkBase.willReturn("http://www.example.com")
       oneOf(userImageStore).save(ImageData(inputStream, imageMetadata.contentType), imageMetadata.fileName)
+      ignoring(commandProcessor)
     }
 
     api.uploadProfileImage(inputStream, imageMetadata, userId)
