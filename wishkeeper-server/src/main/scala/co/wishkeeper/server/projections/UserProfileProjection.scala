@@ -8,7 +8,12 @@ trait UserProfileProjection {
   def get(userId: UUID): UserProfile
 
   private val leaveOnlyStrangerAllowedFields: UserProfile => UserProfile = profile =>
-    UserProfile(name = profile.name, picture = profile.picture, firstName = profile.firstName, gender = profile.gender)
+    UserProfile(
+      name = profile.name,
+      picture = profile.picture,
+      firstName = profile.firstName,
+      gender = profile.gender,
+      genderData = profile.genderData)
 
   val strangerProfile: UUID => UserProfile = get _ andThen leaveOnlyStrangerAllowedFields
 }

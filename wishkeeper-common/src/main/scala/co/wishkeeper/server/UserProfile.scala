@@ -24,3 +24,6 @@ case class AgeRange(min: Option[Int], max: Option[Int])
 case class WishStats(giftsGiven: Int = 0, giftsReceived: Int = 0)
 
 case class GenderData(gender: Gender, customGender: Option[String] = None, genderPronoun: Option[GenderPronoun] = None)
+object GenderData {
+  def custom(custom: String, genderPronoun: GenderPronoun) = GenderData(Gender.Custom, Option(custom), Option(genderPronoun))
+}

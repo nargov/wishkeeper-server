@@ -4,8 +4,7 @@ import java.io.ByteArrayInputStream
 import java.util.UUID
 import java.util.UUID.randomUUID
 
-import co.wishkeeper.server.user.commands._
-import co.wishkeeper.server.Events.{FacebookFriendsListSeen, UserConnected}
+import co.wishkeeper.server.Events.{FacebookFriendsListSeen, UserConnected, UserGenderSet2}
 import co.wishkeeper.server.EventsTestHelper.{EventsList, anEventsListFor}
 import co.wishkeeper.server.FriendRequestStatus.{Approved, Ignored}
 import co.wishkeeper.server.NotificationsData.{FriendRequestNotification, NotificationData}
@@ -14,14 +13,13 @@ import co.wishkeeper.server._
 import co.wishkeeper.server.image.{ImageData, ImageMetadata, ImageStore}
 import co.wishkeeper.server.projections._
 import co.wishkeeper.server.search.SimpleScanUserSearchProjection
-import co.wishkeeper.server.user.{NotFriends, ValidationError, WishNotFound}
+import co.wishkeeper.server.user._
+import co.wishkeeper.server.user.commands._
 import com.wixpress.common.specs2.JMock
 import org.joda.time.DateTime
 import org.specs2.matcher.Matcher
 import org.specs2.mutable.Specification
 import org.specs2.specification.Scope
-
-import scala.tools.nsc.interpreter.InputStream
 
 class DelegatingPublicApiTest extends Specification with JMock {
 
@@ -85,12 +83,15 @@ class DelegatingPublicApiTest extends Specification with JMock {
     val strangerFirstName = "Martin"
     val strangerName = strangerFirstName + " Strange"
     val strangerImage = "expectedImageLink"
+    val strangerGender = GenderData.custom("Awesome", GenderPronoun.Neutral)
 
     checking {
       allowing(dataStore).userEvents(userId).willReturn(EventsList(userId).list)
-      allowing(dataStore).userEvents(friendId).willReturn(EventsList(friendId).withName(strangerName).withPic(strangerImage).list)
+      allowing(dataStore).userEvents(friendId).willReturn(EventsList(friendId).withName(strangerName).withPic(strangerImage)
+        .withEvent(UserGenderSet2(strangerGender.gender, strangerGender.customGender, strangerGender.genderPronoun)).list)
     }
-    api.userProfileFor(sessionId, friendId) must beRight(UserProfile(name = Option(strangerName), picture = Option(strangerImage)))
+    api.userProfileFor(sessionId, friendId) must beRight(
+      UserProfile(name = Option(strangerName), picture = Option(strangerImage), genderData = Option(strangerGender)))
   }
 
   "return friend wishlist" in new LoggedInContext {
