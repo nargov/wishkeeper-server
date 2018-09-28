@@ -80,8 +80,14 @@ object ManagementRoute {
       }
     }
 
+    val historyView: Route = pathPrefix("history" / "rebuild") {
+      managementApi.rebuildHistoryProjection()
+      complete(StatusCodes.OK)
+    }
+
     val views: Route = pathPrefix("views") {
-      search
+      search ~
+      historyView
     }
 
     val resubscribeAll = pathPrefix("resub") {

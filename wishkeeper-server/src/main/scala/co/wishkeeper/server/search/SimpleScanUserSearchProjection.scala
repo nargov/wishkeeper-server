@@ -4,16 +4,15 @@ import java.util.UUID
 
 import co.wishkeeper.server.Events._
 import co.wishkeeper.server._
+import co.wishkeeper.server.projections.Projection
 
 trait UserSearchProjection {
   def byName(userId: UUID, query: String): UserSearchResults
-
-  def rebuild(): Unit
 }
 
-class SimpleScanUserSearchProjection(dataStore: DataStore) extends UserSearchProjection with EventProcessor {
+class SimpleScanUserSearchProjection(dataStore: DataStore) extends UserSearchProjection with EventProcessor with Projection {
 
-  def rebuild(): Unit = {
+  override def rebuild(): Unit = {
     val eventInstances = dataStore.allUserEvents(classOf[UserNameSet], classOf[UserFirstNameSet], classOf[UserLastNameSet], classOf[UserPictureSet])
     val rows = eventInstances.foldLeft(Map.empty[UUID, UserNameSearchRow])((m, instance) => instance match {
       case UserEventInstance(userId, UserNameSet(_, name), _) =>

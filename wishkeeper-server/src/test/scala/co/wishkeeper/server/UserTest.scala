@@ -404,6 +404,18 @@ class UserTest extends Specification with MatcherMacros with JMock with Notifica
     user.applyEvent(asEventInstant(UserAnniversarySet(date))).userProfile.anniversary must beSome(date)
   }
 
+  "set reserver on reserved wish" in new Context {
+    user.withReservedWish(wishId, friendId).wishes(wishId).reserver must beSome(friendId)
+  }
+
+  "remove reserver on unreserved wish" in new Context {
+    user.withReservedWish(wishId, friendId).withEvent(WishUnreserved(wishId)).wishes(wishId).reserver must beNone
+  }
+
+  "set last reserver on reserved wish" in new Context {
+    user.withReservedWish(wishId, friendId).wishes(wishId).lastReserver must beSome(friendId)
+  }
+
   trait Context extends Scope {
     val user: User = User.createNew()
     val wish: Wish = Wish(randomUUID())

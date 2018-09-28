@@ -5,11 +5,13 @@ import java.util.UUID
 import co.wishkeeper.server.Events.UserEvent
 import co.wishkeeper.server._
 import co.wishkeeper.server.notifications.DeviceIdEventProcessor
-import co.wishkeeper.server.projections.{UserIdByFacebookIdProjection, UserProfileProjection}
+import co.wishkeeper.server.projections.{Projection, UserIdByFacebookIdProjection, UserProfileProjection}
 import co.wishkeeper.server.search.UserSearchProjection
 import co.wishkeeper.server.user.commands.{DeleteUserPicture, SetFlagFacebookFriendsListSeen}
 
 trait ManagementApi {
+  def rebuildHistoryProjection(): Unit
+
   def resubscribePeriodicWakeup(): Unit
 
   def rebuildUserSearch(): Unit
@@ -33,8 +35,9 @@ class DelegatingManagementApi(userIdByFacebookIdProjection: UserIdByFacebookIdPr
                               userProfileProjection: UserProfileProjection,
                               dataStore: DataStore,
                               commandProcessor: CommandProcessor,
-                              userSearchProjection: UserSearchProjection,
-                              deviceIdEventProcessor: DeviceIdEventProcessor) extends ManagementApi {
+                              userSearchProjection: Projection,
+                              deviceIdEventProcessor: DeviceIdEventProcessor,
+                              historyProjection: Projection) extends ManagementApi {
 
 
   override def userByEmail(email: String): Option[UUID] = dataStore.userByEmail(email)
@@ -54,4 +57,6 @@ class DelegatingManagementApi(userIdByFacebookIdProjection: UserIdByFacebookIdPr
   override def rebuildUserSearch(): Unit = userSearchProjection.rebuild()
 
   override def resubscribePeriodicWakeup(): Unit = deviceIdEventProcessor.resubscribeAll()
+
+  override def rebuildHistoryProjection(): Unit = historyProjection.rebuild()
 }

@@ -14,6 +14,7 @@ import co.wishkeeper.server.image._
 import co.wishkeeper.server.projections._
 import co.wishkeeper.server.search.{SearchQuery, UserSearchProjection, UserSearchResults}
 import co.wishkeeper.server.user.commands._
+import co.wishkeeper.server.user.events.history.HistoryEventInstance
 import co.wishkeeper.server.user.{NotFriends, ValidationError, WishNotFound}
 import com.google.common.net.UrlEscapers
 import org.joda.time.LocalDate
@@ -22,6 +23,8 @@ import scala.concurrent.{ExecutionContext, Future}
 import scala.util.Try
 
 trait PublicApi {
+
+  def historyFor(userId: UUID): Either[Error, List[HistoryEventInstance]]
 
   def setAnniversary(userId: UUID, date: LocalDate): Either[Error, Unit]
 
@@ -48,6 +51,8 @@ trait PublicApi {
   def sendFriendRequest(userId: UUID, request: SendFriendRequest): Either[Error, Unit]
 
   def wishById(userId: UUID, wishId: UUID): Either[Error, Wish]
+
+  def wishById(userId: UUID, friendId: UUID, wishId: UUID): Either[Error, Wish]
 
   def unreserveWish(userId: UUID, friendId: UUID, wishId: UUID): Either[Error, Unit]
 
@@ -108,7 +113,8 @@ class DelegatingPublicApi(commandProcessor: CommandProcessor,
                           notificationsProjection: NotificationsProjection,
                           searchProjection: UserSearchProjection,
                           imageStore: ImageStore,
-                          userImageStore: ImageStore)
+                          userImageStore: ImageStore,
+                          userHistoryProjection: UserHistoryProjection)
                          (implicit actorSystem: ActorSystem, ec: ExecutionContext, am: ActorMaterializer) extends PublicApi {
 
   private val imageUploader = new ImageUploader(imageStore, new ScrimageImageProcessor)
@@ -312,4 +318,14 @@ class DelegatingPublicApi(commandProcessor: CommandProcessor,
   override def setBirthday(userId: UUID, date: LocalDate): Either[Error, Unit] = commandProcessor.validatedProcess(SetUserBirthday(date), userId)
 
   override def setAnniversary(userId: UUID, date: LocalDate): Either[Error, Unit] = commandProcessor.validatedProcess(SetAnniversary(date), userId)
+
+  override def historyFor(userId: UUID): Either[Error, List[HistoryEventInstance]] =
+    Try(userHistoryProjection.historyFor(userId)).toEither.left.map(t => GeneralError(t.getMessage))
+
+  override def wishById(userId: UUID, friendId: UUID, wishId: UUID): Either[Error, Wish] = {
+    val user = User.replay(dataStore.userEvents(userId))
+    if(user.friends.current.contains(friendId))
+      wishById(friendId, wishId)
+    else Left(NotFriends)
+  }
 }

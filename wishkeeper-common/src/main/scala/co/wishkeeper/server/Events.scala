@@ -4,7 +4,7 @@ import java.util.UUID
 
 import co.wishkeeper.server.Events.UserEvent
 import co.wishkeeper.server.user.{Gender, GenderPronoun}
-import org.joda.time.{DateTime, LocalDate}
+import org.joda.time.DateTime
 
 object Events {
 

@@ -60,8 +60,10 @@ case class User(id: UUID,
         case _ => None
       }
       updateWishProperty(wishId, _.withStatus(WishStatus.Granted(granter), time))
-    case UserEventInstant(WishReserved(wishId, reserver), time) => updateWishProperty(wishId, _.withStatus(WishStatus.Reserved(reserver), time))
-    case UserEventInstant(WishUnreserved(wishId), time) => updateWishProperty(wishId, _.withStatus(WishStatus.Active, time))
+    case UserEventInstant(WishReserved(wishId, reserver), time) =>
+      updateWishProperty(wishId, _.withStatus(WishStatus.Reserved(reserver), time).withReserver(reserver))
+    case UserEventInstant(WishUnreserved(wishId), time) =>
+      updateWishProperty(wishId, _.withStatus(WishStatus.Active, time).withNoReserver)
     case UserEventInstant(FacebookFriendsListSeen(seen), _) => this.copy(flags = flags.copy(seenFacebookFriendsList = seen))
     case UserEventInstant(FriendRequestNotificationCreated(notificationId, _, from, reqId), time) => this.copy(
       notifications = Notification(notificationId, FriendRequestNotification(from, reqId), time = time) :: notifications)

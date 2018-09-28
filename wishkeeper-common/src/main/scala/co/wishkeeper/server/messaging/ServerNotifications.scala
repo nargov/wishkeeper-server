@@ -18,3 +18,5 @@ case object NotificationsUpdated extends ServerNotification
 case object WishListUpdated extends ServerNotification
 
 case object FriendsListUpdated extends ServerNotification
+
+case object HistoryUpdated extends ServerNotification

@@ -47,6 +47,7 @@ class WishkeeperServer {
   private val friendRequestsProjection = new FriendRequestsEventProcessor(dataStore)
   private val userFriendsProjection = new EventBasedUserFriendsProjection(facebookConnector, userIdByFacebookIdProjection, dataStore)
   private val userSearchProjection = new SimpleScanUserSearchProjection(dataStore)
+  private val userHistoryProjection = new ScanningUserHistoryProjection(dataStore, clientRegistry)
   private val deviceIdEventProcessor = new DeviceIdEventProcessor(pushNotifications, dataStore)
 
   private val slackUrlConfigKey = "wishkeeper.slack.url"
@@ -66,13 +67,14 @@ class WishkeeperServer {
     new ImageUploadEventProcessor(userImageStore, fileAdapter, dataStore),
     userSearchProjection,
     new ReportingEventProcessor(reporter, dataStore),
-    deviceIdEventProcessor
+    deviceIdEventProcessor,
+    userHistoryProjection
   ))
   private val userProfileProjection: UserProfileProjection = new ReplayingUserProfileProjection(dataStore)
-  private val publicApi = new DelegatingPublicApi(commandProcessor, dataStore, facebookConnector,
-    userProfileProjection, userFriendsProjection, notificationsProjection, userSearchProjection, wishImageStore, userImageStore)
+  private val publicApi = new DelegatingPublicApi(commandProcessor, dataStore, facebookConnector, userProfileProjection,
+    userFriendsProjection, notificationsProjection, userSearchProjection, wishImageStore, userImageStore, userHistoryProjection)
   private val managementApi: ManagementApi = new DelegatingManagementApi(userIdByFacebookIdProjection, userProfileProjection,
-    dataStore, commandProcessor, userSearchProjection, deviceIdEventProcessor)
+    dataStore, commandProcessor, userSearchProjection, deviceIdEventProcessor, userHistoryProjection)
   private val webApi = new WebApi(publicApi, managementApi, clientRegistry)
 
   def start(): Unit = {

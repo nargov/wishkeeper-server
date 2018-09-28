@@ -81,6 +81,18 @@ class DataStoreTestHelper extends Matchers {
          |)
        """.stripMargin
     )
+
+    session.execute(
+      s"""
+         |create table if not exists ${CassandraDataStore.historyTable} (
+         |  userId UUID,
+         |  wishId UUID,
+         |  time timestamp,
+         |  event blob,
+         |  PRIMARY KEY((userId), wishId, time)
+         |)
+       """.stripMargin
+    )
   }
 }
 

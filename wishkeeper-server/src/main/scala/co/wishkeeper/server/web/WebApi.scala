@@ -21,8 +21,8 @@ import co.wishkeeper.server.api.{ManagementApi, PublicApi}
 import co.wishkeeper.server.image.ImageMetadata
 import co.wishkeeper.server.messaging.ClientRegistry
 import co.wishkeeper.server.search.SearchQuery
-import co.wishkeeper.server.user.commands._
 import co.wishkeeper.server.user._
+import co.wishkeeper.server.user.commands._
 import co.wishkeeper.server.web.WebApi.{imageDimensionsHeader, sessionIdHeader}
 import co.wishkeeper.server.{Error, GeneralError, GeneralSettings}
 import de.heikoseeberger.akkahttpcirce.FailFastCirceSupport._
@@ -52,6 +52,7 @@ class WebApi(publicApi: PublicApi, managementApi: ManagementApi, clientRegistry:
     case err: WishNotFound => complete(StatusCodes.NotFound, err)
     case err: InvalidStatusChange => complete(StatusCodes.Conflict, err)
     case err: ValidationError => complete(StatusCodes.InternalServerError, err)
+    case err@NotFriends => complete(StatusCodes.Forbidden, err)
     case NoChange => complete(StatusCodes.OK)
     case _ => complete(StatusCodes.InternalServerError)
   }
@@ -102,10 +103,15 @@ class WebApi(publicApi: PublicApi, managementApi: ManagementApi, clientRegistry:
       }
     }
 
+  val getFriendWish: (UUID, UUID, UUID) => Route = (userId, friendId, wishId) => get {
+    publicApi.wishById(userId, friendId, wishId).fold(handleErrors, complete(_))
+  }
+
   val friendWishes: (UUID, UUID) => Route = (userId, friendId) =>
     pathPrefix("wishes") {
       pathPrefix(JavaUUID) { wishId =>
-        wishReservation(userId, friendId, wishId)
+        wishReservation(userId, friendId, wishId) ~
+        getFriendWish(userId, friendId, wishId)
       }
     }
 
@@ -227,6 +233,10 @@ class WebApi(publicApi: PublicApi, managementApi: ManagementApi, clientRegistry:
     generalSettings(userId)
   }
 
+  val history: UUID => Route = userId => pathPrefix("history") {
+    publicApi.historyFor(userId).fold(handleErrors, complete(_))
+  }
+
   val newUserRoute: Route =
     userIdFromSessionHeader { userId =>
       pathPrefix("me") {
@@ -235,7 +245,8 @@ class WebApi(publicApi: PublicApi, managementApi: ManagementApi, clientRegistry:
           myId(userId) ~
           notifications(userId) ~
           profile(userId) ~
-          settings(userId)
+          settings(userId) ~
+          history(userId)
       } ~
         pathPrefix(JavaUUID) { friendId =>
           friendWishes(userId, friendId)

@@ -6,6 +6,7 @@ import java.util.concurrent.atomic.AtomicReference
 
 import co.wishkeeper.json._
 import co.wishkeeper.server.Events.UserEvent
+import co.wishkeeper.server.user.events.history.{HistoryEvent, HistoryEventInstance}
 import com.datastax.driver.core._
 import io.circe.generic.extras
 import io.circe.generic.extras.auto._
@@ -17,6 +18,13 @@ import scala.collection.JavaConverters._
 
 
 trait DataStore {
+  def deleteWishHistoryEvent(userId: UUID, wishId: UUID): Boolean
+
+  def truncateHistory(): Boolean
+
+  def historyFor(userId: UUID): List[HistoryEventInstance]
+
+  def saveUserHistoryEvent(userId: UUID, time: DateTime, event: HistoryEvent, wishId: UUID): Boolean
 
   def allUserEvents(eventTypes: Class[_ <: UserEvent]*): Iterator[UserEventInstance[_ <: UserEvent]]
 
@@ -55,6 +63,7 @@ case class DataStoreConfig(addresses: List[String])
 
 class CassandraDataStore(dataStoreConfig: DataStoreConfig) extends DataStore {
 
+
   import CassandraDataStore._
 
   private implicit val circeConfig = extras.Configuration.default.withDefaults
@@ -81,6 +90,11 @@ class CassandraDataStore(dataStoreConfig: DataStoreConfig) extends DataStore {
        |values (:userId, :name, :picture, :firstName, :lastName)""".stripMargin)
   private lazy val selectAllNamesToUserIds = session.prepare(s"select * from $userByNameTable")
   private lazy val selectAllUserEvents = session.prepare(s"select * from $userEventsTable")
+  private lazy val saveUserHistoryEvent = session.prepare(
+    s"insert into $historyTable (userId, wishId, time, event) values (:userId, :wishId, :time, :event)")
+  private lazy val selectUserHistory = session.prepare(s"select * from $historyTable where userId = :userId")
+  private lazy val truncateHistoryTable = session.prepare(s"truncate table $historyTable")
+  private lazy val deleteUserHistoryByWishId = session.prepare(s"delete from $historyTable where userId = :userId and wishId = :wishId")
 
 
   override def saveUserEvents(userId: UUID, lastSeqNum: Option[Long], time: DateTime, events: Seq[UserEvent]): Boolean = {
@@ -218,6 +232,32 @@ class CassandraDataStore(dataStoreConfig: DataStoreConfig) extends DataStore {
       filter(instant => eventTypes.contains(instant.event.getClass))
   }
 
+  override def saveUserHistoryEvent(userId: UUID, time: DateTime, event: HistoryEvent, wishId: UUID): Boolean = {
+    val eventJson = event.asJson.noSpaces
+    session.execute(saveUserHistoryEvent.bind()
+      .setUUID("userId", userId)
+      .setUUID("wishId", wishId)
+      .setTimestamp("time", time.toDate)
+      .setBytes("event", ByteBuffer.wrap(eventJson.getBytes))).wasApplied()
+  }
+
+  override def historyFor(userId: UUID): List[HistoryEventInstance] =
+    session.execute(selectUserHistory.bind().setUUID("userId", userId)).asScala.map(row => {
+      val json = new String(row.getBytes("event").array())
+      val time = new DateTime(row.getTimestamp("time"))
+      val wishId = row.getUUID("wishId")
+      val eventOrError = decode[HistoryEvent](json)
+      eventOrError match {
+        case Right(event: HistoryEvent) => HistoryEventInstance(userId, wishId, time, event)
+        case Left(err: Throwable) ⇒ throw err
+        case Left(err) ⇒ throw new RuntimeException(s"Error decoding json: $json [${err.toString}]")
+      }
+    }).toList
+
+  override def truncateHistory(): Boolean = session.execute(truncateHistoryTable.bind()).wasApplied()
+
+  override def deleteWishHistoryEvent(userId: UUID, wishId: UUID): Boolean =
+    session.execute(deleteUserHistoryByWishId.bind().setUUID("userId", userId).setUUID("wishId", wishId)).wasApplied()
 
   override def close(): Unit = {
     session.close()
@@ -236,6 +276,7 @@ object CassandraDataStore {
   val userSession: String = keyspace + ".user_session"
   val userByEmailTable: String = keyspace + ".user_by_email"
   val userByNameTable: String = keyspace + ".user_by_name"
+  val historyTable: String = keyspace + ".history"
 }
 
 case class UserNameSearchRow(userId: UUID, name: String, picture: Option[String] = None, firstName: Option[String] = None,

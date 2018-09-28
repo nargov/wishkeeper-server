@@ -17,6 +17,7 @@ import co.wishkeeper.server.projections.{Friend, FriendBirthdaysResult, Potentia
 import co.wishkeeper.server.search.{SearchQuery, UserSearchResults}
 import co.wishkeeper.server.user._
 import co.wishkeeper.server.user.commands._
+import co.wishkeeper.server.user.events.history.{HistoryEventInstance, ReservedWish}
 import co.wishkeeper.server.web.{ManagementRoute, WebApi}
 import com.wixpress.common.specs2.JMock
 import de.heikoseeberger.akkahttpcirce.FailFastCirceSupport._
@@ -112,6 +113,16 @@ class RouteTest extends Specification with Specs2RouteTest with JMock {
 
       Post(s"/subs/periodic/resub") ~> managementRoute ~> check {
         handled should beTrue
+      }
+    }
+
+    "Rebuild user history view" in new ManagementContext {
+      checking {
+        oneOf(managementApi).rebuildHistoryProjection()
+      }
+
+      Post("/views/history/rebuild") ~> managementRoute ~> check {
+        handled must beTrue
       }
     }
   }
@@ -613,6 +624,28 @@ class RouteTest extends Specification with Specs2RouteTest with JMock {
         .withEntity(formContentType, "date=1950-08-06")
         .withHeaders(sessionIdHeader) ~> webApi.newUserRoute ~> check {
         status must beEqualTo(StatusCodes.OK)
+      }
+    }
+
+    "Return user history" in new LoggedInUserContext {
+      val historyEventInstance = HistoryEventInstance(userId, wishId, time.DateTime.now(), ReservedWish(wishId, friendId, "Bill", "wish", None))
+      checking {
+        oneOf(publicApi).historyFor(userId).willReturn(Right(List(historyEventInstance)))
+      }
+
+      Get("/me/history").withHeaders(sessionIdHeader) ~> webApi.newUserRoute ~> check {
+        responseAs[List[HistoryEventInstance]] must contain(historyEventInstance)
+      }
+    }
+
+    "Return a friend's wish" in new LoggedInUserContext {
+      val wish = Wish(wishId)
+      checking {
+        oneOf(publicApi).wishById(userId, friendId, wishId).willReturn(Right(wish))
+      }
+
+      Get(s"/$friendId/wishes/$wishId").withHeaders(sessionIdHeader) ~> webApi.newUserRoute ~> check {
+        responseAs[Wish] must beEqualTo(wish)
       }
     }
   }

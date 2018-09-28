@@ -264,6 +264,25 @@ class DelegatingPublicApiTest extends Specification with JMock {
     api.uploadProfileImage(inputStream, imageMetadata, userId)
   }
 
+  "return friend wish" in new LoggedInContext {
+    val wishName = "The Wish"
+    checking {
+      allowing(dataStore).userEvents(userId).willReturn(EventsList(userId).withFriend(friendId).list)
+      allowing(dataStore).userEvents(friendId).willReturn(EventsList(friendId).withWish(wishId, wishName).list)
+    }
+
+    api.wishById(userId, friendId, wishId) must beRight(aWishWith(wishId, wishName))
+  }
+
+  "return error if wish belongs to user who is not a friend" in new LoggedInContext {
+    val wishName = "The Wish"
+    checking {
+      allowing(dataStore).userEvents(userId).willReturn(EventsList(userId).list)
+    }
+
+    api.wishById(userId, friendId, wishId) must beLeft[Error](NotFriends)
+  }
+
   def userWishesWith(wishId: UUID, wishName: String): Matcher[UserWishes] = contain(aWishWith(wishId, wishName)) ^^ {(_: UserWishes).wishes}
 
   def aWishWith(id: UUID, name: String): Matcher[Wish] = (wish: Wish) =>
@@ -283,7 +302,7 @@ class DelegatingPublicApiTest extends Specification with JMock {
     val userProfileProjection: UserProfileProjection = new ReplayingUserProfileProjection(dataStore)
     val userImageStore = mock[ImageStore]
     val api: PublicApi = new DelegatingPublicApi(commandProcessor, dataStore, null, userProfileProjection, userFriendsProjection,
-      notificationsProjection, searchProjection, null, userImageStore)(null, null, null)
+      notificationsProjection, searchProjection, null, userImageStore, null)(null, null, null)
     val friendId: UUID = randomUUID()
     val friendRequestId = randomUUID()
     val notificationData = FriendRequestNotification(friendId, friendRequestId)
