@@ -3,7 +3,7 @@ val dockerTestKitVersion = "0.9.0"
 val logbackVersion = "1.2.1"
 val specs2Version = "4.2.0"
 
-val scalaVer = "2.12.5"
+val scalaVer = "2.12.7"
 
 lazy val integrationSettings = inConfig(IntegrationTest)(Defaults.itSettings) ++ Seq(
   fork in IntegrationTest := false,
@@ -16,7 +16,9 @@ lazy val commonSettings = Seq(
   organization := "co.wishkeeper",
   scalaVersion := scalaVer,
   scalacOptions ++= Seq("-deprecation", "-feature", "-Ypartial-unification"),
-
+  sources in (Compile,doc) := Seq.empty,
+  publishArtifact in (Compile, packageDoc) := false,
+  
   resolvers +=
     "Artifactory" at "http://ci-artifacts.wishkeeper.co:8081/artifactory/sbt-release/",
 
