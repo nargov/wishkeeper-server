@@ -60,6 +60,7 @@ class ScanningUserHistoryProjection(dataStore: DataStore, clientNotifier: Client
 
   override def rebuild(): Unit = {
     dataStore.truncateHistory()
-    dataStore.allUserEvents(classOf[WishReserved], classOf[WishGranted]).foreach(instance => process(instance.event, instance.userId, instance.time))
+    dataStore.allUserEvents(classOf[WishReserved], classOf[WishUnreserved], classOf[WishGranted])
+      .foreach(instance => process(instance.event, instance.userId, instance.time))
   }
 }

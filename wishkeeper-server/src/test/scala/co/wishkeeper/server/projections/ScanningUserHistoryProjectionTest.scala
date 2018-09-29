@@ -64,7 +64,7 @@ class ScanningUserHistoryProjectionTest extends Spec with JMock {
   "Rebuilds projection" in new DataStoreContext {
     checking {
       allowing(dataStore).userEvents(userId).willReturn(EventsList(userId).withReservedWish(wishId, wishName, reserver).list)
-      oneOf(dataStore).allUserEvents(classOf[WishReserved], classOf[WishGranted]).willReturn(
+      oneOf(dataStore).allUserEvents(classOf[WishReserved], classOf[WishUnreserved], classOf[WishGranted]).willReturn(
         List(UserEventInstance(userId, WishReserved(wishId, reserver), DateTime.now())).iterator)
       oneOf(dataStore).truncateHistory().willReturn(true)
       oneOf(dataStore).saveUserHistoryEvent(having(===(reserver)), having(any[DateTime]), having(anInstanceOf[ReservedWish]), having(===(wishId)))
