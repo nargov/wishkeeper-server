@@ -413,7 +413,7 @@ class UserTest extends Specification with MatcherMacros with JMock with Notifica
   }
 
   "set last reserver on reserved wish" in new Context {
-    user.withReservedWish(wishId, friendId).wishes(wishId).lastReserver must beSome(friendId)
+    user.withReservedWish(wishId, friendId).wishes(wishId).pastReservers must contain(friendId)
   }
 
   trait Context extends Scope {

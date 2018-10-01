@@ -15,6 +15,7 @@ import co.wishkeeper.server.projections._
 import co.wishkeeper.server.search.SimpleScanUserSearchProjection
 import co.wishkeeper.server.user._
 import co.wishkeeper.server.user.commands._
+import co.wishkeeper.server.user.events.history.{HistoryEventInstance, ReceivedWish}
 import com.wixpress.common.specs2.JMock
 import org.joda.time.DateTime
 import org.specs2.matcher.Matcher
@@ -283,6 +284,25 @@ class DelegatingPublicApiTest extends Specification with JMock {
     api.wishById(userId, friendId, wishId) must beLeft[Error](NotFriends)
   }
 
+  "return friend history" in new LoggedInContext {
+    val eventInstance = HistoryEventInstance(friendId, wishId, DateTime.now(), ReceivedWish(wishId, userId, "Joe", "Wish"))
+
+    checking {
+      allowing(dataStore).userEvents(userId).willReturn(EventsList(userId).withFriend(friendId).list)
+      oneOf(userHistoryProjection).friendHistory(friendId).willReturn(eventInstance :: Nil)
+    }
+
+    api.historyFor(userId, friendId) must beRight(contain(eventInstance))
+  }
+
+  "return error if not friends" in new LoggedInContext {
+    checking {
+      allowing(dataStore).userEvents(userId).willReturn(EventsList(userId).list)
+    }
+
+    api.historyFor(userId, friendId) must beLeft[Error](NotFriends)
+  }
+
   def userWishesWith(wishId: UUID, wishName: String): Matcher[UserWishes] = contain(aWishWith(wishId, wishName)) ^^ {(_: UserWishes).wishes}
 
   def aWishWith(id: UUID, name: String): Matcher[Wish] = (wish: Wish) =>
@@ -300,9 +320,20 @@ class DelegatingPublicApiTest extends Specification with JMock {
     val userFriendsProjection: UserFriendsProjection = mock[UserFriendsProjection]
     val searchProjection = new SimpleScanUserSearchProjection(dataStore)
     val userProfileProjection: UserProfileProjection = new ReplayingUserProfileProjection(dataStore)
+    val userHistoryProjection = mock[UserHistoryProjection]
     val userImageStore = mock[ImageStore]
-    val api: PublicApi = new DelegatingPublicApi(commandProcessor, dataStore, null, userProfileProjection, userFriendsProjection,
-      notificationsProjection, searchProjection, null, userImageStore, null)(null, null, null)
+    val api: PublicApi = new DelegatingPublicApi(
+      commandProcessor,
+      dataStore,
+      null,
+      userProfileProjection,
+      userFriendsProjection,
+      notificationsProjection,
+      searchProjection,
+      null,
+      userImageStore,
+      userHistoryProjection
+    )(null, null, null)
     val friendId: UUID = randomUUID()
     val friendRequestId = randomUUID()
     val notificationData = FriendRequestNotification(friendId, friendRequestId)

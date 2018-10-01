@@ -17,7 +17,7 @@ import co.wishkeeper.server.projections.{Friend, FriendBirthdaysResult, Potentia
 import co.wishkeeper.server.search.{SearchQuery, UserSearchResults}
 import co.wishkeeper.server.user._
 import co.wishkeeper.server.user.commands._
-import co.wishkeeper.server.user.events.history.{HistoryEventInstance, ReservedWish}
+import co.wishkeeper.server.user.events.history.{HistoryEventInstance, ReceivedWish, ReservedWish}
 import co.wishkeeper.server.web.{ManagementRoute, WebApi}
 import com.wixpress.common.specs2.JMock
 import de.heikoseeberger.akkahttpcirce.FailFastCirceSupport._
@@ -646,6 +646,18 @@ class RouteTest extends Specification with Specs2RouteTest with JMock {
 
       Get(s"/$friendId/wishes/$wishId").withHeaders(sessionIdHeader) ~> webApi.newUserRoute ~> check {
         responseAs[Wish] must beEqualTo(wish)
+      }
+    }
+
+    "Return friend history" in new LoggedInUserContext {
+      val historyEventInstance = HistoryEventInstance(userId, wishId, time.DateTime.now(), ReceivedWish(wishId, friendId, "Bill", "wish", None))
+
+      checking {
+        oneOf(publicApi).historyFor(userId, friendId).willReturn(Right(List(historyEventInstance)))
+      }
+
+      Get(s"/$friendId/history").withHeaders(sessionIdHeader) ~> webApi.newUserRoute ~> check {
+        responseAs[List[HistoryEventInstance]] must contain(historyEventInstance)
       }
     }
   }

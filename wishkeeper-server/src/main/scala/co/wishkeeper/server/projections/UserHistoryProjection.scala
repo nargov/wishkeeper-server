@@ -9,6 +9,8 @@ import co.wishkeeper.server.{DataStore, EventProcessor, Events, User}
 import org.joda.time.DateTime
 
 trait UserHistoryProjection extends Projection {
+  def friendHistory(friendId: UUID): List[HistoryEventInstance]
+
   def historyFor(userId: UUID): List[HistoryEventInstance]
 }
 
@@ -18,36 +20,38 @@ class ScanningUserHistoryProjection(dataStore: DataStore, clientNotifier: Client
     Nil
   }
 
+  val unnamed = "Unnamed"
+
   private def process(event: Events.Event, userId: UUID, time: DateTime): Unit = {
     event match {
       case WishReserved(wishId, reserverId) =>
         val user = User.replay(dataStore.userEvents(userId))
         val maybeWish = user.wishes.get(wishId)
         maybeWish.foreach { wish =>
-          dataStore.saveUserHistoryEvent(reserverId, time, ReservedWish(wishId, userId, user.userProfile.name.getOrElse("Unnamed"),
-            wish.name.getOrElse(""), wish.image), wishId)
+          val historyEvent = ReservedWish(wishId, userId, user.userProfile.name.getOrElse(unnamed), wish.name.getOrElse(""), wish.image)
+          dataStore.saveUserHistoryEvent(reserverId, time, historyEvent, wishId)
           clientNotifier.sendTo(HistoryUpdated, reserverId)
+        }
+      case WishUnreserved(wishId) =>
+        val user = User.replay(dataStore.userEvents(userId))
+        user.wishes.get(wishId).foreach { wish =>
+          wish.pastReservers.foreach { reserverId =>
+            dataStore.deleteWishHistoryEvent(reserverId, wishId)
+            clientNotifier.sendTo(HistoryUpdated, reserverId)
+          }
         }
       case WishGranted(wishId) =>
         val user = User.replay(dataStore.userEvents(userId))
         val maybeWish = user.wishes.get(wishId)
         maybeWish.foreach { wish =>
           wish.reserver.foreach { reserver =>
-            val reserverName = User.replay(dataStore.userEvents(reserver)).userProfile.name.getOrElse("Unnamed")
+            val reserverName = User.replay(dataStore.userEvents(reserver)).userProfile.name.getOrElse(unnamed)
             dataStore.deleteWishHistoryEvent(reserver, wishId)
-            dataStore.saveUserHistoryEvent(reserver, time, GrantedWish(wishId, userId, user.userProfile.name.getOrElse("Unnamed"),
+            dataStore.saveUserHistoryEvent(reserver, time, GrantedWish(wishId, userId, user.userProfile.name.getOrElse(unnamed),
               wish.name.getOrElse(""), wish.image), wishId)
             dataStore.saveUserHistoryEvent(userId, time, ReceivedWish(wishId, reserver, reserverName, wish.name.getOrElse(""), wish.image), wishId)
             clientNotifier.sendTo(HistoryUpdated, userId)
             clientNotifier.sendTo(HistoryUpdated, reserver)
-          }
-        }
-      case WishUnreserved(wishId) =>
-        val user = User.replay(dataStore.userEvents(userId))
-        user.wishes.get(wishId).foreach { wish =>
-          wish.lastReserver.foreach { reserverId =>
-            dataStore.deleteWishHistoryEvent(reserverId, wishId)
-            clientNotifier.sendTo(HistoryUpdated, reserverId)
           }
         }
       case _ =>
@@ -57,6 +61,9 @@ class ScanningUserHistoryProjection(dataStore: DataStore, clientNotifier: Client
   implicit val historyOrdering: Ordering[HistoryEventInstance] = Ordering.fromLessThan[HistoryEventInstance]((i1, i2) => i1.time.isAfter(i2.time))
 
   override def historyFor(userId: UUID): List[HistoryEventInstance] = dataStore.historyFor(userId).sorted
+
+  override def friendHistory(friendId: UUID): List[HistoryEventInstance] =
+    historyFor(friendId).filter(_.event.isInstanceOf[ReceivedWish])
 
   override def rebuild(): Unit = {
     dataStore.truncateHistory()

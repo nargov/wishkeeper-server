@@ -135,6 +135,35 @@ class ScanningUserHistoryProjectionTest extends Spec with JMock {
     projection.historyFor(userId).map(_.wishId) must beEqualTo(List(wish1, wish2, wish3))
   }
 
+  "Deletes history event after unreserve, taking into account older reserves" in new DataStoreContext {
+    val anotherReserver = randomUUID()
+    checking {
+      allowing(dataStore).userEvents(userId).willReturn(EventsList(userId)
+        .withReservedWish(wishId, "name", reserver)
+        .withEvent(WishUnreserved(wishId))
+        .withReservedWish(wishId, "name", anotherReserver)
+        .withEvent(WishUnreserved(wishId))
+        .list
+      )
+      oneOf(dataStore).deleteWishHistoryEvent(reserver, wishId)
+      allowing(dataStore).deleteWishHistoryEvent(anotherReserver, wishId)
+    }
+
+    projection.process(WishUnreserved(wishId), userId)
+  }
+
+  "return friend history" in new DataStoreContext {
+    val receivedWishEvent = HistoryEventInstance(userId, wishId, DateTime.now(), ReceivedWish(wishId, randomUUID(), "B", "B", None))
+    checking {
+      allowing(dataStore).historyFor(userId).willReturn(List(
+        HistoryEventInstance(userId, wishId, DateTime.now(), ReservedWish(randomUUID(), randomUUID(), "A", "A", None)),
+        receivedWishEvent,
+      ))
+    }
+
+    projection.friendHistory(userId) must contain(exactly(receivedWishEvent))
+  }
+
   trait DataStoreContext extends Context {
     checking {
       ignoring(notifier)

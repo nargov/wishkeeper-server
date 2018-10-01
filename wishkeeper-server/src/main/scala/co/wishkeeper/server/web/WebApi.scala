@@ -233,8 +233,11 @@ class WebApi(publicApi: PublicApi, managementApi: ManagementApi, clientRegistry:
     generalSettings(userId)
   }
 
-  val history: UUID => Route = userId => pathPrefix("history") {
-    publicApi.historyFor(userId).fold(handleErrors, complete(_))
+  val history: (UUID, Option[UUID]) => Route = (userId, maybeFriendId) => pathPrefix("history") {
+    maybeFriendId.fold(
+      publicApi.historyFor(userId).fold(handleErrors, complete(_)))(friendId =>
+      publicApi.historyFor(userId, friendId).fold(handleErrors, complete(_)))
+
   }
 
   val newUserRoute: Route =
@@ -246,10 +249,11 @@ class WebApi(publicApi: PublicApi, managementApi: ManagementApi, clientRegistry:
           notifications(userId) ~
           profile(userId) ~
           settings(userId) ~
-          history(userId)
+          history(userId, None)
       } ~
         pathPrefix(JavaUUID) { friendId =>
-          friendWishes(userId, friendId)
+          friendWishes(userId, friendId) ~
+          history(userId, Option(friendId))
         } ~
         search(userId)
     } ~

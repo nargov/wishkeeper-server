@@ -26,6 +26,8 @@ trait PublicApi {
 
   def historyFor(userId: UUID): Either[Error, List[HistoryEventInstance]]
 
+  def historyFor(userId: UUID, friendId: UUID): Either[Error, List[HistoryEventInstance]]
+
   def setAnniversary(userId: UUID, date: LocalDate): Either[Error, Unit]
 
   def setBirthday(userId: UUID, date: LocalDate): Either[Error, Unit]
@@ -321,6 +323,13 @@ class DelegatingPublicApi(commandProcessor: CommandProcessor,
 
   override def historyFor(userId: UUID): Either[Error, List[HistoryEventInstance]] =
     Try(userHistoryProjection.historyFor(userId)).toEither.left.map(t => GeneralError(t.getMessage))
+
+  override def historyFor(userId: UUID, friendId: UUID): Either[Error, List[HistoryEventInstance]] = {
+    val user = User.replay(dataStore.userEvents(userId))
+    if(user.friends.current.contains(friendId))
+      Try(userHistoryProjection.friendHistory(friendId)).toEither.left.map(t => GeneralError(t.getMessage))
+    else Left(NotFriends)
+  }
 
   override def wishById(userId: UUID, friendId: UUID, wishId: UUID): Either[Error, Wish] = {
     val user = User.replay(dataStore.userEvents(userId))
