@@ -41,7 +41,6 @@ class AkkaHttpFacebookConnector(appId: String, appSecret: String)
   }
 
   private def friendsFor(url: String): Future[List[FacebookFriend]] = {
-    println("request " + DateTime.now().toString)
     val response = Http().singleRequest(HttpRequest().withUri(url))
 
     val jsonStr = response.flatMap {
@@ -49,9 +48,7 @@ class AkkaHttpFacebookConnector(appId: String, appSecret: String)
     }
 
     val eventualResult = jsonStr.map(decode[FacebookFriendsResult]).map {
-      case Right(result) =>
-        println("response " + DateTime.now().toString)
-        result
+      case Right(result) => result
       case Left(err) => throw err
     }
 

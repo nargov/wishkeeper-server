@@ -55,9 +55,7 @@ class SdkGoogleAuthAdapter extends GoogleAuthAdapter {
         .setAccessToken(accessToken)
         .setPersonFields("genders,birthdays")
         .execute()
-      println("DDDDDDDDDDDDDDD " +  person.getBirthdays)
       val birthDate = Option(person.getBirthdays).flatMap { birthdays =>
-        println("AAAAAAAAAAAA  " + birthdays.get(0).getText)
         if (birthdays.size() > 0) Option(birthdays.get(0)).map(_.getDate) else None
       }
       val birthday = birthDate.map(d => new LocalDate(d.getYear, d.getMonth, d.getDay))
