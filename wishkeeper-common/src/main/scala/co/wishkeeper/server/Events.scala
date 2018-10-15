@@ -56,6 +56,8 @@ object Events {
 
   case class FacebookFriendsListSeen(seen: Boolean = true) extends UserEvent
 
+  case class GoogleFriendsListSeen(seen: Boolean = true) extends UserEvent
+
   case class FriendRemoved(userId: UUID, friendId: UUID) extends UserEvent
 
   case class NotificationViewed(id: UUID) extends UserEvent

@@ -39,13 +39,14 @@ class WishkeeperServer {
   private val notificationsScheduler = new ExecutorNotificationsScheduler(clientNotifier = clientRegistry, dataStore = dataStore,
     pushNotifications = pushNotifications)
   private val notificationsProjection = new DataStoreNotificationsProjection(dataStore)
+  private val googleAuth = new SdkGoogleAuthAdapter
 
   private val facebookConnector: FacebookConnector = new AkkaHttpFacebookConnector(
     config.getString("wishkeeper.facebook.app-id"),
     config.getString("wishkeeper.facebook.app-secret"))
 
   private val friendRequestsProjection = new FriendRequestsEventProcessor(dataStore)
-  private val userFriendsProjection = new EventBasedUserFriendsProjection(facebookConnector, userIdByFacebookIdProjection, dataStore)
+  private val userFriendsProjection = new EventBasedUserFriendsProjection(facebookConnector, googleAuth, userIdByFacebookIdProjection, dataStore)
   private val userSearchProjection = new SimpleScanUserSearchProjection(dataStore)
   private val userHistoryProjection = new ScanningUserHistoryProjection(dataStore, clientRegistry)
   private val deviceIdEventProcessor = new DeviceIdEventProcessor(pushNotifications, dataStore)
@@ -69,10 +70,10 @@ class WishkeeperServer {
     new ReportingEventProcessor(reporter, dataStore),
     deviceIdEventProcessor,
     userHistoryProjection
-  ))
+  ), googleAuth)
   private val userProfileProjection: UserProfileProjection = new ReplayingUserProfileProjection(dataStore)
   private val publicApi = new DelegatingPublicApi(commandProcessor, dataStore, facebookConnector, userProfileProjection,
-    userFriendsProjection, notificationsProjection, userSearchProjection, wishImageStore, userImageStore, userHistoryProjection)
+    userFriendsProjection, notificationsProjection, userSearchProjection, wishImageStore, userImageStore, userHistoryProjection, googleAuth)
   private val managementApi: ManagementApi = new DelegatingManagementApi(userIdByFacebookIdProjection, userProfileProjection,
     dataStore, commandProcessor, userSearchProjection, deviceIdEventProcessor, userHistoryProjection)
   private val webApi = new WebApi(publicApi, managementApi, clientRegistry)

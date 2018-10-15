@@ -13,7 +13,7 @@ import co.wishkeeper.server.WishStatus.Deleted
 import co.wishkeeper.server.api.{ManagementApi, PublicApi}
 import co.wishkeeper.server.image.ImageMetadata
 import co.wishkeeper.server.messaging.MemStateClientRegistry
-import co.wishkeeper.server.projections.{Friend, FriendBirthdaysResult, PotentialFriend, UserFriends}
+import co.wishkeeper.server.projections._
 import co.wishkeeper.server.search.{SearchQuery, UserSearchResults}
 import co.wishkeeper.server.user._
 import co.wishkeeper.server.user.commands._
@@ -134,7 +134,7 @@ class RouteTest extends Specification with Specs2RouteTest with JMock {
       val potentialFriends = List(PotentialFriend(randomUUID(), "Alice", "link"), PotentialFriend(randomUUID(), "Bob", "link"))
 
       checking {
-        allowing(publicApi).potentialFriendsFor(having(===(accessToken)), having(any)).willReturn(Some(Future.successful(potentialFriends)))
+        allowing(publicApi).facebookPotentialFriends(having(===(accessToken)), having(any)).willReturn(Some(Future.successful(potentialFriends)))
       }
 
       Get(s"/users/friends/facebook").withHeaders(sessionIdHeader, accessTokenHeader) ~> webApi.userRoute ~> check {
@@ -658,6 +658,51 @@ class RouteTest extends Specification with Specs2RouteTest with JMock {
 
       Get(s"/$friendId/history").withHeaders(sessionIdHeader) ~> webApi.newUserRoute ~> check {
         responseAs[List[HistoryEventInstance]] must contain(historyEventInstance)
+      }
+    }
+
+    "Connect with google" in new NotLoggedInContext {
+      val command = ConnectGoogleUser("access-token", "id-token", randomUUID())
+
+      checking {
+        oneOf(publicApi).connectGoogleUser(command).willReturn(Right(()))
+      }
+
+      Post("/connect/google").withEntity(ContentTypes.`application/json`, command.asJson.noSpaces) ~> webApi.newUserRoute ~> check {
+        status must beEqualTo(StatusCodes.OK)
+      }
+    }
+
+    "Set flag facebook friends seen" in new LoggedInUserContext {
+      checking {
+        oneOf(publicApi).setFlagFacebookFriendsSeen(userId).willReturn(Right(()))
+      }
+
+      Post("/me/flags/facebook-friends").withHeaders(sessionIdHeader) ~> webApi.newUserRoute ~> check {
+        status must beEqualTo(StatusCodes.OK)
+      }
+    }
+
+    "Set flag google friends seen" in new LoggedInUserContext {
+      checking {
+        oneOf(publicApi).setFlagGoogleFriendsSeen(userId).willReturn(Right(()))
+      }
+
+      Post("/me/flags/google-friends").withHeaders(sessionIdHeader) ~> webApi.newUserRoute ~> check {
+        status must beEqualTo(StatusCodes.OK)
+      }
+    }
+
+    "Return potential google friends" in new LoggedInUserContext {
+      val accessToken = "access-token"
+
+      checking {
+        oneOf(publicApi).googlePotentialFriends(userId, accessToken).willReturn(Right(PotentialFriends()))
+      }
+
+      Get("/me/friends/potential/google")
+        .withHeaders(sessionIdHeader, RawHeader("gAccessToken", accessToken)) ~> webApi.newUserRoute ~> check {
+        responseAs[PotentialFriends] must beEqualTo(PotentialFriends())
       }
     }
   }

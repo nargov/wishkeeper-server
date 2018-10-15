@@ -18,6 +18,10 @@ import scala.collection.JavaConverters._
 
 
 trait DataStore {
+  def userEmails: Iterator[(String, UUID)]
+
+  def userByGoogleId(googleUserId: String): Option[UUID]
+
   def deleteWishHistoryEvent(userId: UUID, wishId: UUID): Boolean
 
   def truncateHistory(): Boolean
@@ -34,7 +38,7 @@ trait DataStore {
 
   def saveUserByName(rows: List[UserNameSearchRow]): Boolean
 
-  def userByEmail(email: String): Option[UUID]
+  def userIdByEmail(email: String): Option[UUID]
 
   def saveUserByEmail(email: String, userId: UUID): Boolean
 
@@ -63,7 +67,6 @@ case class DataStoreConfig(addresses: List[String])
 
 class CassandraDataStore(dataStoreConfig: DataStoreConfig) extends DataStore {
 
-
   import CassandraDataStore._
 
   private implicit val circeConfig = extras.Configuration.default.withDefaults
@@ -85,6 +88,7 @@ class CassandraDataStore(dataStoreConfig: DataStoreConfig) extends DataStore {
   private lazy val selectUsersByFacebookIds = session.prepare(s"select facebookId, userId from $userByFacebookId where facebookId in :idList")
   private lazy val insertUserByEmail = session.prepare(s"insert into $userByEmailTable (email, userId) values (:email, :userId) if not exists")
   private lazy val selectUserByEmail = session.prepare(s"select userId from $userByEmailTable where email = :email")
+  private lazy val selectAllUserByEmailEntries = session.prepare(s"select * from $userByEmailTable")
   private lazy val insertUserByName = session.prepare(
     s"""insert into $userByNameTable (userId, name, picture, first_name, last_name)
        |values (:userId, :name, :picture, :firstName, :lastName)""".stripMargin)
@@ -180,7 +184,7 @@ class CassandraDataStore(dataStoreConfig: DataStoreConfig) extends DataStore {
     resultSet.asScala.map(row => row.getString("facebookId") -> row.getUUID("userId")).toMap
   }
 
-  override def userByEmail(email: String): Option[UUID] = {
+  override def userIdByEmail(email: String): Option[UUID] = {
     val resultSet = session.execute(selectUserByEmail.bind().setString("email", email))
     userIdFromSingleResult(resultSet)
   }
@@ -258,6 +262,11 @@ class CassandraDataStore(dataStoreConfig: DataStoreConfig) extends DataStore {
 
   override def deleteWishHistoryEvent(userId: UUID, wishId: UUID): Boolean =
     session.execute(deleteUserHistoryByWishId.bind().setUUID("userId", userId).setUUID("wishId", wishId)).wasApplied()
+
+  override def userByGoogleId(googleUserId: String): Option[UUID] = None
+
+  override def userEmails: Iterator[(String, UUID)] = session.execute(selectAllUserByEmailEntries.bind()).iterator().asScala
+    .map(row => row.getString("email") -> row.getUUID("userId"))
 
   override def close(): Unit = {
     session.close()

@@ -1,14 +1,15 @@
 package co.wishkeeper.server
 
+import java.util.UUID
 import java.util.UUID.randomUUID
 
 import co.wishkeeper.DataStoreTestHelper
 import co.wishkeeper.server.Events.{UserConnected, UserNameSet}
 import co.wishkeeper.server.EventsTestHelper.EventsList
-import co.wishkeeper.server.WishStatus.Reserved
 import co.wishkeeper.server.image.ContentTypes
 import co.wishkeeper.server.user.events.history.{HistoryEventInstance, ReceivedWish, ReservedWish}
 import org.joda.time.DateTime
+import org.scalatest.enablers.Containing
 import org.scalatest.{BeforeAndAfterAll, FlatSpec, Matchers}
 
 class CassandraDataStoreIT extends FlatSpec with Matchers with BeforeAndAfterAll {
@@ -65,7 +66,7 @@ class CassandraDataStoreIT extends FlatSpec with Matchers with BeforeAndAfterAll
   it should "return a user by email" in {
     val email = "zaphod@beeblebrox.com"
     dataStore.saveUserByEmail(email, userId)
-    dataStore.userByEmail(email) shouldBe Some(userId)
+    dataStore.userIdByEmail(email) shouldBe Some(userId)
   }
 
   it should "Save a user by name" in {
@@ -129,6 +130,26 @@ class CassandraDataStoreIT extends FlatSpec with Matchers with BeforeAndAfterAll
     dataStore.historyFor(userId) should have size 2
     dataStore.deleteWishHistoryEvent(userId, wishId)
     dataStore.historyFor(userId) should have size 1
+  }
+
+  it should "return all user id and emails" in {
+    implicit val containsEntry: Containing[Map[String, UUID]] = new Containing[Map[String, UUID]] {
+      override def contains(container: Map[String, UUID], element: Any): Boolean = element match {
+        case e: String => container.contains(e)
+        case _ => false
+      }
+
+      override def containsOneOf(container: Map[String, UUID], elements: Seq[Any]): Boolean = ???
+
+      override def containsNoneOf(container: Map[String, UUID], elements: Seq[Any]): Boolean = ???
+    }
+    val userId1 = randomUUID()
+    val userId2 = randomUUID()
+    dataStore.saveUserByEmail("a", userId1)
+    dataStore.saveUserByEmail("b", userId2)
+    val emails = dataStore.userEmails.toMap
+    emails.exists(e => e._1 == "a" && e._2 == userId1) shouldBe true
+    emails.exists(e => e._1 == "b" && e._2 == userId2) shouldBe true
   }
 
   val dataStoreTestHelper = DataStoreTestHelper()

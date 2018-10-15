@@ -9,6 +9,7 @@ import co.wishkeeper.server.user.events.NotificationEventHandlers._
 import co.wishkeeper.server.user.events.SettingsEventHandlers._
 import co.wishkeeper.server.user.events.ProfileEventHandlers._
 import co.wishkeeper.server.user.events.UserEventHandler
+import co.wishkeeper.server.user.events.FlagsHandlers._
 import org.joda.time.DateTime
 
 
@@ -64,7 +65,6 @@ case class User(id: UUID,
       updateWishProperty(wishId, _.withStatus(WishStatus.Reserved(reserver), time).withReserver(reserver))
     case UserEventInstant(WishUnreserved(wishId), time) =>
       updateWishProperty(wishId, _.withStatus(WishStatus.Active, time).withNoReserver)
-    case UserEventInstant(FacebookFriendsListSeen(seen), _) => this.copy(flags = flags.copy(seenFacebookFriendsList = seen))
     case UserEventInstant(FriendRequestNotificationCreated(notificationId, _, from, reqId), time) => this.copy(
       notifications = Notification(notificationId, FriendRequestNotification(from, reqId), time = time) :: notifications)
     case UserEventInstant(FriendRequestStatusChanged(_, reqId, from, toStatus), _) => this.copy(
@@ -94,6 +94,8 @@ case class User(id: UUID,
       else this
     case UserEventInstant(FriendRemoved(_, friendId), _) => this.copy(friends = friends.copy(current = friends.current.filterNot(_ == friendId)))
 
+    case UserEventInstant(e@FacebookFriendsListSeen(_), time) => handleEventWithHandler(e, time)
+    case UserEventInstant(e@GoogleFriendsListSeen(_), time) => handleEventWithHandler(e, time)
     case UserEventInstant(n@WishReservedNotificationCreated(_, _, _), time) => handleEventWithHandler(n, time)
     case UserEventInstant(e@WishUnreservedNotificationCreated(_, _), time) => handleEventWithHandler(e, time)
     case UserEventInstant(e@DeviceNotificationIdSet(_), time) => handleEventWithHandler(e, time)
@@ -139,7 +141,7 @@ case class Friends(current: List[UUID] = Nil,
                    sentRequests: List[FriendRequest] = Nil,
                    receivedRequests: List[FriendRequest] = Nil)
 
-case class Flags(seenFacebookFriendsList: Boolean = false)
+case class Flags(seenFacebookFriendsList: Boolean = false, seenGoogleFriendsList: Boolean = false)
 
 case class Settings(deviceNotificationId: Option[String] = None, general: GeneralSettings = GeneralSettings())
 

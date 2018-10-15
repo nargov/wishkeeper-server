@@ -40,7 +40,7 @@ class DelegatingManagementApi(userIdByFacebookIdProjection: UserIdByFacebookIdPr
                               historyProjection: Projection) extends ManagementApi {
 
 
-  override def userByEmail(email: String): Option[UUID] = dataStore.userByEmail(email)
+  override def userByEmail(email: String): Option[UUID] = dataStore.userIdByEmail(email)
 
   override def resetFacebookFriendsSeenFlag(userId: UUID): Unit = commandProcessor.process(SetFlagFacebookFriendsListSeen(false), userId)
 

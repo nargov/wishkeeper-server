@@ -24,7 +24,7 @@ import co.wishkeeper.server.search.SearchQuery
 import co.wishkeeper.server.user._
 import co.wishkeeper.server.user.commands._
 import co.wishkeeper.server.web.WebApi.{imageDimensionsHeader, sessionIdHeader}
-import co.wishkeeper.server.{Error, GeneralError, GeneralSettings}
+import co.wishkeeper.server.{ConnectGoogleUser, Error, GeneralError, GeneralSettings}
 import de.heikoseeberger.akkahttpcirce.FailFastCirceSupport._
 import io.circe.generic.extras.Configuration
 import io.circe.generic.extras.auto._
@@ -54,6 +54,7 @@ class WebApi(publicApi: PublicApi, managementApi: ManagementApi, clientRegistry:
     case err: ValidationError => complete(StatusCodes.InternalServerError, err)
     case err@NotFriends => complete(StatusCodes.Forbidden, err)
     case NoChange => complete(StatusCodes.OK)
+    case GeneralError(msg) => complete(StatusCodes.InternalServerError, msg)
     case _ => complete(StatusCodes.InternalServerError)
   }
 
@@ -111,7 +112,7 @@ class WebApi(publicApi: PublicApi, managementApi: ManagementApi, clientRegistry:
     pathPrefix("wishes") {
       pathPrefix(JavaUUID) { wishId =>
         wishReservation(userId, friendId, wishId) ~
-        getFriendWish(userId, friendId, wishId)
+          getFriendWish(userId, friendId, wishId)
       }
     }
 
@@ -148,10 +149,17 @@ class WebApi(publicApi: PublicApi, managementApi: ManagementApi, clientRegistry:
       publicApi.friendsBornToday(userId).fold(handleErrors, result => complete(result))
     }
 
+  val potentialFriends: UUID => Route = userId => (pathPrefix("potential") & get) {
+    (pathPrefix("google") & headerValueByName("gAccessToken")) { accessToken =>
+      publicApi.googlePotentialFriends(userId, accessToken).fold(handleErrors, complete(_))
+    }
+  }
+
   val friends: UUID => Route = userId => pathPrefix("friends") {
     sendFriendRequest(userId) ~
       removeFriend(userId) ~
-      birthdayToday(userId)
+      birthdayToday(userId) ~
+      potentialFriends(userId)
   }
 
   val setNotificationId: UUID => Route = userId => (post & pathPrefix("id") & formField("id")) { notificationId =>
@@ -240,6 +248,25 @@ class WebApi(publicApi: PublicApi, managementApi: ManagementApi, clientRegistry:
 
   }
 
+  val connectGoogleUser: Route = pathPrefix("connect" / "google") {
+    entity(as[ConnectGoogleUser]) { connect => handleCommandResult(publicApi.connectGoogleUser(connect)) }
+  }
+
+  val setFacebookFriendsFlag: UUID => Route = userId => path("facebook-friends") {
+    handleCommandResult(publicApi.setFlagFacebookFriendsSeen(userId))
+  }
+
+  val setGoogleFriendsFlag: UUID => Route = userId => path("google-friends") {
+    handleCommandResult(publicApi.setFlagGoogleFriendsSeen(userId))
+  }
+
+  val flags: UUID => Route = userId => pathPrefix("flags") {
+    post {
+      setFacebookFriendsFlag(userId) ~
+        setGoogleFriendsFlag(userId)
+    }
+  }
+
   val newUserRoute: Route =
     userIdFromSessionHeader { userId =>
       pathPrefix("me") {
@@ -249,15 +276,17 @@ class WebApi(publicApi: PublicApi, managementApi: ManagementApi, clientRegistry:
           notifications(userId) ~
           profile(userId) ~
           settings(userId) ~
-          history(userId, None)
+          history(userId, None) ~
+          flags(userId)
       } ~
         pathPrefix(JavaUUID) { friendId =>
           friendWishes(userId, friendId) ~
-          history(userId, Option(friendId))
+            history(userId, Option(friendId))
         } ~
         search(userId)
     } ~
-      websocket
+      websocket ~
+      connectGoogleUser
 
   val userRoute: Route = DebuggingDirectives.logRequestResult(LoggingMagnet(printer)) {
     pathPrefix("users") {
@@ -321,7 +350,7 @@ class WebApi(publicApi: PublicApi, managementApi: ManagementApi, clientRegistry:
                 } ~
                   path("facebook") {
                     headerValueByName(WebApi.facebookAccessTokenHeader) { accessToken =>
-                      publicApi.potentialFriendsFor(accessToken, sessionUUID.get).
+                      publicApi.facebookPotentialFriends(accessToken, sessionUUID.get).
                         map(onSuccess(_) {
                           complete(_)
                         }).get //TODO test for rejection if user not found

@@ -91,6 +91,7 @@ lazy val server = (project in file("wishkeeper-server")).
         exclude("org.apache.httpcomponents", "httpclient")
         exclude("com.google.guava", "guava-jdk5"),
       "com.google.cloud" % "google-cloud-pubsub" % "1.31.0",
+      "com.google.apis" % "google-api-services-people" % "v1-rev352-1.25.0",
       "com.google.firebase" % "firebase-admin" % "6.2.0",
       "com.sksamuel.scrimage" %% "scrimage-core" % "2.1.8"
         exclude("commons-io", "commons-io"),

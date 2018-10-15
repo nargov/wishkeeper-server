@@ -322,6 +322,7 @@ class DelegatingPublicApiTest extends Specification with JMock {
     val userProfileProjection: UserProfileProjection = new ReplayingUserProfileProjection(dataStore)
     val userHistoryProjection = mock[UserHistoryProjection]
     val userImageStore = mock[ImageStore]
+    val googleAuth = mock[GoogleAuthAdapter]
     val api: PublicApi = new DelegatingPublicApi(
       commandProcessor,
       dataStore,
@@ -332,7 +333,8 @@ class DelegatingPublicApiTest extends Specification with JMock {
       searchProjection,
       null,
       userImageStore,
-      userHistoryProjection
+      userHistoryProjection,
+      googleAuth
     )(null, null, null)
     val friendId: UUID = randomUUID()
     val friendRequestId = randomUUID()

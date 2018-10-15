@@ -4,6 +4,7 @@ import java.util.UUID
 
 import co.wishkeeper.server.Events._
 import co.wishkeeper.server.user._
+import co.wishkeeper.server.user.commands.UserCommandValidator.Always
 import co.wishkeeper.server.{FriendRequestStatus, GeneralSettings, User}
 import org.joda.time.LocalDate
 
@@ -32,6 +33,16 @@ object SendFriendRequest {
 case class SetFlagFacebookFriendsListSeen(seen: Boolean = true) extends UserCommand {
   override def process(user: User): List[UserEvent] = FacebookFriendsListSeen(seen) :: Nil
 }
+object SetFlagFacebookFriendsListSeen{
+  implicit val validator: UserCommandValidator[SetFlagFacebookFriendsListSeen] = Always
+}
+
+case class SetFlagGoogleFriendsListSeen(seen: Boolean = true) extends UserCommand {
+  override def process(user: User): List[UserEvent] = GoogleFriendsListSeen(seen) :: Nil
+}
+case object SetFlagGoogleFriendsListSeen {
+  implicit val validator: UserCommandValidator[SetFlagGoogleFriendsListSeen] = Always
+}
 
 case class ChangeFriendRequestStatus(requestId: UUID, status: FriendRequestStatus) extends UserCommand {
   override def process(user: User): List[UserEvent] = {
@@ -43,7 +54,7 @@ case class ChangeFriendRequestStatus(requestId: UUID, status: FriendRequestStatu
 }
 
 object ChangeFriendRequestStatus {
-  implicit val validator: UserCommandValidator[ChangeFriendRequestStatus] = UserCommandValidator.Always
+  implicit val validator: UserCommandValidator[ChangeFriendRequestStatus] = Always
 }
 
 case object MarkAllNotificationsViewed extends UserCommand {
@@ -95,7 +106,7 @@ case class SetUserName(firstName: Option[String], lastName: Option[String]) exte
 }
 
 object SetUserName {
-  implicit val validator: UserCommandValidator[SetUserName] = UserCommandValidator.Always
+  implicit val validator: UserCommandValidator[SetUserName] = Always
 }
 
 case class SetUserPicture(url: String) extends UserCommand {
@@ -103,7 +114,7 @@ case class SetUserPicture(url: String) extends UserCommand {
 }
 
 object SetUserPicture {
-  implicit val validator: UserCommandValidator[SetUserPicture] = UserCommandValidator.Always
+  implicit val validator: UserCommandValidator[SetUserPicture] = Always
 }
 
 case class SetGender(gender: Gender, customGender: Option[String], genderPronoun: Option[GenderPronoun]) extends UserCommand {
@@ -111,7 +122,7 @@ case class SetGender(gender: Gender, customGender: Option[String], genderPronoun
 }
 
 object SetGender {
-  implicit val validator: UserCommandValidator[SetGender] = UserCommandValidator.Always
+  implicit val validator: UserCommandValidator[SetGender] = Always
 }
 
 case class SetGeneralSettings(generalSettings: GeneralSettings) extends UserCommand {
@@ -129,19 +140,19 @@ case class SetGeneralSettings(generalSettings: GeneralSettings) extends UserComm
   }
 }
 object SetGeneralSettings {
-  implicit val validator: UserCommandValidator[SetGeneralSettings] = UserCommandValidator.Always
+  implicit val validator: UserCommandValidator[SetGeneralSettings] = Always
 }
 
 case class SetUserBirthday(birthday: LocalDate) extends UserCommand {
   override def process(user: User): List[UserEvent] = UserBirthdaySet(user.id, birthday.toString("MM/dd/yyyy")) :: Nil
 }
 object SetUserBirthday {
-  implicit val validator: UserCommandValidator[SetUserBirthday] = UserCommandValidator.Always
+  implicit val validator: UserCommandValidator[SetUserBirthday] = Always
 }
 
 case class SetAnniversary(anniversary: LocalDate) extends UserCommand {
   override def process(user: User): List[UserEvent] = UserAnniversarySet(anniversary.toString("MM/dd/yyyy")) :: Nil
 }
 object SetAnniversary {
-  implicit val validator: UserCommandValidator[SetAnniversary] = UserCommandValidator.Always
+  implicit val validator: UserCommandValidator[SetAnniversary] = Always
 }

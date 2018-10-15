@@ -3,11 +3,11 @@ package co.wishkeeper.server
 import java.util.UUID
 
 import co.wishkeeper.server.Events._
-import co.wishkeeper.server.EventsTestHelper.{asEventInstants, userConnectEvent}
-import co.wishkeeper.server.user.DummyError
+import co.wishkeeper.server.EventsTestHelper.{EventsList, asEventInstants, userConnectEvent}
+import co.wishkeeper.server.user.{DummyError, Gender}
 import co.wishkeeper.server.user.commands.{ConnectFacebookUser, SetFacebookUserInfo, UserCommand, UserCommandValidator}
 import com.wixpress.common.specs2.JMock
-import org.joda.time.DateTime
+import org.joda.time.{DateTime, LocalDate}
 import org.specs2.matcher.{Matcher, MatcherMacros}
 import org.specs2.mutable.Specification
 import org.specs2.specification.Scope
@@ -25,7 +25,7 @@ class UserCommandProcessorTest extends Specification with JMock with MatcherMacr
       atLeast(1).of(eventProcessor).process(having(any[Event]), having(any[UUID])).willReturn(Nil)
     }
 
-    processUserConnect()
+    processConnectWithFacebook()
   }
 
   "create new user on ConnectFacebookUser if user doesn't exist" in new EventProcessorContext {
@@ -38,7 +38,7 @@ class UserCommandProcessorTest extends Specification with JMock with MatcherMacr
       oneOf(eventProcessor).process(having(any[UserConnected]), having(any[UUID])).willReturn(Nil)
     }
 
-    processUserConnect()
+    processConnectWithFacebook()
   }
 
   "load user if exists on ConnectFacebookUser" in new EventProcessorContext {
@@ -52,7 +52,7 @@ class UserCommandProcessorTest extends Specification with JMock with MatcherMacr
       oneOf(eventProcessor).process(having(aUserConnectedEventFor(userId)), having(===(userId))).willReturn(Nil)
     }
 
-    processUserConnect()
+    processConnectWithFacebook()
   }
 
   "load user if session exists" in new Context {
@@ -76,7 +76,7 @@ class UserCommandProcessorTest extends Specification with JMock with MatcherMacr
       oneOf(dataStore).saveUserSession(having(===(userId)), having(===(sessionId)), having(any[DateTime]))
     }
 
-    processUserConnect()
+    processConnectWithFacebook()
   }
 
   "retry saving user events on concurrent modification error" in new Context {
@@ -138,20 +138,168 @@ class UserCommandProcessorTest extends Specification with JMock with MatcherMacr
     commandProcessor.validatedProcess(DummyCommand(NoOp :: Nil), userId)(alwaysValid)
   }
 
+  "validate google id token when connecting with google" in new GoogleConnectContext {
+    assumeNewUser()
+    ignoringSaveUserEvents()
+    ignoringSaveUserSession()
+    checking {
+      ignoring(dataStore).saveUserByEmail(having(any), having(any))
+      allowing(dataStore).userIdByEmail(email).willReturn(None)
+      allowing(dataStore).userByGoogleId(googleUserId).willReturn(None)
+      oneOf(googleAuth).validateIdToken(idToken).willReturn(Right(googleUser))
+    }
+
+    commandProcessor.connectWithGoogle(ConnectGoogleUser(accessToken, idToken, sessionId))
+  }
+
+  "return error if google id fails validation" in new GoogleConnectContext {
+    checking {
+      allowing(googleAuth).validateIdToken(idToken).willReturn(Left(GoogleAuthError("error message")))
+    }
+
+    commandProcessor.connectWithGoogle(ConnectGoogleUser(accessToken, idToken, sessionId)) must beLeft(anInstanceOf[GoogleAuthError])
+  }
+
+  "save user session when connecting with google" in new GoogleConnectContext {
+    assumeNewUser()
+    ignoringSaveUserEvents()
+    checking {
+      ignoring(dataStore).saveUserByEmail(having(any), having(any))
+      allowing(dataStore).userIdByEmail(email).willReturn(None)
+      allowing(dataStore).userByGoogleId(googleUserId).willReturn(None)
+      allowing(googleAuth).validateIdToken(idToken).willReturn(Right(googleUser))
+      oneOf(dataStore).saveUserSession(having(any[UUID]), having(===(sessionId)), having(any[DateTime])).willReturn(true)
+    }
+
+    commandProcessor.connectWithGoogle(ConnectGoogleUser(accessToken, idToken, sessionId))
+  }
+
+  "save user connection event when connecting with google" in new GoogleConnectContext {
+    assumeNewUser()
+    ignoringSaveUserSession()
+    checking {
+      ignoring(dataStore).saveUserByEmail(having(any), having(any))
+      allowing(dataStore).userIdByEmail(email).willReturn(None)
+      allowing(dataStore).userByGoogleId(googleUserId).willReturn(None)
+      allowing(googleAuth).validateIdToken(idToken).willReturn(Right(googleUser))
+      oneOf(dataStore).saveUserEvents(having(any[UUID]), having(beNone), having(any[DateTime]), having(contain(anInstanceOf[UserConnected])))
+        .willReturn(true)
+    }
+
+    commandProcessor.connectWithGoogle(ConnectGoogleUser(accessToken, idToken, sessionId))
+  }
+
+  "connect existing user if found by email" in new GoogleConnectContext {
+    assumeExistingUser()
+    checking {
+      allowing(googleAuth).validateIdToken(idToken).willReturn(Right(googleUser))
+      allowing(dataStore).userIdByEmail(email).willReturn(Option(userId))
+      oneOf(dataStore).saveUserSession(having(===(userId)), having(===(sessionId)), having(any[DateTime])).willReturn(true)
+      oneOf(dataStore).saveUserEvents(having(===(userId)), having(some[Long]), having(any[DateTime]), having(contain(anInstanceOf[UserConnected])))
+        .willReturn(true)
+    }
+
+    commandProcessor.connectWithGoogle(ConnectGoogleUser(accessToken, idToken, sessionId))
+  }
+
+  "save google user events for user data" in new GoogleConnectContext {
+    assumeExistingUser()
+    checking {
+      allowing(googleAuth).validateIdToken(idToken).willReturn(Right(googleUser))
+      allowing(dataStore).userIdByEmail(email).willReturn(Option(userId))
+      oneOf(dataStore).saveUserSession(having(===(userId)), having(===(sessionId)), having(any[DateTime])).willReturn(true)
+      oneOf(dataStore).saveUserEvents(having(===(userId)), having(some[Long]), having(any[DateTime]), having(contain(allOf(
+        UserNameSet(userId, name),
+        UserFirstNameSet(userId, givenName),
+        UserLastNameSet(userId, familyName),
+        UserEmailSet(userId, email),
+        UserPictureSet(userId, photo),
+        UserLocaleSet(userId, locale)
+      )))).willReturn(true)
+    }
+
+    commandProcessor.connectWithGoogle(ConnectGoogleUser(accessToken, idToken, sessionId))
+  }
+
+  "not save google user data if already set" in new GoogleConnectContext {
+    assumeHasSequenceNum()
+
+    checking {
+      allowing(googleAuth).validateIdToken(idToken).willReturn(Right(googleUser))
+      allowing(dataStore).userIdByEmail(email).willReturn(Option(userId))
+      oneOf(dataStore).saveUserSession(having(===(userId)), having(===(sessionId)), having(any[DateTime])).willReturn(true)
+      oneOf(dataStore).userEvents(userId).willReturn(EventsList(userId)
+        .withName(name)
+        .withFirstName(givenName)
+        .withLastName(familyName)
+        .withPic(photo)
+        .withEvent(UserLocaleSet(userId, locale))
+        .withEmail(email)
+        .list)
+      oneOf(dataStore).saveUserEvents(having(===(userId)), having(some[Long]), having(any[DateTime]), having(not(contain(allOf(
+        UserNameSet(userId, name),
+        UserFirstNameSet(userId, givenName),
+        UserLastNameSet(userId, familyName),
+        UserEmailSet(userId, email),
+        UserPictureSet(userId, photo),
+        UserLocaleSet(userId, locale)
+      ))))).willReturn(true)
+    }
+
+    commandProcessor.connectWithGoogle(ConnectGoogleUser(accessToken, idToken, sessionId))
+  }
+
+  "save user by email when connecting with google" in new GoogleConnectContext {
+    assumeNewUser()
+    ignoringSaveUserEvents()
+    ignoringSaveUserSession()
+    checking {
+      allowing(googleAuth).validateIdToken(idToken).willReturn(Right(googleUser))
+      allowing(dataStore).userIdByEmail(email).willReturn(None)
+      oneOf(dataStore).saveUserByEmail(having(===(email)), having(any[UUID]))
+    }
+
+    commandProcessor.connectWithGoogle(ConnectGoogleUser(accessToken, idToken, sessionId))
+  }
+
+  "save events for gender and birthday from google user data" in new GoogleConnectContext {
+    assumeExistingUser()
+
+    checking {
+      allowing(googleAuth).validateIdToken(idToken).willReturn(Right(googleUser))
+      allowing(dataStore).userIdByEmail(email).willReturn(Option(userId))
+      allowing(dataStore).saveUserSession(having(===(userId)), having(===(sessionId)), having(any[DateTime])).willReturn(true)
+      oneOf(dataStore).saveUserEvents(having(===(userId)), having(some[Long]), having(any[DateTime]), having(contain(allOf(
+        UserBirthdaySet(userId, birthday.toString("MM/dd/yyyy")),
+        UserGenderSet2(Gender.Female, None, None)
+      )))).willReturn(true)
+    }
+
+    commandProcessor.connectWithGoogle(ConnectGoogleUser(accessToken, idToken, sessionId))
+  }
+
 
   trait Context extends Scope {
     val userId: UUID = UUID.randomUUID()
     val dataStore: DataStore = mock[DataStore]
-    val commandProcessor: CommandProcessor = new UserCommandProcessor(dataStore)
+    val googleAuth = mock[GoogleAuthAdapter]
+    val commandProcessor: CommandProcessor = new UserCommandProcessor(dataStore, Nil, googleAuth)
     val sessionId: UUID = UUID.randomUUID()
     val facebookId = "facebook-id"
     val authToken = "auth-token"
 
-    def assumeExistingUser() = checking {
-      allowing(dataStore).userEvents(userId).willReturn(
-        UserEventInstant(UserConnected(userId, DateTime.now().minusDays(1), UUID.randomUUID()), DateTime.now().minusDays(1)) :: Nil)
-      allowing(dataStore).userBySession(sessionId).willReturn(Some(userId))
-      allowing(dataStore).userIdByFacebookId(facebookId).willReturn(Some(userId))
+    def ignoringGoogleUserData() = checking {
+      ignoring(googleAuth).fetchAdditionalUserData(having(any), having(any)).willReturn(Right(GoogleUserData()))
+    }
+
+    def assumeExistingUser() = {
+      assumeHasSequenceNum()
+      checking {
+        allowing(dataStore).userEvents(userId).willReturn(
+          UserEventInstant(UserConnected(userId, DateTime.now().minusDays(1), UUID.randomUUID()), DateTime.now().minusDays(1)) :: Nil)
+        allowing(dataStore).userBySession(sessionId).willReturn(Some(userId))
+        allowing(dataStore).userIdByFacebookId(facebookId).willReturn(Some(userId))
+      }
     }
 
     def assumeHasSequenceNum() = checking {
@@ -162,7 +310,7 @@ class UserCommandProcessorTest extends Specification with JMock with MatcherMacr
       allowing(dataStore).userIdByFacebookId(facebookId).willReturn(None)
     }
 
-    def processUserConnect() = {
+    def processConnectWithFacebook() = {
       commandProcessor.process(ConnectFacebookUser(facebookId, authToken, sessionId))
     }
 
@@ -173,14 +321,38 @@ class UserCommandProcessorTest extends Specification with JMock with MatcherMacr
     def ignoringSaveUserSession() = checking {
       ignoring(dataStore).saveUserSession(having(any[UUID]), having(any[UUID]), having(any[DateTime]))
     }
+
+    def assumeNewUser() = checking {
+      allowing(dataStore).lastSequenceNum(having(any[UUID])).willReturn(None)
+    }
   }
 
   trait EventProcessorContext extends Context {
     val eventProcessor: EventProcessor = mock[EventProcessor]
-    override val commandProcessor = new UserCommandProcessor(dataStore, eventProcessor :: Nil)
+    override val commandProcessor = new UserCommandProcessor(dataStore, eventProcessor :: Nil, googleAuth)
 
     def ignoringProcessFacebookIdSet() = checking {
       ignoring(eventProcessor).process(having(any[UserFacebookIdSet]), having(any[UUID])).willReturn(Nil)
+    }
+  }
+
+  trait GoogleConnectContext extends Context {
+    val googleUserId = "google user id"
+    val email = "user@gmail.com"
+    val givenName = "Bob"
+    val familyName = "Hoskins"
+    val name = s"$givenName $familyName"
+    val photo = "https://lh4.googleusercontent.com/some-url/my-photo.jpg"
+    val accessToken = "access-token"
+    val idToken = "id-token"
+    val locale = "en-US"
+    val birthday = new LocalDate()
+    val googleUser = GoogleUser(googleUserId, Option(email), Option(true), Option(name), Option(photo), Option(locale),
+      Option(givenName), Option(familyName))
+
+    checking {
+      allowing(googleAuth).fetchAdditionalUserData(accessToken, googleUserId)
+        .willReturn(Right(GoogleUserData(Option(birthday), Option(GenderData(Gender.Female)))))
     }
   }
 

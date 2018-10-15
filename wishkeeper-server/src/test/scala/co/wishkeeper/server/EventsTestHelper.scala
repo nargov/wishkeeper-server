@@ -69,6 +69,8 @@ object EventsTestHelper {
 
     def withEvent(event: UserEvent): EventsList = copy(list = list :+ asEventInstant(event))
 
+    def withEmail(email: String) = withEvent(UserEmailSet(userId, email))
+
     def withPic(link: String) = this.copy(list = list :+ asEventInstant(UserPictureSet(userId, link)))
 
     def withDeviceId(id: String) = withEvent(DeviceNotificationIdSet(id))

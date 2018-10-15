@@ -24,6 +24,14 @@ import scala.util.Try
 
 trait PublicApi {
 
+  def googlePotentialFriends(userId: UUID, accessToken: String): Either[Error, PotentialFriends]
+
+  def setFlagGoogleFriendsSeen(userId: UUID): Either[Error, Unit]
+
+  def setFlagFacebookFriendsSeen(userId: UUID): Either[Error, Unit]
+
+  def connectGoogleUser(command: ConnectGoogleUser): Either[Error, Unit]
+
   def historyFor(userId: UUID): Either[Error, List[HistoryEventInstance]]
 
   def historyFor(userId: UUID, friendId: UUID): Either[Error, List[HistoryEventInstance]]
@@ -94,7 +102,7 @@ trait PublicApi {
 
   def userProfileFor(sessionId: UUID, friendId: UUID): Either[ValidationError, UserProfile]
 
-  def potentialFriendsFor(facebookAccessToken: String, sessionId: UUID): Option[Future[List[PotentialFriend]]]
+  def facebookPotentialFriends(facebookAccessToken: String, sessionId: UUID): Option[Future[List[PotentialFriend]]]
 
   def uploadImage(inputStream: InputStream, imageMetadata: ImageMetadata, wishId: UUID, sessionId: UUID): Try[Unit]
 
@@ -116,7 +124,8 @@ class DelegatingPublicApi(commandProcessor: CommandProcessor,
                           searchProjection: UserSearchProjection,
                           imageStore: ImageStore,
                           userImageStore: ImageStore,
-                          userHistoryProjection: UserHistoryProjection)
+                          userHistoryProjection: UserHistoryProjection,
+                          googleAuth: GoogleAuthAdapter)
                          (implicit actorSystem: ActorSystem, ec: ExecutionContext, am: ActorMaterializer) extends PublicApi {
 
   private val imageUploader = new ImageUploader(imageStore, new ScrimageImageProcessor)
@@ -204,7 +213,7 @@ class DelegatingPublicApi(commandProcessor: CommandProcessor,
     }
   }
 
-  override def potentialFriendsFor(facebookAccessToken: String, sessionId: UUID): Option[Future[List[PotentialFriend]]] = {
+  override def facebookPotentialFriends(facebookAccessToken: String, sessionId: UUID): Option[Future[List[PotentialFriend]]] = {
     withValidSession(sessionId) { userId =>
       Option(userFriendsProjection.potentialFacebookFriends(userId, facebookAccessToken))
     }
@@ -326,15 +335,26 @@ class DelegatingPublicApi(commandProcessor: CommandProcessor,
 
   override def historyFor(userId: UUID, friendId: UUID): Either[Error, List[HistoryEventInstance]] = {
     val user = User.replay(dataStore.userEvents(userId))
-    if(user.friends.current.contains(friendId))
+    if (user.friends.current.contains(friendId))
       Try(userHistoryProjection.friendHistory(friendId)).toEither.left.map(t => GeneralError(t.getMessage))
     else Left(NotFriends)
   }
 
   override def wishById(userId: UUID, friendId: UUID, wishId: UUID): Either[Error, Wish] = {
     val user = User.replay(dataStore.userEvents(userId))
-    if(user.friends.current.contains(friendId))
+    if (user.friends.current.contains(friendId))
       wishById(friendId, wishId)
     else Left(NotFriends)
   }
+
+  override def connectGoogleUser(command: ConnectGoogleUser): Either[Error, Unit] = commandProcessor.connectWithGoogle(command)
+
+  override def setFlagFacebookFriendsSeen(userId: UUID): Either[Error, Unit] =
+    commandProcessor.validatedProcess(SetFlagFacebookFriendsListSeen(), userId)
+
+  override def setFlagGoogleFriendsSeen(userId: UUID): Either[Error, Unit] =
+    commandProcessor.validatedProcess(SetFlagGoogleFriendsListSeen(), userId)
+
+  override def googlePotentialFriends(userId: UUID, accessToken: String): Either[Error, PotentialFriends] =
+    userFriendsProjection.potentialGoogleFriends(userId, accessToken)
 }

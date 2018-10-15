@@ -416,6 +416,10 @@ class UserTest extends Specification with MatcherMacros with JMock with Notifica
     user.withReservedWish(wishId, friendId).wishes(wishId).pastReservers must contain(friendId)
   }
 
+  "apply GoogleFriendsListSeen" in new Context {
+    user.applyEvent(asEventInstant(GoogleFriendsListSeen())).flags.seenGoogleFriendsList must beTrue
+  }
+
   trait Context extends Scope {
     val user: User = User.createNew()
     val wish: Wish = Wish(randomUUID())

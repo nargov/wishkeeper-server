@@ -3,12 +3,12 @@ package co.wishkeeper.server.projections
 import java.util.UUID
 
 import co.wishkeeper.server.projections.UserRelation.{DirectFriend, IncomingRequest, RequestedFriend}
-import co.wishkeeper.server.{DataStore, FacebookConnector, FriendRequest, User}
+import co.wishkeeper.server.{DataStore, Error, FacebookConnector, FriendRequest, GeneralError, GoogleAuthAdapter, User}
 import org.joda.time.DateTime
-import co.wishkeeper.server.Error
 import org.joda.time.format.DateTimeFormat
 
 import scala.concurrent.{ExecutionContext, Future}
+import scala.util.Try
 
 trait UserFriendsProjection {
 
@@ -16,12 +16,15 @@ trait UserFriendsProjection {
 
   def potentialFacebookFriends(userId: UUID, accessToken: String): Future[List[PotentialFriend]]
 
+  def potentialGoogleFriends(userId: UUID, accessToken: String): Either[Error, PotentialFriends]
+
   def friendsFor(userId: UUID): UserFriends
 
   def friendsFor(friendId: UUID, userId: UUID): UserFriends
 }
 
 class EventBasedUserFriendsProjection(facebookConnector: FacebookConnector,
+                                      googleAuth: GoogleAuthAdapter,
                                       userIdByFacebookId: UserIdByFacebookIdProjection,
                                       dataStore: DataStore)
                                      (implicit ex: ExecutionContext) extends UserFriendsProjection {
@@ -84,6 +87,22 @@ class EventBasedUserFriendsProjection(facebookConnector: FacebookConnector,
     Right(FriendBirthdaysResult(bornToday.map(friend =>
       Friend(friend.id, friend.userProfile.name, friend.userProfile.picture, friend.userProfile.firstName, Option(DirectFriend)))))
   }
+
+  override def potentialGoogleFriends(userId: UUID, accessToken: String): Either[Error, PotentialFriends] =
+    googleAuth.userContactEmails(accessToken).flatMap { emails =>
+      Try {
+        val emailsSet = emails.toSet
+        val user = User.replay(dataStore.userEvents(userId))
+        val userFilter: ((String, UUID)) => Boolean = entry =>
+          emailsSet.contains(entry._1) && !user.friends.current.contains(entry._2)
+        PotentialFriends(dataStore.userEmails.filter(userFilter).map { case (_, id) =>
+          val user = User.replay(dataStore.userEvents(id))
+          PotentialFriend(user.id, user.userProfile.name.getOrElse(""), user.userProfile.picture.getOrElse(""))
+        }.toList)
+      }.toEither.left.map[Error] { t =>
+        GeneralError(t.getMessage)
+      }
+    }
 }
 
 

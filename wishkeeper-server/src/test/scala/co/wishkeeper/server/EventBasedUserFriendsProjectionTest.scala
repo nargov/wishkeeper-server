@@ -221,6 +221,26 @@ class EventBasedUserFriendsProjectionTest(implicit ee: ExecutionEnv) extends Spe
     userFriendsProjection.friendsBornToday(userId, today) must beRight(FriendBirthdaysResult(friendsBornToday))
   }
 
+  "returns potential google friends" in new Context {
+    val friendEmail = "friend@gmail.com"
+    val friendName = "George Martin"
+    val friendPhoto = "pic link"
+    val existingFriendEmail = "existing@gmail.com"
+    val existingFriendId = randomUUID()
+
+    checking {
+      allowing(googleAuth).userContactEmails(accessToken).willReturn(Right(List(friendEmail, existingFriendEmail)))
+      allowing(dataStore).userEmails.willReturn(Map(friendEmail -> friendId, existingFriendEmail -> existingFriendId).iterator)
+      allowing(dataStore).userEvents(friendId).willReturn(EventsList(friendId).withName(friendName).withPic(friendPhoto).list)
+      allowing(dataStore).userEvents(userId).willReturn(EventsList(userId).withFriend(existingFriendId).list)
+    }
+
+    val potentialFriends = PotentialFriends(List(PotentialFriend(friendId, friendName, friendPhoto)))
+    userFriendsProjection.potentialGoogleFriends(userId, accessToken) must beRight(potentialFriends)
+  }
+
+
+
   def aFriend(id: UUID): Matcher[Friend] = ===(id) ^^ ((_: Friend).userId)
 
   def anIncomingFriendRequestFrom(friend: UUID, requestId: UUID): Matcher[IncomingFriendRequest] = (req: IncomingFriendRequest) =>
@@ -238,7 +258,9 @@ class EventBasedUserFriendsProjectionTest(implicit ee: ExecutionEnv) extends Spe
     val facebookConnector = mock[FacebookConnector]
     val userIdByFacebookIdProjection = mock[UserIdByFacebookIdProjection]
     val dataStore = mock[DataStore]
-    val userFriendsProjection: UserFriendsProjection = new EventBasedUserFriendsProjection(facebookConnector, userIdByFacebookIdProjection, dataStore)
+    val googleAuth = mock[GoogleAuthAdapter]
+    val userFriendsProjection: UserFriendsProjection =
+      new EventBasedUserFriendsProjection(facebookConnector, googleAuth, userIdByFacebookIdProjection, dataStore)
     val expectedUserName = "Expected Wishkeeper Friend"
     val facebookFriends = List(
       FacebookFriend(expectedUserName, "expected-friend-id"),
