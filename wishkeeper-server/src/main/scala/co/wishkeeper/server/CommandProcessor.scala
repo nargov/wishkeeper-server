@@ -96,8 +96,10 @@ class UserCommandProcessor(dataStore: DataStore, eventProcessors: List[EventProc
           user.userProfile.email.fold(googleUser.email.fold[List[UserEvent]](Nil)(UserEmailSet(user.id, _) :: Nil))(_ => Nil) ++
           user.userProfile.locale.fold(googleUser.locale.fold[List[UserEvent]](Nil)(UserLocaleSet(user.id, _) :: Nil))(_ => Nil)
         val googleDataEvents: List[UserEvent] = googleUserData.map { data =>
-          data.birthday.map(d => UserBirthdaySet(user.id, d.toString("MM/dd/yyyy")) :: Nil).getOrElse(Nil) ++
-          data.gender.map(g => UserGenderSet2(g.gender, g.customGender, g.genderPronoun) :: Nil).getOrElse(Nil)
+          user.userProfile.birthday.fold(
+            data.birthday.map(d => UserBirthdaySet(user.id, d.toString("MM/dd/yyyy")) :: Nil).getOrElse(Nil))(_ => Nil) ++
+          user.userProfile.genderData.fold(
+            data.gender.map(g => UserGenderSet2(g.gender, g.customGender, g.genderPronoun) :: Nil).getOrElse(Nil))(_ => Nil)
         }.toOption.getOrElse(Nil)
         val success = dataStore.saveUserEvents(user.id, dataStore.lastSequenceNum(user.id), time, events ++ googleDataEvents)
         Either.cond(success, (), DbErrorEventsNotSaved)
