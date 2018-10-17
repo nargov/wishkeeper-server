@@ -1,7 +1,7 @@
 package co.wishkeeper.server.api
 
 import java.io.InputStream
-import java.net.URL
+import java.net.{HttpURLConnection, URL}
 import java.nio.file.{Files, Path, Paths}
 import java.util.UUID
 
@@ -153,14 +153,26 @@ class DelegatingPublicApi(commandProcessor: CommandProcessor,
       imageUploader.uploadImageAndResizedCopies(imageMetadata, origFile, toImageStore = store))
   }
 
+  val userAgent = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/60.0.3112.113 Safari/537.36"
+
+  private def connectionFor(url: String) = {
+    val connection = new URL(url).openConnection().asInstanceOf[HttpURLConnection]
+    connection.setRequestProperty("User-Agent", userAgent)
+    connection.connect()
+    connection
+  }
+
   override def uploadImage(url: String, imageMetadata: ImageMetadata, wishId: UUID, sessionId: UUID): Try[Unit] = {
     Try {
       val escapedUrl = UrlEscapers.urlFragmentEscaper().escape(url)
-      val connection = new URL(escapedUrl).openConnection()
-      connection.setRequestProperty("User-Agent",
-        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/60.0.3112.113 Safari/537.36")
-      connection.connect()
-      connection
+      val connection = connectionFor(escapedUrl)
+      val code = connection.getResponseCode
+      if(code == HttpURLConnection.HTTP_MOVED_PERM || code == HttpURLConnection.HTTP_MOVED_TEMP || code == HttpURLConnection.HTTP_SEE_OTHER) {
+        connectionFor(connection.getHeaderField("Location"))
+      }
+      else {
+        connection
+      }
     }.flatMap(con => uploadImage(con.getInputStream, imageMetadata, wishId, sessionId))
   }
 
