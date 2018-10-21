@@ -44,7 +44,11 @@ class ScanningUserHistoryProjection(dataStore: DataStore, clientNotifier: Client
         val user = User.replay(dataStore.userEvents(userId))
         val maybeWish = user.wishes.get(wishId)
         maybeWish.foreach { wish =>
-          wish.reserver.foreach { reserver =>
+          wish.reserver.fold {
+            dataStore.saveUserHistoryEvent(userId, time, ReceivedWish(wishId, userId, user.userProfile.name.getOrElse("Unknown"),
+              wish.name.getOrElse(""), wish.image), wishId)
+            clientNotifier.sendTo(HistoryUpdated, userId)
+          } { reserver =>
             val reserverName = User.replay(dataStore.userEvents(reserver)).userProfile.name.getOrElse(unnamed)
             dataStore.deleteWishHistoryEvent(reserver, wishId)
             dataStore.saveUserHistoryEvent(reserver, time, GrantedWish(wishId, userId, user.userProfile.name.getOrElse(unnamed),

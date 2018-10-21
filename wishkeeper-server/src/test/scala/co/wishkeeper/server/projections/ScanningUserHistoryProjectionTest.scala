@@ -164,6 +164,23 @@ class ScanningUserHistoryProjectionTest extends Spec with JMock {
     projection.friendHistory(userId) must contain(exactly(receivedWishEvent))
   }
 
+  "saves history event for self granted wish" in new DataStoreContext {
+    checking {
+      allowing(dataStore).userEvents(userId).willReturn(EventsList(userId)
+        .withName(userName)
+        .withWish(wishId, wishName)
+        .withEvent(WishImageSet(wishId, imageLinks))
+        .withEvent(WishGranted(wishId))
+        .list)
+      ignoring(dataStore).saveUserHistoryEvent(having(any[UUID]), having(any[DateTime]), having(anInstanceOf[GrantedWish]), having(any))
+      ignoring(dataStore).deleteWishHistoryEvent(having(any), having(any))
+      oneOf(dataStore).saveUserHistoryEvent(having(===(userId)), having(any[DateTime]),
+        having(===(ReceivedWish(wishId, userId, userName, wishName, maybeLinks))), having(===(wishId))).willReturn(true)
+    }
+
+    projection.process(WishGranted(wishId), userId)
+  }
+
   trait DataStoreContext extends Context {
     checking {
       ignoring(notifier)
