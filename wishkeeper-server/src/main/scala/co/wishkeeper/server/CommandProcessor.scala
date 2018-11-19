@@ -8,7 +8,7 @@ import co.wishkeeper.server.CommandProcessor.retry
 import co.wishkeeper.server.Events._
 import co.wishkeeper.server.messaging.EmailSender
 import co.wishkeeper.server.user.commands.{ConnectFacebookUser, CreateUserEmailFirebase, UserCommand, UserCommandValidator}
-import co.wishkeeper.server.user.{Unauthorized, UserNotFound, VerificationToken}
+import co.wishkeeper.server.user.{EmailNotVerified, Unauthorized, UserNotFound, VerificationToken}
 import org.joda.time.DateTime
 
 import scala.annotation.tailrec
@@ -119,13 +119,18 @@ class UserCommandProcessor(dataStore: DataStore, eventProcessors: List[EventProc
 
   override def connectWithFirebase(sessionId: UUID, idToken: String, email: String): Either[Error, Unit] = {
     val now = DateTime.now()
-    firebaseAuth.validate(idToken).flatMap { _ =>
+    firebaseAuth.validate(idToken).flatMap { emailAuthData =>
       dataStore.userIdByEmail(email).map { userId =>
-        val events = UserConnected(userId, now, sessionId) :: Nil
-        val savedEvents = dataStore.saveUserEvents(userId, dataStore.lastSequenceNum(userId), now, events)
-        dataStore.saveUserSession(userId, sessionId, now)
-        if (savedEvents) publishEvents(events, userId)
-        Either.cond(savedEvents, (), DbErrorEventsNotSaved)
+        val user = User.replay(dataStore.userEvents(userId))
+        if (user.flags.emailVerified) {
+          val events = UserConnected(userId, now, sessionId) :: Nil
+          val savedEvents = dataStore.saveUserEvents(userId, dataStore.lastSequenceNum(userId), now, events)
+          dataStore.saveUserSession(userId, sessionId, now)
+          if (savedEvents) publishEvents(events, userId)
+          Either.cond(savedEvents, (), DbErrorEventsNotSaved)
+        } else {
+          Left(EmailNotVerified(email))
+        }
       }.getOrElse(Left(UserNotFound(email)))
     }
   }
@@ -133,27 +138,46 @@ class UserCommandProcessor(dataStore: DataStore, eventProcessors: List[EventProc
   override def connectWithEmail(command: CreateUserEmailFirebase, emailSender: EmailSender): EitherT[Future, Error, Unit] = {
     val verificationToken = UUID.randomUUID()
 
-    val user: User = dataStore.userIdByEmail(command.email).fold {
+    val maybeUserId = dataStore.userIdByEmail(command.email)
+    val user: User = maybeUserId.fold {
       val newUser = User.createNew()
       dataStore.saveUserByEmail(command.email, newUser.id)
       newUser
     }(userId => User.replay(dataStore.userEvents(userId)))
 
-    for {
-      _ <- EitherT(Future.successful(firebaseAuth.validate(command.idToken).flatMap(data =>
-        Either.cond(data.email == command.email, (), Unauthorized("Email does not match email on record")))))
-      _ <- EitherT(Future.successful(retry {
-        val events = command.process(user)
-        val saved = dataStore.saveUserEvents(user.id, None, DateTime.now(), events)
-        if (saved) publishEvents(events, user.id)
-        Either.cond(saved, (), DbErrorEventsNotSaved)
-      }))
-      _ <- EitherT(Future.successful(retry {
-        dataStore.saveVerificationToken(VerificationToken(verificationToken, command.email, user.id))
-      }))
-      result <- EitherT(emailSender.sendVerificationEmail(command.email, "do-not-replay@wishkeeper.co", EmailSender.verificationEmailSubject,
-        verificationToken.toString, command.firstName))
-    } yield result
+    def saveEvents = retry {
+      val events = command.process(user)
+      val saved = dataStore.saveUserEvents(user.id, None, DateTime.now(), events)
+      if (saved) publishEvents(events, user.id)
+      Either.cond(saved, (), DbErrorEventsNotSaved)
+    }
+
+    def saveToken = retry {
+      dataStore.saveVerificationToken(VerificationToken(verificationToken, command.email, user.id))
+    }
+
+    def validateEmailInFirebase = firebaseAuth.validate(command.idToken).flatMap(data =>
+      Either.cond(data.email == command.email, (), Unauthorized("Email does not match email on record")))
+
+    def sendVerificationEmail =
+      emailSender.sendVerificationEmail(command.email, verificationToken.toString, command.firstName)
+
+
+    maybeUserId.fold {
+      for {
+        _ <- EitherT(Future.successful(validateEmailInFirebase))
+        _ <- EitherT(Future.successful(saveEvents))
+        _ <- EitherT(Future.successful(saveToken))
+        result <- EitherT(sendVerificationEmail)
+      } yield result
+    } { userId =>
+      for {
+        _ <- EitherT(Future.successful(validateEmailInFirebase))
+        _ <- EitherT(Future.successful(saveToken))
+        result <- EitherT(sendVerificationEmail)
+      } yield result
+
+    }
   }
 }
 

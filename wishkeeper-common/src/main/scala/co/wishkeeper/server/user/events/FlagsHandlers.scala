@@ -22,6 +22,6 @@ object FlagsHandlers {
 
   implicit val emailVerifiedHandler = new UserEventHandler[EmailVerified] {
     override def apply(user: User, event: EmailVerified, time: DateTime): User =
-      user.copy(flags = user.flags.copy(haveOpenEmailConnect = false))
+      user.copy(flags = user.flags.copy(haveOpenEmailConnect = false, emailVerified = true))
   }
 }

@@ -430,7 +430,9 @@ class UserTest extends Specification with MatcherMacros with JMock with Notifica
       .withEvent(EmailConnectStarted(user.id))
       .withEvent(EmailVerified(email))
       .list
-    events.foldLeft(user)(_.applyEvent(_)).flags.haveOpenEmailConnect must beFalse
+    val flags: Flags = events.foldLeft(user)(_.applyEvent(_)).flags
+    flags.haveOpenEmailConnect must beFalse
+    flags.emailVerified must beTrue
   }
 
   trait Context extends Scope {

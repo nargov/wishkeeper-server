@@ -146,7 +146,8 @@ case class Friends(current: List[UUID] = Nil,
                    sentRequests: List[FriendRequest] = Nil,
                    receivedRequests: List[FriendRequest] = Nil)
 
-case class Flags(seenFacebookFriendsList: Boolean = false, seenGoogleFriendsList: Boolean = false, haveOpenEmailConnect: Boolean = false)
+case class Flags(seenFacebookFriendsList: Boolean = false, seenGoogleFriendsList: Boolean = false, haveOpenEmailConnect: Boolean = false,
+                 emailVerified: Boolean = false)
 
 case class Settings(deviceNotificationId: Option[String] = None, general: GeneralSettings = GeneralSettings())
 

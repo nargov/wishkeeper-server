@@ -6,7 +6,7 @@ import co.wishkeeper.server.Events._
 import co.wishkeeper.server.EventsTestHelper.{EventsList, asEventInstants, userConnectEvent}
 import co.wishkeeper.server.messaging.{EmailProvider, EmailSender, TemplateEngineAdapter}
 import co.wishkeeper.server.user.commands._
-import co.wishkeeper.server.user.{DummyError, Gender}
+import co.wishkeeper.server.user.{DummyError, EmailNotVerified, Gender}
 import com.wixpress.common.specs2.JMock
 import org.jmock.lib.concurrent.DeterministicExecutor
 import org.joda.time.{DateTime, LocalDate}
@@ -280,11 +280,13 @@ class UserCommandProcessorTest extends Specification with JMock with MatcherMacr
   }
 
   "connect with existing firebase user" in new ConnectContext {
-    assumeExistingUser()
+    assumeHasSequenceNum()
 
     checking {
-      allowing(dataStore).userIdByEmail(email).willReturn(Option(userId))
       oneOf(firebaseAuth).validate(authToken).willReturn(Right(EmailAuthData(email, verified = true)))
+      allowing(dataStore).userIdByEmail(email).willReturn(Option(userId))
+      allowing(dataStore).userEvents(userId).willReturn(
+        EventsList(userId).withEvent(EmailConnectStarted(userId)).withEvent(EmailVerified(email)).list)
       oneOf(dataStore).saveUserSession(having(===(userId)), having(===(sessionId)), having(any[DateTime]))
       oneOf(dataStore).saveUserEvents(having(===(userId)), having(any[Some[Long]]), having(any[DateTime]), having(contain(
         anInstanceOf[UserConnected]
@@ -337,6 +339,44 @@ class UserCommandProcessorTest extends Specification with JMock with MatcherMacr
 
     commandProcessor.connectWithEmail(command, emailSender)
     executor.runUntilIdle()
+  }
+
+  "Start connect user with email when already started" in new ConnectContext {
+    assumeExistingUser()
+    val command = CreateUserEmailFirebase(email, idToken, givenName, familyName, "notification-id")
+    val emailProvider: EmailProvider = mock[EmailProvider]
+    val templateEngineAdapter: TemplateEngineAdapter = mock[TemplateEngineAdapter]
+    val emailSender: EmailSender = new EmailSender(emailProvider, templateEngineAdapter)
+    val emailContent = "email-content"
+
+    checking {
+      allowing(firebaseAuth).validate(command.idToken).willReturn(Right(EmailAuthData(email)))
+      allowing(dataStore).userIdByEmail(email).willReturn(Option(userId))
+      never(dataStore).saveUserByEmail(having(===(email)), having(any[UUID]))
+      never(dataStore).saveUserEvents(having(any), having(any), having(any), having(any)).willReturn(true)
+      allowing(dataStore).saveVerificationToken(having(any)).willReturn(Right(true))
+      oneOf(templateEngineAdapter).process(having(any[String]), having(any)).willReturn(Success(emailContent))
+      oneOf(emailProvider).sendEmail(having(===(email)), having(any[String]), having(===(EmailSender.verificationEmailSubject)),
+        having(===("")), having(===(emailContent))) //TODO add text only template
+        .willReturn(Future.successful(Right(())))
+    }
+
+    commandProcessor.connectWithEmail(command, emailSender)
+    executor.runUntilIdle()
+  }
+
+  "login with email/password when not verified returns error" in new ConnectContext {
+    assumeExistingUser()
+
+    checking {
+      allowing(firebaseAuth).validate(idToken).willReturn(Right(EmailAuthData(email)))
+      allowing(dataStore).userIdByEmail(email).willReturn(Option(userId))
+      allowing(dataStore).userEvents(userId).willReturn(EventsList(userId).withEvent(EmailConnectStarted(userId)).list)
+      never(dataStore).saveUserEvents(having(any), having(any), having(any), having(any))
+      never(dataStore).saveUserSession(having(any), having(any), having(any))
+    }
+
+    commandProcessor.connectWithFirebase(sessionId, idToken, email) must beLeft[Error](EmailNotVerified(email))
   }
 
 
