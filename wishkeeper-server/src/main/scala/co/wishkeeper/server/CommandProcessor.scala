@@ -151,7 +151,7 @@ class UserCommandProcessor(dataStore: DataStore, eventProcessors: List[EventProc
       _ <- EitherT(Future.successful(retry {
         dataStore.saveVerificationToken(VerificationToken(verificationToken, command.email, user.id))
       }))
-      result <- EitherT(emailSender.sendVerificationEmail(command.email, "do-not-replay@wishkeeper.co", "Please confirm your email",
+      result <- EitherT(emailSender.sendVerificationEmail(command.email, "do-not-replay@wishkeeper.co", EmailSender.verificationEmailSubject,
         verificationToken.toString, command.firstName))
     } yield result
   }

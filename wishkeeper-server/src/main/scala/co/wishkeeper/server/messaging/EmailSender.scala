@@ -18,4 +18,5 @@ class EmailSender(emailProvider: EmailProvider, templateEngineAdapter: TemplateE
 
 object EmailSender {
   val verificationEmailTemplate = "/templates/email-confirm.mustache"
+  val verificationEmailSubject = "Please confirm your email"
 }

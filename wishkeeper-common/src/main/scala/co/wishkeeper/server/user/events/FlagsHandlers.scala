@@ -1,6 +1,6 @@
 package co.wishkeeper.server.user.events
 
-import co.wishkeeper.server.Events.{FacebookFriendsListSeen, GoogleFriendsListSeen}
+import co.wishkeeper.server.Events.{EmailConnectStarted, EmailVerified, FacebookFriendsListSeen, GoogleFriendsListSeen}
 import co.wishkeeper.server.User
 import org.joda.time.DateTime
 
@@ -13,5 +13,15 @@ object FlagsHandlers {
   implicit val googleHandler = new UserEventHandler[GoogleFriendsListSeen] {
     override def apply(user: User, event: GoogleFriendsListSeen, time: DateTime): User =
       user.copy(flags = user.flags.copy(seenGoogleFriendsList = event.seen))
+  }
+
+  implicit val openEmailConnectHandler = new UserEventHandler[EmailConnectStarted] {
+    override def apply(user: User, event: EmailConnectStarted, time: DateTime): User =
+      user.copy(flags = user.flags.copy(haveOpenEmailConnect = true))
+  }
+
+  implicit val emailVerifiedHandler = new UserEventHandler[EmailVerified] {
+    override def apply(user: User, event: EmailVerified, time: DateTime): User =
+      user.copy(flags = user.flags.copy(haveOpenEmailConnect = false))
   }
 }

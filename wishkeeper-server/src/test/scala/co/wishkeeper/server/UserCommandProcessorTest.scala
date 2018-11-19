@@ -4,8 +4,9 @@ import java.util.UUID
 
 import co.wishkeeper.server.Events._
 import co.wishkeeper.server.EventsTestHelper.{EventsList, asEventInstants, userConnectEvent}
-import co.wishkeeper.server.user.{DummyError, Gender}
+import co.wishkeeper.server.messaging.{EmailProvider, EmailSender, TemplateEngineAdapter}
 import co.wishkeeper.server.user.commands._
+import co.wishkeeper.server.user.{DummyError, Gender}
 import com.wixpress.common.specs2.JMock
 import org.jmock.lib.concurrent.DeterministicExecutor
 import org.joda.time.{DateTime, LocalDate}
@@ -13,8 +14,9 @@ import org.specs2.matcher.{Matcher, MatcherMacros}
 import org.specs2.mutable.Specification
 import org.specs2.specification.Scope
 
-import scala.concurrent.ExecutionContext
+import scala.concurrent.{ExecutionContext, Future}
 import scala.language.experimental.macros
+import scala.util.Success
 
 class UserCommandProcessorTest extends Specification with JMock with MatcherMacros {
 
@@ -292,13 +294,59 @@ class UserCommandProcessorTest extends Specification with JMock with MatcherMacr
     commandProcessor.connectWithFirebase(sessionId, authToken, email)
   }
 
+  "connect user by email" in new ConnectContext {
+    assumeNewUser()
+    val command = CreateUserEmailFirebase(email, idToken, givenName, familyName, "notification-id")
+    val emailProvider: EmailProvider = mock[EmailProvider]
+    val templateEngineAdapter: TemplateEngineAdapter = mock[TemplateEngineAdapter]
+    val emailSender: EmailSender = new EmailSender(emailProvider, templateEngineAdapter)
+
+    checking {
+      oneOf(firebaseAuth).validate(command.idToken).willReturn(Right(EmailAuthData(email)))
+      oneOf(dataStore).saveUserEvents(having(any), having(any), having(any), having(any)).willReturn(true)
+      oneOf(dataStore).saveVerificationToken(having(any)).willReturn(Right(true))
+      allowing(dataStore).userIdByEmail(email).willReturn(None)
+      oneOf(dataStore).saveUserByEmail(having(===(email)), having(any[UUID])).willReturn(true)
+      allowing(templateEngineAdapter).process(having(any), having(any)).willReturn(Success(""))
+      allowing(emailProvider).sendEmail(having(any), having(any), having(any), having(any), having(any)).willReturn(Future.successful(Right(())))
+    }
+
+    commandProcessor.connectWithEmail(command, emailSender)
+    executor.runUntilIdle()
+  }
+
+  "send verification email on email sign up" in new ConnectContext {
+    assumeNewUser()
+    val command = CreateUserEmailFirebase(email, idToken, givenName, familyName, "notification-id")
+    val emailProvider: EmailProvider = mock[EmailProvider]
+    val templateEngineAdapter: TemplateEngineAdapter = mock[TemplateEngineAdapter]
+    val emailSender: EmailSender = new EmailSender(emailProvider, templateEngineAdapter)
+    val emailContent = "email-content"
+
+    checking {
+      allowing(firebaseAuth).validate(command.idToken).willReturn(Right(EmailAuthData(email)))
+      allowing(dataStore).saveUserEvents(having(any), having(any), having(any), having(any)).willReturn(true)
+      allowing(dataStore).saveVerificationToken(having(any)).willReturn(Right(true))
+      allowing(dataStore).userIdByEmail(email).willReturn(None)
+      allowing(dataStore).saveUserByEmail(having(===(email)), having(any[UUID])).willReturn(true)
+      oneOf(templateEngineAdapter).process(having(any[String]), having(any)).willReturn(Success(emailContent))
+      oneOf(emailProvider).sendEmail(having(===(email)), having(any[String]), having(===(EmailSender.verificationEmailSubject)),
+        having(===("")), having(===(emailContent))) //TODO add text only template
+        .willReturn(Future.successful(Right(())))
+    }
+
+    commandProcessor.connectWithEmail(command, emailSender)
+    executor.runUntilIdle()
+  }
+
 
   trait Context extends Scope {
     val userId: UUID = UUID.randomUUID()
     val dataStore: DataStore = mock[DataStore]
     val googleAuth = mock[GoogleAuthAdapter]
     val firebaseAuth = mock[EmailAuthProvider]
-    implicit val ec = ExecutionContext.fromExecutor(new DeterministicExecutor)
+    val executor = new DeterministicExecutor
+    implicit val ec = ExecutionContext.fromExecutor(executor)
     val commandProcessor: CommandProcessor = new UserCommandProcessor(dataStore, Nil, googleAuth, firebaseAuth)
     val sessionId: UUID = UUID.randomUUID()
     val facebookId = "facebook-id"

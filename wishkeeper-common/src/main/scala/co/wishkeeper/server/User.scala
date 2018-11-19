@@ -104,6 +104,8 @@ case class User(id: UUID,
     case UserEventInstant(e@GeneralSettingPushNotificationEnabledSet(_), time) => handleEventWithHandler(e, time)
     case UserEventInstant(e@GeneralSettingVibrateEnabledSet(_), time) => handleEventWithHandler(e, time)
     case UserEventInstant(e@UserAnniversarySet(_), time) => handleEventWithHandler(e, time)
+    case UserEventInstant(e@EmailConnectStarted(_), time) => handleEventWithHandler(e, time)
+    case UserEventInstant(e@EmailVerified(_), time) => handleEventWithHandler(e, time)
     case _ => this
   }
 
@@ -144,7 +146,7 @@ case class Friends(current: List[UUID] = Nil,
                    sentRequests: List[FriendRequest] = Nil,
                    receivedRequests: List[FriendRequest] = Nil)
 
-case class Flags(seenFacebookFriendsList: Boolean = false, seenGoogleFriendsList: Boolean = false)
+case class Flags(seenFacebookFriendsList: Boolean = false, seenGoogleFriendsList: Boolean = false, haveOpenEmailConnect: Boolean = false)
 
 case class Settings(deviceNotificationId: Option[String] = None, general: GeneralSettings = GeneralSettings())
 

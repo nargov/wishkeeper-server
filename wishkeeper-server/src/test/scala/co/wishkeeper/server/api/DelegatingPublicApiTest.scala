@@ -319,40 +319,6 @@ class DelegatingPublicApiTest(implicit ee: ExecutionEnv) extends Specification w
     api.verifyEmail(verificationToken)
   }
 
-  // TODO Move these tests to UserCommandProcessorTest
-//  "validate and create user by email" in new Context {
-//    val command = ConnectUserEmailFirebase("email", "token", "first-name", "last-name", "notification-id")
-//    checking {
-//      oneOf(firebaseAuth).isValidToken(command.idToken).willReturn(Right("uid"))
-//      oneOf(commandProcessor).connectWithEmail(command).willReturn(Right(()))
-//      allowing(dataStore).saveUserEvents(having(any), having(any), having(any), having(any)).willReturn(true)
-//      allowing(dataStore).saveVerificationToken(having(any)).willReturn(Right(true))
-//      allowing(emailProvider).sendEmail(having(any), having(any), having(any), having(any), having(any)).willReturn(Future.successful(Right(())))
-//      allowing(templateEngineAdapter).process(having(any), having(any)).willReturn(Success(""))
-//    }
-//
-//    api.createUserWithEmail(command)
-//    executor.runUntilIdle()
-//  }
-//
-//  "send verification email on email sign up" in new Context {
-//    val command = ConnectUserEmailFirebase("email", "token", "first-name", "last-name", "notification-id")
-//    val verificationToken = randomUUID()
-//    val processedTemplate = s"template-content"
-//    checking {
-//      allowing(firebaseAuth).isValidToken(command.idToken).willReturn(Right("uid"))
-//      allowing(commandProcessor).connectWithEmail(command).willReturn(Right(()))
-//      oneOf(dataStore).saveVerificationToken(having(any[VerificationToken])).willReturn(Right(true))
-//      oneOf(templateEngineAdapter).process(having(===(EmailSender.verificationEmailTemplate)),
-//        having(haveKeys("token", "firstName"))
-//      ).willReturn(Success(processedTemplate))
-//      oneOf(emailProvider).sendEmail(having(===(command.email)), having(any[String]), having(any[String]), having(any[String]),
-//        having(===(processedTemplate)))
-//    }
-//    api.createUserWithEmail(command)
-//    executor.runUntilIdle()
-//  }
-
   def userWishesWith(wishId: UUID, wishName: String): Matcher[UserWishes] = contain(aWishWith(wishId, wishName)) ^^ {(_: UserWishes).wishes}
 
   def aWishWith(id: UUID, name: String): Matcher[Wish] = (wish: Wish) =>

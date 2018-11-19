@@ -4,7 +4,7 @@ import java.util.UUID
 import java.util.UUID.randomUUID
 
 import co.wishkeeper.server.Events._
-import co.wishkeeper.server.EventsTestHelper.asEventInstant
+import co.wishkeeper.server.EventsTestHelper.{EventsList, asEventInstant}
 import co.wishkeeper.server.FriendRequestStatus.Approved
 import co.wishkeeper.server.NotificationsData.{FriendRequestNotification, WishReservedNotification, WishUnreservedNotification}
 import co.wishkeeper.server.UserTestHelper._
@@ -420,6 +420,19 @@ class UserTest extends Specification with MatcherMacros with JMock with Notifica
     user.applyEvent(asEventInstant(GoogleFriendsListSeen())).flags.seenGoogleFriendsList must beTrue
   }
 
+  "apply EmailConnectStarted" in new Context {
+    user.applyEvent(asEventInstant(EmailConnectStarted(user.id))).flags.haveOpenEmailConnect must beTrue
+  }
+
+  "apply EmailVerified" in new Context {
+    val email = "user@address.com"
+    val events = EventsList(user.id).withEmail(email)
+      .withEvent(EmailConnectStarted(user.id))
+      .withEvent(EmailVerified(email))
+      .list
+    events.foldLeft(user)(_.applyEvent(_)).flags.haveOpenEmailConnect must beFalse
+  }
+
   trait Context extends Scope {
     val user: User = User.createNew()
     val wish: Wish = Wish(randomUUID())
@@ -435,13 +448,9 @@ class UserTest extends Specification with MatcherMacros with JMock with Notifica
     val now: DateTime = DateTime.now()
   }
 
-  def haveStatusLastUpdate(time: DateTime): Matcher[Wish] = beSome(time) ^^ {
-    (_: Wish).statusLastUpdate
-  }
+  def haveStatusLastUpdate(time: DateTime): Matcher[Wish] = beSome(time) ^^ ((_: Wish).statusLastUpdate)
 
-  def haveStatus(status: WishStatus): Matcher[Wish] = ===(status) ^^ {
-    (_: Wish).status
-  }
+  def haveStatus(status: WishStatus): Matcher[Wish] = ===(status) ^^ ((_: Wish).status)
 
   def haveCreationTime(time: DateTime): Matcher[Wish] = ===(time) ^^ {
     (_: Wish).creationTime
