@@ -7,6 +7,7 @@ import co.wishkeeper.DataStoreTestHelper
 import co.wishkeeper.server.Events.{UserConnected, UserNameSet}
 import co.wishkeeper.server.EventsTestHelper.EventsList
 import co.wishkeeper.server.image.ContentTypes
+import co.wishkeeper.server.user.VerificationToken
 import co.wishkeeper.server.user.events.history.{HistoryEventInstance, ReceivedWish, ReservedWish}
 import org.joda.time.DateTime
 import org.scalatest.enablers.Containing
@@ -150,6 +151,18 @@ class CassandraDataStoreIT extends FlatSpec with Matchers with BeforeAndAfterAll
     val emails = dataStore.userEmails.toMap
     emails.exists(e => e._1 == "a" && e._2 == userId1) shouldBe true
     emails.exists(e => e._1 == "b" && e._2 == userId2) shouldBe true
+  }
+
+  it should "store an email verification token" in {
+    val token = VerificationToken(randomUUID(), "email@address.com", randomUUID())
+    dataStore.saveVerificationToken(token) shouldBe Right(true)
+    dataStore.readVerificationToken(token.token) shouldBe Right(token)
+  }
+
+  it should "set verification token to verified" in {
+    val token = VerificationToken(randomUUID(), "email@address.com", randomUUID())
+    dataStore.saveVerificationToken(token) shouldBe Right(true)
+    dataStore.verifyEmailToken(token.token) shouldBe Right(token.copy(verified = true))
   }
 
   val dataStoreTestHelper = DataStoreTestHelper()

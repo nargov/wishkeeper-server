@@ -7,7 +7,7 @@ import java.util.concurrent.atomic.AtomicReference
 
 import co.wishkeeper.server.Events.{DeviceNotificationIdSet, WishReservedNotificationCreated, WishUnreservedNotificationCreated}
 import co.wishkeeper.server.EventsTestHelper.EventsList
-import co.wishkeeper.server.NotificationsData.{NotificationData, PeriodicWakeup, WishReservedNotification, WishUnreservedNotification}
+import co.wishkeeper.server.NotificationsData.{PeriodicWakeup, WishReservedNotification, WishUnreservedNotification}
 import co.wishkeeper.server.messaging.{MemStateClientRegistry, NotificationsUpdated, PushNotificationSender, ServerNotification}
 import co.wishkeeper.server.{BroadcastNotification, DataStore, PushNotification}
 import com.wixpress.common.specs2.JMock

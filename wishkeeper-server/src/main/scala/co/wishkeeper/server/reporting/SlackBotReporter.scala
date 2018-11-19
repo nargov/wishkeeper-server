@@ -57,4 +57,5 @@ case class SlackData(text: String)
 
 case class SlackReportError(msg: String, reason: String) extends server.Error {
   override val message: String = "Error sending message to slack: " + reason
+  override val code: String = "slack.report"
 }

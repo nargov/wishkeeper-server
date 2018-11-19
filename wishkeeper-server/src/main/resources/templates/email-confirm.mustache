@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8"/>
+
+    <link href="https://fonts.googleapis.com/css?family=Roboto" rel="stylesheet"/>
+    <style type="text/css">
+        @import url('https://fonts.googleapis.com/css?family=Roboto');
+
+        div#root {
+            width: 768px;
+            margin: 0 auto;
+        }
+
+        div#container {
+            width: 490px;
+            margin: 0 auto;
+            font-family: Roboto, sans-serif;
+            font-size: 17px;
+            color: #717171;
+        }
+
+        a.button {
+            display: block;
+            height: 44px;
+            background-color: #de284c;
+            text-decoration: none;
+            color: white;
+            line-height: 44px;
+            text-align: center;
+            font-weight: bold;
+            border-radius: 4px;
+            margin: 45px 0 32px 0;
+        }
+
+        p {
+            line-height: 1.59
+        }
+
+        #social-buttons {
+            text-align: center;
+            margin-top: 72px
+        }
+
+        #social-buttons img {
+            margin: 0 8px;
+        }
+
+        #footer {
+            text-align: center;
+            margin: 42px 0 50px 0
+        }
+
+        #footer a {
+            text-decoration: underline;
+            color: #717171;
+        }
+    </style>
+</head>
+<body>
+<div id="root">
+    <div id="container">
+        <div style="text-align: center;">
+            <img src="http://app.media.wishkeeper.co/email-assets/wishkeeper-logo-email-header.png" style="margin: 24px 0;"/>
+        </div>
+        <p>
+            Hi {{firstName}},<br/>
+            <br/>
+            Welcome to Wishkeeper! In order to get your started, you need to confirm your email address.
+        </p>
+        <a class="button" href="http://api.wishkeeper.co/connect/new/email-confirm?t={{token}}">Confirm Email</a>
+        <p>
+            Thanks,<br/>
+            The Wishkeeper Team
+        </p>
+        <div id="social-buttons">
+            <a href="https://www.facebook.com/wishkeeper.co/"><img src="http://app.media.wishkeeper.co/email-assets/facebook.png"/></a>
+            <a href="https://twitter.com/wishkeeper"><img src="http://app.media.wishkeeper.co/email-assets/twitter.png"/></a>
+            <a href="https://www.pinterest.com/wishkeeperapp/"><img src="http://app.media.wishkeeper.co/email-assets/googleplus.png"/></a>
+            <a href="https://www.instagram.com/wishkeeperapp/"><img src="http://app.media.wishkeeper.co/email-assets/instagram.png"/></a>
+        </div>
+        <p id="footer">
+            Have a question?<br/>
+            <a href="mailto:support@wishkeeper.co">support@wishkeeper.co</a>
+        </p>
+    </div>
+</div>
+<script>
+    document.getElementById("submit-button").onclick = function() {
+      document.getElementById('confirm').submit();
+    }
+</script>
+</body>
+</html>

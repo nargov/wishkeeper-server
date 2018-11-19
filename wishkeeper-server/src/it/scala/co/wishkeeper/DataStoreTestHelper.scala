@@ -93,6 +93,19 @@ class DataStoreTestHelper extends Matchers {
          |)
        """.stripMargin
     )
+
+    session.execute(
+      s"""
+        |create table if not exists ${CassandraDataStore.emailTokensTable} (
+        | emailToken UUID,
+        | email text,
+        | userId UUID,
+        | time timestamp,
+        | verified boolean,
+        | PRIMARY KEY(emailToken)
+        |)
+      """.stripMargin
+    )
   }
 }
 

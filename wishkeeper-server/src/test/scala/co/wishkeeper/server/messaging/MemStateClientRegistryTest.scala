@@ -1,7 +1,7 @@
 package co.wishkeeper.server.messaging
 
 import java.util.UUID
-import java.util.concurrent.atomic.{AtomicBoolean, AtomicReference}
+import java.util.concurrent.atomic.AtomicReference
 
 import com.wixpress.common.specs2.JMock
 import org.specs2.mutable.Specification

@@ -2,14 +2,23 @@ package co.wishkeeper.server
 
 import java.util.UUID
 
+import cats.data.EitherT
+import cats.implicits._
 import co.wishkeeper.server.CommandProcessor.retry
 import co.wishkeeper.server.Events._
-import co.wishkeeper.server.user.commands.{ConnectFacebookUser, UserCommand, UserCommandValidator}
+import co.wishkeeper.server.messaging.EmailSender
+import co.wishkeeper.server.user.commands.{ConnectFacebookUser, CreateUserEmailFirebase, UserCommand, UserCommandValidator}
+import co.wishkeeper.server.user.{Unauthorized, UserNotFound, VerificationToken}
 import org.joda.time.DateTime
 
 import scala.annotation.tailrec
+import scala.concurrent.{ExecutionContext, Future}
 
 trait CommandProcessor {
+  def connectWithEmail(command: CreateUserEmailFirebase, emailSender: EmailSender): EitherT[Future, Error, Unit]
+
+  def connectWithFirebase(sessionId: UUID, idToken: String, email: String): Either[Error, Unit]
+
   def connectWithGoogle(command: ConnectGoogleUser): Either[Error, Unit]
 
   def process(command: UserCommand, sessionId: Option[UUID] = None): Boolean
@@ -19,7 +28,8 @@ trait CommandProcessor {
   def validatedProcess[C <: UserCommand](command: C, userId: UUID)(implicit validator: UserCommandValidator[C]): Either[Error, Unit]
 }
 
-class UserCommandProcessor(dataStore: DataStore, eventProcessors: List[EventProcessor] = Nil, google: GoogleAuthAdapter) extends CommandProcessor {
+class UserCommandProcessor(dataStore: DataStore, eventProcessors: List[EventProcessor] = Nil, google: GoogleAuthAdapter,
+                           firebaseAuth: EmailAuthProvider)(implicit ec: ExecutionContext) extends CommandProcessor {
 
   //TODO unify as much as possible
   override def process(command: UserCommand, sessionId: Option[UUID]): Boolean = {
@@ -98,19 +108,58 @@ class UserCommandProcessor(dataStore: DataStore, eventProcessors: List[EventProc
         val googleDataEvents: List[UserEvent] = googleUserData.map { data =>
           user.userProfile.birthday.fold(
             data.birthday.map(d => UserBirthdaySet(user.id, d.toString("MM/dd/yyyy")) :: Nil).getOrElse(Nil))(_ => Nil) ++
-          user.userProfile.genderData.fold(
-            data.gender.map(g => UserGenderSet2(g.gender, g.customGender, g.genderPronoun) :: Nil).getOrElse(Nil))(_ => Nil)
+            user.userProfile.genderData.fold(
+              data.gender.map(g => UserGenderSet2(g.gender, g.customGender, g.genderPronoun) :: Nil).getOrElse(Nil))(_ => Nil)
         }.toOption.getOrElse(Nil)
         val success = dataStore.saveUserEvents(user.id, dataStore.lastSequenceNum(user.id), time, events ++ googleDataEvents)
         Either.cond(success, (), DbErrorEventsNotSaved)
       }
     }
   }
+
+  override def connectWithFirebase(sessionId: UUID, idToken: String, email: String): Either[Error, Unit] = {
+    val now = DateTime.now()
+    firebaseAuth.validate(idToken).flatMap { _ =>
+      dataStore.userIdByEmail(email).map { userId =>
+        val events = UserConnected(userId, now, sessionId) :: Nil
+        val savedEvents = dataStore.saveUserEvents(userId, dataStore.lastSequenceNum(userId), now, events)
+        dataStore.saveUserSession(userId, sessionId, now)
+        if (savedEvents) publishEvents(events, userId)
+        Either.cond(savedEvents, (), DbErrorEventsNotSaved)
+      }.getOrElse(Left(UserNotFound(email)))
+    }
+  }
+
+  override def connectWithEmail(command: CreateUserEmailFirebase, emailSender: EmailSender): EitherT[Future, Error, Unit] = {
+    val verificationToken = UUID.randomUUID()
+
+    val user: User = dataStore.userIdByEmail(command.email).fold {
+      val newUser = User.createNew()
+      dataStore.saveUserByEmail(command.email, newUser.id)
+      newUser
+    }(userId => User.replay(dataStore.userEvents(userId)))
+
+    for {
+      _ <- EitherT(Future.successful(firebaseAuth.validate(command.idToken).flatMap(data =>
+        Either.cond(data.email == command.email, (), Unauthorized("Email does not match email on record")))))
+      _ <- EitherT(Future.successful(retry {
+        val events = command.process(user)
+        val saved = dataStore.saveUserEvents(user.id, None, DateTime.now(), events)
+        if (saved) publishEvents(events, user.id)
+        Either.cond(saved, (), DbErrorEventsNotSaved)
+      }))
+      _ <- EitherT(Future.successful(retry {
+        dataStore.saveVerificationToken(VerificationToken(verificationToken, command.email, user.id))
+      }))
+      result <- EitherT(emailSender.sendVerificationEmail(command.email, "do-not-replay@wishkeeper.co", "Please confirm your email",
+        verificationToken.toString, command.firstName))
+    } yield result
+  }
 }
 
 object CommandProcessor {
   @tailrec
-  def retry(f: => Either[Error, Unit], retries: Int = 50): Either[Error, Unit] = {
+  def retry[T](f: => Either[Error, T], retries: Int = 50): Either[Error, T] = {
     val result = f
     result match {
       case Left(DbErrorEventsNotSaved) if retries > 0 => retry(f, retries - 1)

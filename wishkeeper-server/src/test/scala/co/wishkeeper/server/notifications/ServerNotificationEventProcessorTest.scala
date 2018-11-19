@@ -6,10 +6,12 @@ import java.util.UUID.randomUUID
 import co.wishkeeper.server.Events._
 import co.wishkeeper.server.EventsTestHelper.EventsList
 import co.wishkeeper.server.FriendRequestStatus.Approved
-import co.wishkeeper.server.NotificationsData.{FriendRequestAcceptedNotification, FriendRequestNotification}
+import co.wishkeeper.server.NotificationsData.{EmailVerifiedNotification, FriendRequestAcceptedNotification, FriendRequestNotification, NotificationData}
 import co.wishkeeper.server.messaging._
+import co.wishkeeper.server.user.EmailNotVerified
 import co.wishkeeper.server.{DataStore, PushNotification, UserProfile}
 import com.wixpress.common.specs2.JMock
+import org.specs2.matcher.Matcher
 import org.specs2.mutable.Specification
 import org.specs2.specification.Scope
 
@@ -98,6 +100,19 @@ class ServerNotificationEventProcessorTest extends Specification with JMock {
 
     processEvent(FriendRequestAcceptedNotificationCreated(notificationId, userId, friendId, requestId))
   }
+
+  "Send push notification after email token verification" in new Context {
+    checking {
+      ignoring(clientNotifier)
+      allowing(dataStore).userEvents(userId).willReturn(EventsList(userId).withDeviceId(deviceToken).list)
+      oneOf(pushNotifications).send(having(===(deviceToken)), having(aPushNotificationWith(userId, EmailVerifiedNotification)))
+    }
+
+    processEvent(EmailVerified("email"))
+  }
+
+  def aPushNotificationWith(userId: UUID, data: NotificationData): Matcher[PushNotification] = (push: PushNotification) =>
+    (push.data == data && push.userId == userId, "This is not the push notification you were looking for")
 
   trait Friend {
     val friendName = "Friend Name"

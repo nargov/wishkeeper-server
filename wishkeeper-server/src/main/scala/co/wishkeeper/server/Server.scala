@@ -6,7 +6,7 @@ import co.wishkeeper.json._
 import co.wishkeeper.server.api.{DelegatingManagementApi, DelegatingPublicApi, ManagementApi}
 import co.wishkeeper.server.events.processing.ImageUploadEventProcessor
 import co.wishkeeper.server.image.{GoogleCloudStorageImageStore, ImageStore}
-import co.wishkeeper.server.messaging.{FirebaseConfig, FirebasePushNotificationSender, MemStateClientRegistry}
+import co.wishkeeper.server.messaging._
 import co.wishkeeper.server.notifications.{DeviceIdEventProcessor, ExecutorNotificationsScheduler, ReportingEventProcessor, ServerNotificationEventProcessor}
 import co.wishkeeper.server.projections._
 import co.wishkeeper.server.reporting.{NoOpReporter, Reporter, SlackBotReporter}
@@ -40,6 +40,7 @@ class WishkeeperServer {
     pushNotifications = pushNotifications)
   private val notificationsProjection = new DataStoreNotificationsProjection(dataStore)
   private val googleAuth = new SdkGoogleAuthAdapter
+  private val firebaseAuth = new FirebaseEmailAuthProvider
 
   private val facebookConnector: FacebookConnector = new AkkaHttpFacebookConnector(
     config.getString("wishkeeper.facebook.app-id"),
@@ -70,10 +71,12 @@ class WishkeeperServer {
     new ReportingEventProcessor(reporter, dataStore),
     deviceIdEventProcessor,
     userHistoryProjection
-  ), googleAuth)
+  ), googleAuth, firebaseAuth)
   private val userProfileProjection: UserProfileProjection = new ReplayingUserProfileProjection(dataStore)
-  private val publicApi = new DelegatingPublicApi(commandProcessor, dataStore, facebookConnector, userProfileProjection,
-    userFriendsProjection, notificationsProjection, userSearchProjection, wishImageStore, userImageStore, userHistoryProjection, googleAuth)
+  private val mailgunApiKey: String = config.getString("wishkeeper.mail.mailgun.api.key")
+  private val emailSender = new EmailSender(new MailgunEmailProvider(mailgunApiKey), new ScalateTemplateEngine)
+  private val publicApi = new DelegatingPublicApi(commandProcessor, dataStore, facebookConnector, userProfileProjection, userFriendsProjection,
+    notificationsProjection, userSearchProjection, wishImageStore, userImageStore, userHistoryProjection, googleAuth, firebaseAuth, emailSender)
   private val managementApi: ManagementApi = new DelegatingManagementApi(userIdByFacebookIdProjection, userProfileProjection,
     dataStore, commandProcessor, userSearchProjection, deviceIdEventProcessor, userHistoryProjection)
   private val webApi = new WebApi(publicApi, managementApi, clientRegistry)

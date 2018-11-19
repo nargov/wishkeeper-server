@@ -11,18 +11,24 @@ import co.wishkeeper.server.NotificationsData.{FriendRequestNotification, Notifi
 import co.wishkeeper.server.WishStatus.WishStatus
 import co.wishkeeper.server._
 import co.wishkeeper.server.image.{ImageData, ImageMetadata, ImageStore}
+import co.wishkeeper.server.messaging.{EmailProvider, EmailSender, TemplateEngineAdapter}
 import co.wishkeeper.server.projections._
 import co.wishkeeper.server.search.SimpleScanUserSearchProjection
 import co.wishkeeper.server.user._
 import co.wishkeeper.server.user.commands._
 import co.wishkeeper.server.user.events.history.{HistoryEventInstance, ReceivedWish}
 import com.wixpress.common.specs2.JMock
+import org.jmock.lib.concurrent.DeterministicExecutor
 import org.joda.time.DateTime
+import org.specs2.concurrent.ExecutionEnv
 import org.specs2.matcher.Matcher
 import org.specs2.mutable.Specification
 import org.specs2.specification.Scope
 
-class DelegatingPublicApiTest extends Specification with JMock {
+import scala.concurrent.{ExecutionContext, Future}
+import scala.util.Success
+
+class DelegatingPublicApiTest(implicit ee: ExecutionEnv) extends Specification with JMock {
 
   "returns the flags for user by the given session" in new LoggedInContext {
     checking {
@@ -303,6 +309,50 @@ class DelegatingPublicApiTest extends Specification with JMock {
     api.historyFor(userId, friendId) must beLeft[Error](NotFriends)
   }
 
+  "verify email" in new LoggedInContext {
+    val verificationToken = randomUUID()
+    checking {
+      oneOf(dataStore).verifyEmailToken(verificationToken).willReturn(Right(VerificationToken(verificationToken, "email", userId)))
+      oneOf(commandProcessor).validatedProcess(MarkEmailVerified, userId).willReturn(Right(()))
+    }
+
+    api.verifyEmail(verificationToken)
+  }
+
+  // TODO Move these tests to UserCommandProcessorTest
+//  "validate and create user by email" in new Context {
+//    val command = ConnectUserEmailFirebase("email", "token", "first-name", "last-name", "notification-id")
+//    checking {
+//      oneOf(firebaseAuth).isValidToken(command.idToken).willReturn(Right("uid"))
+//      oneOf(commandProcessor).connectWithEmail(command).willReturn(Right(()))
+//      allowing(dataStore).saveUserEvents(having(any), having(any), having(any), having(any)).willReturn(true)
+//      allowing(dataStore).saveVerificationToken(having(any)).willReturn(Right(true))
+//      allowing(emailProvider).sendEmail(having(any), having(any), having(any), having(any), having(any)).willReturn(Future.successful(Right(())))
+//      allowing(templateEngineAdapter).process(having(any), having(any)).willReturn(Success(""))
+//    }
+//
+//    api.createUserWithEmail(command)
+//    executor.runUntilIdle()
+//  }
+//
+//  "send verification email on email sign up" in new Context {
+//    val command = ConnectUserEmailFirebase("email", "token", "first-name", "last-name", "notification-id")
+//    val verificationToken = randomUUID()
+//    val processedTemplate = s"template-content"
+//    checking {
+//      allowing(firebaseAuth).isValidToken(command.idToken).willReturn(Right("uid"))
+//      allowing(commandProcessor).connectWithEmail(command).willReturn(Right(()))
+//      oneOf(dataStore).saveVerificationToken(having(any[VerificationToken])).willReturn(Right(true))
+//      oneOf(templateEngineAdapter).process(having(===(EmailSender.verificationEmailTemplate)),
+//        having(haveKeys("token", "firstName"))
+//      ).willReturn(Success(processedTemplate))
+//      oneOf(emailProvider).sendEmail(having(===(command.email)), having(any[String]), having(any[String]), having(any[String]),
+//        having(===(processedTemplate)))
+//    }
+//    api.createUserWithEmail(command)
+//    executor.runUntilIdle()
+//  }
+
   def userWishesWith(wishId: UUID, wishName: String): Matcher[UserWishes] = contain(aWishWith(wishId, wishName)) ^^ {(_: UserWishes).wishes}
 
   def aWishWith(id: UUID, name: String): Matcher[Wish] = (wish: Wish) =>
@@ -323,6 +373,12 @@ class DelegatingPublicApiTest extends Specification with JMock {
     val userHistoryProjection = mock[UserHistoryProjection]
     val userImageStore = mock[ImageStore]
     val googleAuth = mock[GoogleAuthAdapter]
+    val firebaseAuth = mock[EmailAuthProvider]
+    val emailProvider = mock[EmailProvider]
+    val templateEngineAdapter = mock[TemplateEngineAdapter]
+    val emailSender = new EmailSender(emailProvider, templateEngineAdapter)
+    val executor = new DeterministicExecutor
+
     val api: PublicApi = new DelegatingPublicApi(
       commandProcessor,
       dataStore,
@@ -334,8 +390,10 @@ class DelegatingPublicApiTest extends Specification with JMock {
       null,
       userImageStore,
       userHistoryProjection,
-      googleAuth
-    )(null, null, null)
+      googleAuth,
+      firebaseAuth,
+      emailSender
+    )(null, ExecutionContext.fromExecutor(executor), null)
     val friendId: UUID = randomUUID()
     val friendRequestId = randomUUID()
     val notificationData = FriendRequestNotification(friendId, friendRequestId)

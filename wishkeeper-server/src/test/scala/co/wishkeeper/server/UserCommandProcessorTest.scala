@@ -5,13 +5,15 @@ import java.util.UUID
 import co.wishkeeper.server.Events._
 import co.wishkeeper.server.EventsTestHelper.{EventsList, asEventInstants, userConnectEvent}
 import co.wishkeeper.server.user.{DummyError, Gender}
-import co.wishkeeper.server.user.commands.{ConnectFacebookUser, SetFacebookUserInfo, UserCommand, UserCommandValidator}
+import co.wishkeeper.server.user.commands._
 import com.wixpress.common.specs2.JMock
+import org.jmock.lib.concurrent.DeterministicExecutor
 import org.joda.time.{DateTime, LocalDate}
 import org.specs2.matcher.{Matcher, MatcherMacros}
 import org.specs2.mutable.Specification
 import org.specs2.specification.Scope
 
+import scala.concurrent.ExecutionContext
 import scala.language.experimental.macros
 
 class UserCommandProcessorTest extends Specification with JMock with MatcherMacros {
@@ -138,21 +140,20 @@ class UserCommandProcessorTest extends Specification with JMock with MatcherMacr
     commandProcessor.validatedProcess(DummyCommand(NoOp :: Nil), userId)(alwaysValid)
   }
 
-  "validate google id token when connecting with google" in new GoogleConnectContext {
+  "validate google id token when connecting with google" in new ConnectContext {
     assumeNewUser()
     ignoringSaveUserEvents()
     ignoringSaveUserSession()
     checking {
       ignoring(dataStore).saveUserByEmail(having(any), having(any))
       allowing(dataStore).userIdByEmail(email).willReturn(None)
-      allowing(dataStore).userByGoogleId(googleUserId).willReturn(None)
       oneOf(googleAuth).validateIdToken(idToken).willReturn(Right(googleUser))
     }
 
     commandProcessor.connectWithGoogle(ConnectGoogleUser(accessToken, idToken, sessionId))
   }
 
-  "return error if google id fails validation" in new GoogleConnectContext {
+  "return error if google id fails validation" in new ConnectContext {
     checking {
       allowing(googleAuth).validateIdToken(idToken).willReturn(Left(GoogleAuthError("error message")))
     }
@@ -160,13 +161,12 @@ class UserCommandProcessorTest extends Specification with JMock with MatcherMacr
     commandProcessor.connectWithGoogle(ConnectGoogleUser(accessToken, idToken, sessionId)) must beLeft(anInstanceOf[GoogleAuthError])
   }
 
-  "save user session when connecting with google" in new GoogleConnectContext {
+  "save user session when connecting with google" in new ConnectContext {
     assumeNewUser()
     ignoringSaveUserEvents()
     checking {
       ignoring(dataStore).saveUserByEmail(having(any), having(any))
       allowing(dataStore).userIdByEmail(email).willReturn(None)
-      allowing(dataStore).userByGoogleId(googleUserId).willReturn(None)
       allowing(googleAuth).validateIdToken(idToken).willReturn(Right(googleUser))
       oneOf(dataStore).saveUserSession(having(any[UUID]), having(===(sessionId)), having(any[DateTime])).willReturn(true)
     }
@@ -174,13 +174,12 @@ class UserCommandProcessorTest extends Specification with JMock with MatcherMacr
     commandProcessor.connectWithGoogle(ConnectGoogleUser(accessToken, idToken, sessionId))
   }
 
-  "save user connection event when connecting with google" in new GoogleConnectContext {
+  "save user connection event when connecting with google" in new ConnectContext {
     assumeNewUser()
     ignoringSaveUserSession()
     checking {
       ignoring(dataStore).saveUserByEmail(having(any), having(any))
       allowing(dataStore).userIdByEmail(email).willReturn(None)
-      allowing(dataStore).userByGoogleId(googleUserId).willReturn(None)
       allowing(googleAuth).validateIdToken(idToken).willReturn(Right(googleUser))
       oneOf(dataStore).saveUserEvents(having(any[UUID]), having(beNone), having(any[DateTime]), having(contain(anInstanceOf[UserConnected])))
         .willReturn(true)
@@ -189,7 +188,7 @@ class UserCommandProcessorTest extends Specification with JMock with MatcherMacr
     commandProcessor.connectWithGoogle(ConnectGoogleUser(accessToken, idToken, sessionId))
   }
 
-  "connect existing user if found by email" in new GoogleConnectContext {
+  "connect existing user if found by email" in new ConnectContext {
     assumeExistingUser()
     checking {
       allowing(googleAuth).validateIdToken(idToken).willReturn(Right(googleUser))
@@ -202,7 +201,7 @@ class UserCommandProcessorTest extends Specification with JMock with MatcherMacr
     commandProcessor.connectWithGoogle(ConnectGoogleUser(accessToken, idToken, sessionId))
   }
 
-  "save google user events for user data" in new GoogleConnectContext {
+  "save google user events for user data" in new ConnectContext {
     assumeExistingUser()
     checking {
       allowing(googleAuth).validateIdToken(idToken).willReturn(Right(googleUser))
@@ -221,7 +220,7 @@ class UserCommandProcessorTest extends Specification with JMock with MatcherMacr
     commandProcessor.connectWithGoogle(ConnectGoogleUser(accessToken, idToken, sessionId))
   }
 
-  "not save google user data if already set" in new GoogleConnectContext {
+  "not save google user data if already set" in new ConnectContext {
     assumeHasSequenceNum()
 
     checking {
@@ -249,7 +248,7 @@ class UserCommandProcessorTest extends Specification with JMock with MatcherMacr
     commandProcessor.connectWithGoogle(ConnectGoogleUser(accessToken, idToken, sessionId))
   }
 
-  "save user by email when connecting with google" in new GoogleConnectContext {
+  "save user by email when connecting with google" in new ConnectContext {
     assumeNewUser()
     ignoringSaveUserEvents()
     ignoringSaveUserSession()
@@ -262,7 +261,7 @@ class UserCommandProcessorTest extends Specification with JMock with MatcherMacr
     commandProcessor.connectWithGoogle(ConnectGoogleUser(accessToken, idToken, sessionId))
   }
 
-  "save events for gender and birthday from google user data" in new GoogleConnectContext {
+  "save events for gender and birthday from google user data" in new ConnectContext {
     assumeExistingUser()
 
     checking {
@@ -278,12 +277,29 @@ class UserCommandProcessorTest extends Specification with JMock with MatcherMacr
     commandProcessor.connectWithGoogle(ConnectGoogleUser(accessToken, idToken, sessionId))
   }
 
+  "connect with existing firebase user" in new ConnectContext {
+    assumeExistingUser()
+
+    checking {
+      allowing(dataStore).userIdByEmail(email).willReturn(Option(userId))
+      oneOf(firebaseAuth).validate(authToken).willReturn(Right(EmailAuthData(email, verified = true)))
+      oneOf(dataStore).saveUserSession(having(===(userId)), having(===(sessionId)), having(any[DateTime]))
+      oneOf(dataStore).saveUserEvents(having(===(userId)), having(any[Some[Long]]), having(any[DateTime]), having(contain(
+        anInstanceOf[UserConnected]
+      )))
+    }
+
+    commandProcessor.connectWithFirebase(sessionId, authToken, email)
+  }
+
 
   trait Context extends Scope {
     val userId: UUID = UUID.randomUUID()
     val dataStore: DataStore = mock[DataStore]
     val googleAuth = mock[GoogleAuthAdapter]
-    val commandProcessor: CommandProcessor = new UserCommandProcessor(dataStore, Nil, googleAuth)
+    val firebaseAuth = mock[EmailAuthProvider]
+    implicit val ec = ExecutionContext.fromExecutor(new DeterministicExecutor)
+    val commandProcessor: CommandProcessor = new UserCommandProcessor(dataStore, Nil, googleAuth, firebaseAuth)
     val sessionId: UUID = UUID.randomUUID()
     val facebookId = "facebook-id"
     val authToken = "auth-token"
@@ -329,14 +345,14 @@ class UserCommandProcessorTest extends Specification with JMock with MatcherMacr
 
   trait EventProcessorContext extends Context {
     val eventProcessor: EventProcessor = mock[EventProcessor]
-    override val commandProcessor = new UserCommandProcessor(dataStore, eventProcessor :: Nil, googleAuth)
+    override val commandProcessor = new UserCommandProcessor(dataStore, eventProcessor :: Nil, googleAuth, firebaseAuth)
 
     def ignoringProcessFacebookIdSet() = checking {
       ignoring(eventProcessor).process(having(any[UserFacebookIdSet]), having(any[UUID])).willReturn(Nil)
     }
   }
 
-  trait GoogleConnectContext extends Context {
+  trait ConnectContext extends Context {
     val googleUserId = "google user id"
     val email = "user@gmail.com"
     val givenName = "Bob"

@@ -33,13 +33,15 @@ object SendFriendRequest {
 case class SetFlagFacebookFriendsListSeen(seen: Boolean = true) extends UserCommand {
   override def process(user: User): List[UserEvent] = FacebookFriendsListSeen(seen) :: Nil
 }
-object SetFlagFacebookFriendsListSeen{
+
+object SetFlagFacebookFriendsListSeen {
   implicit val validator: UserCommandValidator[SetFlagFacebookFriendsListSeen] = Always
 }
 
 case class SetFlagGoogleFriendsListSeen(seen: Boolean = true) extends UserCommand {
   override def process(user: User): List[UserEvent] = GoogleFriendsListSeen(seen) :: Nil
 }
+
 case object SetFlagGoogleFriendsListSeen {
   implicit val validator: UserCommandValidator[SetFlagGoogleFriendsListSeen] = Always
 }
@@ -134,11 +136,12 @@ case class SetGeneralSettings(generalSettings: GeneralSettings) extends UserComm
 
     val vibrateEnabled: List[UserEvent] = if (settings.vibrate != generalSettings.vibrate)
       GeneralSettingVibrateEnabledSet(generalSettings.vibrate) :: Nil
-      else Nil
+    else Nil
 
     pushEnabled ++ vibrateEnabled
   }
 }
+
 object SetGeneralSettings {
   implicit val validator: UserCommandValidator[SetGeneralSettings] = Always
 }
@@ -146,6 +149,7 @@ object SetGeneralSettings {
 case class SetUserBirthday(birthday: LocalDate) extends UserCommand {
   override def process(user: User): List[UserEvent] = UserBirthdaySet(user.id, birthday.toString("MM/dd/yyyy")) :: Nil
 }
+
 object SetUserBirthday {
   implicit val validator: UserCommandValidator[SetUserBirthday] = Always
 }
@@ -153,6 +157,28 @@ object SetUserBirthday {
 case class SetAnniversary(anniversary: LocalDate) extends UserCommand {
   override def process(user: User): List[UserEvent] = UserAnniversarySet(anniversary.toString("MM/dd/yyyy")) :: Nil
 }
+
 object SetAnniversary {
   implicit val validator: UserCommandValidator[SetAnniversary] = Always
+}
+
+case class CreateUserEmailFirebase(email: String, idToken: String, firstName: String, lastName: String, notificationId: String) extends UserCommand {
+
+  override def process(user: User): List[UserEvent] = {
+    List(
+      EmailConnectStarted(user.id),
+      UserFirstNameSet(user.id, firstName),
+      UserLastNameSet(user.id, lastName),
+      DeviceNotificationIdSet(notificationId)
+    ) ++ user.userProfile.email.fold(List(UserEmailSet(user.id, email)))(_ => Nil)
+  }
+}
+
+object CreateUserEmailFirebase {
+  implicit val validator: UserCommandValidator[CreateUserEmailFirebase] = Always
+}
+
+case object MarkEmailVerified extends UserCommand {
+  override def process(user: User): List[UserEvent] = user.userProfile.email.fold[List[UserEvent]](Nil)(email => List(EmailVerified(email)))
+  implicit val validator: UserCommandValidator[MarkEmailVerified.type] = Always
 }

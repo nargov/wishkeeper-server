@@ -8,7 +8,7 @@ import co.wishkeeper.server._
 
 class DeviceIdEventProcessor(topicManager: TopicManager, dataStore: DataStore) extends EventProcessor {
   def resubscribeAll(): Unit = {
-    val deviceIds = dataStore.allUserEvents(classOf[DeviceNotificationIdSet]).map {
+    val deviceIds = dataStore.allUserEvents(classOf[DeviceNotificationIdSet]).collect {
       case UserEventInstance(_, Events.DeviceNotificationIdSet(id), _) => id
     }
     topicManager.subscribeTo(PushNotificationSender.periodicWakeup, deviceIds.toList)

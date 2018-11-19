@@ -10,8 +10,8 @@ case class ConnectGoogleUser(accessToken: String, idToken: String, sessionId: UU
   override def process(user: User): List[Events.UserEvent] = UserConnected(user.id, DateTime.now(), sessionId) :: Nil
 }
 
+case class ConnectFirebaseUser(idToken: String, sessionId: UUID, email: String)
+
 trait ConnectCommand extends UserCommand {
   def sessionId: UUID
 }
-
-

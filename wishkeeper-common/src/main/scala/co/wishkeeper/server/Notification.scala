@@ -40,6 +40,7 @@ object NotificationsData {
                                         reserverProfile: Option[UserProfile] = None,
                                         wishName: Option[String] = None) extends WishNotification
 
+  case object EmailVerifiedNotification extends NotificationData
 }
 
 case class Notification(id: UUID, data: NotificationData, viewed: Boolean = false, time: DateTime = DateTime.now())

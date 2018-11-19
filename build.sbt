@@ -1,4 +1,4 @@
-val circeVersion = "0.9.3"
+val circeVersion = "0.10.1"
 val dockerTestKitVersion = "0.9.0"
 val logbackVersion = "1.2.1"
 val specs2Version = "4.2.0"
@@ -78,9 +78,9 @@ lazy val server = (project in file("wishkeeper-server")).
     name := "wishkeeper-server",
     resolvers += Resolver.bintrayRepo("hseeberger", "maven"),
     libraryDependencies ++= Seq(
-      "com.typesafe.akka" %% "akka-http" % "10.1.1",
-      "com.typesafe.akka" %% "akka-http-testkit" % "10.1.1",
-      "de.heikoseeberger" %% "akka-http-circe" % "1.20.1",
+      "com.typesafe.akka" %% "akka-http" % "10.1.5",
+      "com.typesafe.akka" %% "akka-http-testkit" % "10.1.5",
+      "de.heikoseeberger" %% "akka-http-circe" % "1.22.0",
       "com.datastax.cassandra" % "cassandra-driver-core" % "3.2.0",
       "org.slf4j" % "slf4j-api" % "1.7.22",
       "commons-io" % "commons-io" % "2.5",
@@ -95,7 +95,8 @@ lazy val server = (project in file("wishkeeper-server")).
       "com.google.firebase" % "firebase-admin" % "6.2.0",
       "com.sksamuel.scrimage" %% "scrimage-core" % "2.1.8"
         exclude("commons-io", "commons-io"),
-      "io.appium" % "java-client" % "5.0.0-BETA6" % "it" exclude("com.codeborne", "phantomjsdriver")
+      "io.appium" % "java-client" % "5.0.0-BETA6" % "it" exclude("com.codeborne", "phantomjsdriver"),
+      "org.scalatra.scalate" %% "scalate-core" % "1.9.0"
     ),
     packAutoSettings,
     addArtifact(Artifact("wishkeeper-server", "Bundled Archive", "tar.gz"), packArchiveTgz).settings

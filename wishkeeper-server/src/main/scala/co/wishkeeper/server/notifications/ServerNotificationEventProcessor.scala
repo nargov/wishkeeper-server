@@ -57,6 +57,11 @@ class ServerNotificationEventProcessor(notifier: ClientNotifier,
           },
           n.id,
           notificationStillExists(userId, n.id))
+      case _: EmailVerified =>
+        val user = User.replay(dataStore.userEvents(userId))
+        user.settings.deviceNotificationId.foreach{deviceId =>
+          pushNotifications.send(deviceId, PushNotification(user.id, UUID.randomUUID(), EmailVerifiedNotification))
+        }
       case _ =>
     }
     Nil

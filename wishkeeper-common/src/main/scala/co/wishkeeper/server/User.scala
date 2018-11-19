@@ -128,10 +128,13 @@ case class User(id: UUID,
 
 object User {
   def replay(events: List[UserEventInstant[_ <: UserEvent]]): User = {
-    events.headOption.map {
-      case UserEventInstant(UserConnected(userId, time, _), _) =>
-        events.foldLeft(User(userId, created = time))((user, instant) => user.applyEvent(instant))
-    }.getOrElse(throw new IllegalArgumentException("Event stream does not begin with UserConnected"))
+    events match {
+      case UserEventInstant(UserConnected(userId, _, _), time) :: _ =>
+        events.foldLeft(User(userId, created = time))((user, eventInstant) => user.applyEvent(eventInstant))
+      case UserEventInstant(EmailConnectStarted(userId), time) :: _ =>
+        events.foldLeft(User(userId, created = time))((user, eventInstant) => user.applyEvent(eventInstant))
+      case _ => throw new IllegalArgumentException("Invalid or corrupted user event stream")
+    }
   }
 
   def createNew() = new User(UUID.randomUUID())

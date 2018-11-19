@@ -14,6 +14,8 @@ object Events {
 
   case object NoOp extends UserEvent
 
+  case class EmailConnectStarted(userId: UUID) extends UserEvent
+
   case class UserConnected(userId: UUID, time: DateTime = DateTime.now(), sessionId: UUID) extends UserEvent
 
   case class UserFacebookIdSet(userId: UUID, facebookId: String) extends UserEvent
@@ -97,6 +99,8 @@ object Events {
   case class GeneralSettingPushNotificationEnabledSet(enabled: Boolean) extends UserEvent
 
   case class GeneralSettingVibrateEnabledSet(enabled: Boolean) extends UserEvent
+
+  case class EmailVerified(email: String) extends UserEvent
 }
 
 case class UserEventInstant[E <: UserEvent](event: E, time: DateTime)

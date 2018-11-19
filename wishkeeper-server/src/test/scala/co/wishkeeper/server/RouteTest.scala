@@ -348,7 +348,7 @@ class RouteTest extends Specification with Specs2RouteTest with JMock {
 
       Get(s"/users/wishes/${friendId.toString}").withHeaders(sessionIdHeader) ~> webApi.userRoute ~> check {
         status must beEqualTo(StatusCodes.Forbidden)
-        responseAs[ValidationError] must beEqualTo(NotFriends)
+        responseAs[Map[String, String]] must havePair("code", NotFriends.code) and havePair("message", NotFriends.message)
       }
     }
 
@@ -705,19 +705,60 @@ class RouteTest extends Specification with Specs2RouteTest with JMock {
         responseAs[PotentialFriends] must beEqualTo(PotentialFriends())
       }
     }
+
+
+    "Connect with firebase auth" in new NotLoggedInContext {
+      val idToken = "id-token"
+      val email = "email"
+      val command = ConnectFirebaseUser(idToken, sessionId, email)
+
+      checking {
+        oneOf(publicApi).connectFirebaseUser(sessionId, idToken, email).willReturn(Right(()))
+      }
+
+      Post("/connect/firebase").withEntity(ContentTypes.`application/json`, command.asJson.noSpaces) ~> webApi.newUserRoute ~> check {
+        status must beEqualTo(StatusCodes.OK)
+      }
+    }
+
+    "Sign up with new email/password" in new NotLoggedInContext {
+      val idToken = "id-token"
+      val email = "email"
+      val command = CreateUserEmailFirebase(email, idToken, "firstName", "lastName", "notificationId")
+
+      checking {
+        oneOf(publicApi).createUserWithEmail(command).willReturn(Future.successful(Right(())))
+      }
+
+      Post("/connect/new/email").withEntity(ContentTypes.`application/json`, command.asJson.noSpaces) ~> webApi.newUserRoute ~> check {
+        status must beEqualTo(StatusCodes.OK)
+      }
+    }
+
+    "Verify email" in new NotLoggedInContext {
+      val verificationToken = randomUUID()
+
+      checking {
+        oneOf(publicApi).verifyEmail(verificationToken).willReturn(Right(()))
+      }
+
+      Get(s"/connect/new/email-confirm?t=$verificationToken") ~> webApi.newUserRoute ~> check {
+        status must beEqualTo(StatusCodes.OK)
+      }
+    }
   }
 
   trait BaseContext extends Scope {
     val publicApi = mock[PublicApi]
     val managementApi = mock[ManagementApi]
+    val sessionId = randomUUID()
+    val userId = randomUUID()
 
     val webApi = new WebApi(publicApi, managementApi, new MemStateClientRegistry)
   }
 
   trait LoggedInUserContext extends BaseContext {
     val wishId = randomUUID()
-    val sessionId = randomUUID()
-    val userId = randomUUID()
     val friendId = randomUUID()
     val requestId = randomUUID()
     val sessionIdHeader = RawHeader(WebApi.sessionIdHeader, sessionId.toString)
@@ -733,10 +774,6 @@ class RouteTest extends Specification with Specs2RouteTest with JMock {
   }
 
   def aPotentialFriendWith(id: UUID, name: String): Matcher[PotentialFriend] =
-    (===(name) ^^ {
-      (_: PotentialFriend).name
-    }) and (===(id) ^^ {
-      (_: PotentialFriend).userId
-    })
+    (===(name) ^^ ((_: PotentialFriend).name)) and (===(id) ^^ ((_: PotentialFriend).userId))
 
 }

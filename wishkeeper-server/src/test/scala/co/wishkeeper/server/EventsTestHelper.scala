@@ -79,7 +79,8 @@ object EventsTestHelper {
   }
 
   object EventsList {
-    def apply(userId: UUID, created: DateTime = DateTime.now()): EventsList = EventsList(userId, asEventInstants(List(userConnectEvent(userId, created))))
+    def apply(userId: UUID, created: DateTime = DateTime.now()): EventsList =
+      EventsList(userId, asEventInstant(userConnectEvent(userId, created), created) :: Nil)
   }
 
 }

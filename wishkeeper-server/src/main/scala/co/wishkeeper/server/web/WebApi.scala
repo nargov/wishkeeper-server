@@ -12,6 +12,7 @@ import akka.http.scaladsl.model.{HttpRequest, StatusCodes}
 import akka.http.scaladsl.server.Directives.{as, complete, entity, get, headerValueByName, path, pathPrefix, post, _}
 import akka.http.scaladsl.server._
 import akka.http.scaladsl.server.directives.{DebuggingDirectives, LoggingMagnet}
+import akka.http.scaladsl.unmarshalling.Unmarshaller
 import akka.http.scaladsl.{Http, HttpExt}
 import akka.stream.scaladsl.{Flow, Sink, Source, SourceQueueWithComplete, StreamConverters}
 import akka.stream.{ActorMaterializer, OverflowStrategy}
@@ -24,7 +25,7 @@ import co.wishkeeper.server.search.SearchQuery
 import co.wishkeeper.server.user._
 import co.wishkeeper.server.user.commands._
 import co.wishkeeper.server.web.WebApi.{imageDimensionsHeader, sessionIdHeader}
-import co.wishkeeper.server.{ConnectGoogleUser, Error, GeneralError, GeneralSettings}
+import co.wishkeeper.server.{ConnectFirebaseUser, ConnectGoogleUser, Error, GeneralError, GeneralSettings}
 import de.heikoseeberger.akkahttpcirce.FailFastCirceSupport._
 import io.circe.generic.extras.Configuration
 import io.circe.generic.extras.auto._
@@ -42,6 +43,10 @@ class WebApi(publicApi: PublicApi, managementApi: ManagementApi, clientRegistry:
   private implicit val timeout: Timeout = 4.seconds
 
   private implicit val circeConfig = Configuration.default.withDefaults
+
+  private implicit val uuidUnmarshaller: Unmarshaller[String, UUID] = Unmarshaller.apply[String, UUID](ec => uuid => Try {
+    UUID.fromString(uuid)
+  }.fold(Future.failed, Future.successful))
 
   val printer: LoggingAdapter => HttpRequest => RouteResult => Unit = logging => req => res => {
     logging.info(req.toString)
@@ -248,8 +253,41 @@ class WebApi(publicApi: PublicApi, managementApi: ManagementApi, clientRegistry:
 
   }
 
-  val connectGoogleUser: Route = pathPrefix("connect" / "google") {
+
+  val connectGoogleUser: Route = pathPrefix("google") {
     entity(as[ConnectGoogleUser]) { connect => handleCommandResult(publicApi.connectGoogleUser(connect)) }
+  }
+
+  val connectFirebaseUser: Route = pathPrefix("firebase") {
+    entity(as[ConnectFirebaseUser]) { connect =>
+      handleCommandResult(publicApi.connectFirebaseUser(connect.sessionId, connect.idToken, connect.email))
+    }
+  }
+
+  val createUserByEmail: Route = (pathPrefix("email") & post) {
+    entity(as[CreateUserEmailFirebase]) { command =>
+      onComplete(publicApi.createUserWithEmail(command)) {
+        case Success(value) => handleCommandResult(value)
+        case Failure(exception) => complete(StatusCodes.InternalServerError, GeneralError(exception.getMessage))
+      }
+    }
+  }
+
+  val verifyEmail: Route = pathPrefix("email-confirm") {
+    parameter('t.as[UUID]) { token =>
+      handleCommandResult(publicApi.verifyEmail(token))
+    }
+  }
+
+  val createUser: Route = pathPrefix("new") {
+    createUserByEmail ~
+      verifyEmail
+  }
+
+  val connect: Route = pathPrefix("connect") {
+    connectGoogleUser ~
+      connectFirebaseUser ~
+      createUser
   }
 
   val setFacebookFriendsFlag: UUID => Route = userId => path("facebook-friends") {
@@ -286,7 +324,7 @@ class WebApi(publicApi: PublicApi, managementApi: ManagementApi, clientRegistry:
         search(userId)
     } ~
       websocket ~
-      connectGoogleUser
+      connect
 
   val userRoute: Route = DebuggingDirectives.logRequestResult(LoggingMagnet(printer)) {
     pathPrefix("users") {

@@ -6,6 +6,7 @@ import java.util.concurrent.atomic.AtomicReference
 
 import co.wishkeeper.json._
 import co.wishkeeper.server.Events.UserEvent
+import co.wishkeeper.server.user.VerificationToken
 import co.wishkeeper.server.user.events.history.{HistoryEvent, HistoryEventInstance}
 import com.datastax.driver.core._
 import io.circe.generic.extras
@@ -15,12 +16,17 @@ import io.circe.syntax._
 import org.joda.time.DateTime
 
 import scala.collection.JavaConverters._
+import scala.util.Try
 
 
 trait DataStore {
-  def userEmails: Iterator[(String, UUID)]
+  def verifyEmailToken(token: UUID): Either[Error, VerificationToken]
 
-  def userByGoogleId(googleUserId: String): Option[UUID]
+  def readVerificationToken(token: UUID): Either[Error, VerificationToken]
+
+  def saveVerificationToken(token: VerificationToken): Either[Error, Boolean]
+
+  def userEmails: Iterator[(String, UUID)]
 
   def deleteWishHistoryEvent(userId: UUID, wishId: UUID): Boolean
 
@@ -67,6 +73,7 @@ case class DataStoreConfig(addresses: List[String])
 
 class CassandraDataStore(dataStoreConfig: DataStoreConfig) extends DataStore {
 
+
   import CassandraDataStore._
 
   private implicit val circeConfig = extras.Configuration.default.withDefaults
@@ -79,11 +86,14 @@ class CassandraDataStore(dataStoreConfig: DataStoreConfig) extends DataStore {
   private lazy val selectMaxSeq = session.prepare(s"select seqMax from $userEventsTable where userId = :userId")
   private lazy val insertMaxSeq = session.prepare(s"insert into $userEventsTable (userId, seqMax) values (:userId, :newMax) if not exists")
   private lazy val updateMaxSeq = session.prepare(s"update $userEventsTable set seqMax = :newMax where userId = :userId if seqMax = :oldMax")
-  private lazy val insertEvent = session.prepare(s"insert into $userEventsTable (userId, seq, time, event) values (:userId, :seq, :time, :event)")
+  private lazy val insertEvent = session.prepare(
+    s"insert into $userEventsTable (userId, seq, time, event) values (:userId, :seq, :time, :event)")
   private lazy val selectUserEvents = session.prepare(s"select userId, seq, time, event from $userEventsTable where userId = :userId")
-  private lazy val insertUserSession = session.prepare(s"insert into $userSession (sessionId, userId, created) values (:sessionId, :userId, :created)")
+  private lazy val insertUserSession = session.prepare(
+    s"insert into $userSession (sessionId, userId, created) values (:sessionId, :userId, :created)")
   private lazy val selectUserSession = session.prepare(s"select * from $userSession where sessionId = :sessionId")
-  private lazy val insertUserByFacebookId = session.prepare(s"insert into $userByFacebookId (facebookId, userId) values (:facebookId, :userId)")
+  private lazy val insertUserByFacebookId = session.prepare(
+    s"insert into $userByFacebookId (facebookId, userId) values (:facebookId, :userId)")
   private lazy val selectUserByFacebookId = session.prepare(s"select userId from $userByFacebookId where facebookId = :facebookId")
   private lazy val selectUsersByFacebookIds = session.prepare(s"select facebookId, userId from $userByFacebookId where facebookId in :idList")
   private lazy val insertUserByEmail = session.prepare(s"insert into $userByEmailTable (email, userId) values (:email, :userId) if not exists")
@@ -99,6 +109,10 @@ class CassandraDataStore(dataStoreConfig: DataStoreConfig) extends DataStore {
   private lazy val selectUserHistory = session.prepare(s"select * from $historyTable where userId = :userId")
   private lazy val truncateHistoryTable = session.prepare(s"truncate table $historyTable")
   private lazy val deleteUserHistoryByWishId = session.prepare(s"delete from $historyTable where userId = :userId and wishId = :wishId")
+  private lazy val insertVerificationToken = session.prepare(
+    s"insert into $emailTokensTable (emailToken, email, userId, time, verified) values (:emailToken, :email, :userId, :time, :verified)")
+  private lazy val selectVerificationToken = session.prepare(s"select * from $emailTokensTable where emailToken = :emailToken")
+  private lazy val setTokenVerified = session.prepare(s"update $emailTokensTable set verified = true where emailToken = :emailToken")
 
 
   override def saveUserEvents(userId: UUID, lastSeqNum: Option[Long], time: DateTime, events: Seq[UserEvent]): Boolean = {
@@ -263,10 +277,34 @@ class CassandraDataStore(dataStoreConfig: DataStoreConfig) extends DataStore {
   override def deleteWishHistoryEvent(userId: UUID, wishId: UUID): Boolean =
     session.execute(deleteUserHistoryByWishId.bind().setUUID("userId", userId).setUUID("wishId", wishId)).wasApplied()
 
-  override def userByGoogleId(googleUserId: String): Option[UUID] = None
-
   override def userEmails: Iterator[(String, UUID)] = session.execute(selectAllUserByEmailEntries.bind()).iterator().asScala
     .map(row => row.getString("email") -> row.getUUID("userId"))
+
+  override def saveVerificationToken(token: VerificationToken): Either[Error, Boolean] = Try {
+    session.execute(insertVerificationToken.bind()
+      .setUUID("emailToken", token.token)
+      .setString("email", token.email)
+      .setUUID("userId", token.userId)
+      .setTimestamp("time", token.created.toDate)
+      .setBool("verified", false)
+    ).wasApplied()
+  }.toEither.left.map(x => DatabaseError(x.getMessage, x))
+
+  override def readVerificationToken(token: UUID): Either[Error, VerificationToken] = Try {
+    val row = session.execute(selectVerificationToken.bind().setUUID("emailToken", token)).one()
+    VerificationToken(
+      token,
+      row.getString("email"),
+      row.getUUID("userId"),
+      new DateTime(row.getTimestamp("time")),
+      row.getBool("verified"))
+  }.toEither.left.map(x => DatabaseError(x.getMessage, x))
+
+  override def verifyEmailToken(token: UUID): Either[Error, VerificationToken] = Try {
+    session.execute(setTokenVerified.bind().setUUID("emailToken", token)).wasApplied()
+  }.toEither.left.map(x => DatabaseError(x.getMessage, x))
+    .flatMap(wasApplied => Either.cond[Error, Unit](wasApplied, (), DatabaseSaveError("Error saving verified email token status")))
+    .flatMap(_ => readVerificationToken(token))
 
   override def close(): Unit = {
     session.close()
@@ -286,7 +324,8 @@ object CassandraDataStore {
   val userByEmailTable: String = keyspace + ".user_by_email"
   val userByNameTable: String = keyspace + ".user_by_name"
   val historyTable: String = keyspace + ".history"
+  val emailTokensTable: String = keyspace + ".email_tokens"
 }
 
-case class UserNameSearchRow(userId: UUID, name: String, picture: Option[String] = None, firstName: Option[String] = None,
-                             lastName: Option[String] = None)
+case class UserNameSearchRow(userId: UUID, name: String, picture: Option[String] = None,
+                             firstName: Option[String] = None, lastName: Option[String] = None)

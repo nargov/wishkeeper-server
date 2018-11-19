@@ -95,6 +95,8 @@ class SdkGoogleAuthAdapter extends GoogleAuthAdapter {
   }
 }
 
-case class GoogleAuthError(message: String) extends Error
+case class GoogleAuthError(message: String) extends Error {
+  override val code: String = "auth.google"
+}
 
 case class GoogleUserData(birthday: Option[LocalDate] = None, gender: Option[GenderData] = None)

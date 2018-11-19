@@ -7,10 +7,12 @@ import java.util.UUID
 
 import akka.actor.ActorSystem
 import akka.stream.ActorMaterializer
+import cats.implicits._
 import co.wishkeeper.server.FriendRequestStatus.{Approved, Ignored}
 import co.wishkeeper.server.WishStatus.{Active, Reserved, WishStatus}
 import co.wishkeeper.server._
 import co.wishkeeper.server.image._
+import co.wishkeeper.server.messaging.EmailSender
 import co.wishkeeper.server.projections._
 import co.wishkeeper.server.search.{SearchQuery, UserSearchProjection, UserSearchResults}
 import co.wishkeeper.server.user.commands._
@@ -23,6 +25,12 @@ import scala.concurrent.{ExecutionContext, Future}
 import scala.util.Try
 
 trait PublicApi {
+
+  def verifyEmail(verificationToken: UUID): Either[Error, Unit]
+
+  def createUserWithEmail(command: CreateUserEmailFirebase): Future[Either[Error, Unit]]
+
+  def connectFirebaseUser(sessionId: UUID, idToken: String, email: String): Either[Error, Unit]
 
   def googlePotentialFriends(userId: UUID, accessToken: String): Either[Error, PotentialFriends]
 
@@ -125,7 +133,9 @@ class DelegatingPublicApi(commandProcessor: CommandProcessor,
                           imageStore: ImageStore,
                           userImageStore: ImageStore,
                           userHistoryProjection: UserHistoryProjection,
-                          googleAuth: GoogleAuthAdapter)
+                          googleAuth: GoogleAuthAdapter,
+                          firebaseAuth: EmailAuthProvider,
+                          emailSender: EmailSender)
                          (implicit actorSystem: ActorSystem, ec: ExecutionContext, am: ActorMaterializer) extends PublicApi {
 
   private val imageUploader = new ImageUploader(imageStore, new ScrimageImageProcessor)
@@ -167,7 +177,7 @@ class DelegatingPublicApi(commandProcessor: CommandProcessor,
       val escapedUrl = UrlEscapers.urlFragmentEscaper().escape(url)
       val connection = connectionFor(escapedUrl)
       val code = connection.getResponseCode
-      if(code == HttpURLConnection.HTTP_MOVED_PERM || code == HttpURLConnection.HTTP_MOVED_TEMP || code == HttpURLConnection.HTTP_SEE_OTHER) {
+      if (code == HttpURLConnection.HTTP_MOVED_PERM || code == HttpURLConnection.HTTP_MOVED_TEMP || code == HttpURLConnection.HTTP_SEE_OTHER) {
         connectionFor(connection.getHeaderField("Location"))
       }
       else {
@@ -369,4 +379,16 @@ class DelegatingPublicApi(commandProcessor: CommandProcessor,
 
   override def googlePotentialFriends(userId: UUID, accessToken: String): Either[Error, PotentialFriends] =
     userFriendsProjection.potentialGoogleFriends(userId, accessToken)
+
+  override def connectFirebaseUser(sessionId: UUID, idToken: String, email: String): Either[Error, Unit] =
+    commandProcessor.connectWithFirebase(sessionId, idToken, email)
+
+  override def createUserWithEmail(command: CreateUserEmailFirebase): Future[Either[Error, Unit]] =
+    commandProcessor.connectWithEmail(command, emailSender).value
+
+  override def verifyEmail(verificationToken: UUID): Either[Error, Unit] = {
+    dataStore.verifyEmailToken(verificationToken).flatMap(token => {
+      commandProcessor.validatedProcess(MarkEmailVerified, token.userId)
+    })
+  }
 }
