@@ -708,8 +708,6 @@ class RouteTest extends Specification with Specs2RouteTest with JMock {
 
 
     "Connect with firebase auth" in new NotLoggedInContext {
-      val idToken = "id-token"
-      val email = "email"
       val command = ConnectFirebaseUser(idToken, sessionId, email)
 
       checking {
@@ -722,8 +720,6 @@ class RouteTest extends Specification with Specs2RouteTest with JMock {
     }
 
     "Sign up with new email/password" in new NotLoggedInContext {
-      val idToken = "id-token"
-      val email = "email"
       val command = CreateUserEmailFirebase(email, idToken, "firstName", "lastName", "notificationId")
 
       checking {
@@ -743,6 +739,18 @@ class RouteTest extends Specification with Specs2RouteTest with JMock {
       }
 
       Get(s"/connect/new/email-confirm?t=$verificationToken") ~> webApi.newUserRoute ~> check {
+        status must beEqualTo(StatusCodes.OK)
+      }
+    }
+
+    "Resend verification email" in new NotLoggedInContext {
+
+      checking {
+        oneOf(publicApi).resendVerificationEmail(email, idToken).willReturn(Future.successful(Right(())))
+      }
+
+      Post(s"/connect/new/resend-confirm-email")
+        .withEntity(ContentTypes.`application/json`, ResendVerificationEmail(email, idToken).asJson.noSpaces) ~> webApi.newUserRoute ~> check {
         status must beEqualTo(StatusCodes.OK)
       }
     }
@@ -771,6 +779,8 @@ class RouteTest extends Specification with Specs2RouteTest with JMock {
   trait NotLoggedInContext extends BaseContext {
     val token = "auth-token"
     val connectFacebookUser = ConnectFacebookUser("facebook-id", token, randomUUID())
+    val idToken = "id-token"
+    val email = "email"
   }
 
   def aPotentialFriendWith(id: UUID, name: String): Matcher[PotentialFriend] =

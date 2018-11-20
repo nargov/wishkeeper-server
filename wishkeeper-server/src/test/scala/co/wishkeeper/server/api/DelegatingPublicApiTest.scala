@@ -4,7 +4,7 @@ import java.io.ByteArrayInputStream
 import java.util.UUID
 import java.util.UUID.randomUUID
 
-import co.wishkeeper.server.Events.{FacebookFriendsListSeen, UserConnected, UserGenderSet2}
+import co.wishkeeper.server.Events.{EmailConnectStarted, FacebookFriendsListSeen, UserConnected, UserGenderSet2}
 import co.wishkeeper.server.EventsTestHelper.{EventsList, anEventsListFor}
 import co.wishkeeper.server.FriendRequestStatus.{Approved, Ignored}
 import co.wishkeeper.server.NotificationsData.{FriendRequestNotification, NotificationData}
@@ -309,7 +309,7 @@ class DelegatingPublicApiTest(implicit ee: ExecutionEnv) extends Specification w
     api.historyFor(userId, friendId) must beLeft[Error](NotFriends)
   }
 
-  "verify email" in new LoggedInContext {
+  "verify email" in new Context {
     val verificationToken = randomUUID()
     checking {
       oneOf(dataStore).verifyEmailToken(verificationToken).willReturn(Right(VerificationToken(verificationToken, "email", userId)))
@@ -317,6 +317,28 @@ class DelegatingPublicApiTest(implicit ee: ExecutionEnv) extends Specification w
     }
 
     api.verifyEmail(verificationToken)
+  }
+
+  "resend email" in new Context {
+    val idToken = "token"
+    val email = "email"
+    val emailContent = "email content"
+
+    checking {
+      oneOf(firebaseAuth).validate(idToken).willReturn(Right(EmailAuthData(email)))
+      allowing(dataStore).userIdByEmail(email).willReturn(Option(userId))
+      allowing(dataStore).userEvents(userId).willReturn(EventsList(userId)
+        .withFirstName("firstName")
+        .withEvent(EmailConnectStarted(userId))
+        .list)
+      oneOf(dataStore).saveVerificationToken(having(any[VerificationToken])).willReturn(Right(true))
+      oneOf(templateEngineAdapter).process(having(===(EmailSender.verificationEmailTemplate)), having(any)).willReturn(Success(emailContent))
+      oneOf(emailProvider).sendEmail(having(===(email)), having(any), having(===(EmailSender.verificationEmailSubject)), having(any[String]),
+        having(===(emailContent))).willReturn(Future.successful(Right(())))
+    }
+
+    api.resendVerificationEmail(email, idToken)
+    executor.runUntilIdle()
   }
 
   def userWishesWith(wishId: UUID, wishName: String): Matcher[UserWishes] = contain(aWishWith(wishId, wishName)) ^^ {(_: UserWishes).wishes}

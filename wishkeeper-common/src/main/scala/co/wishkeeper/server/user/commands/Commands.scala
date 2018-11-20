@@ -182,3 +182,5 @@ case object MarkEmailVerified extends UserCommand {
   override def process(user: User): List[UserEvent] = user.userProfile.email.fold[List[UserEvent]](Nil)(email => List(EmailVerified(email)))
   implicit val validator: UserCommandValidator[MarkEmailVerified.type] = Always
 }
+
+case class ResendVerificationEmail(email: String, idToken: String)

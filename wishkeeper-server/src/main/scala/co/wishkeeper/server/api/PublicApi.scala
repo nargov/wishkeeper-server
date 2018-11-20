@@ -7,6 +7,7 @@ import java.util.UUID
 
 import akka.actor.ActorSystem
 import akka.stream.ActorMaterializer
+import cats.data.EitherT
 import cats.implicits._
 import co.wishkeeper.server.FriendRequestStatus.{Approved, Ignored}
 import co.wishkeeper.server.WishStatus.{Active, Reserved, WishStatus}
@@ -15,9 +16,9 @@ import co.wishkeeper.server.image._
 import co.wishkeeper.server.messaging.EmailSender
 import co.wishkeeper.server.projections._
 import co.wishkeeper.server.search.{SearchQuery, UserSearchProjection, UserSearchResults}
+import co.wishkeeper.server.user._
 import co.wishkeeper.server.user.commands._
 import co.wishkeeper.server.user.events.history.HistoryEventInstance
-import co.wishkeeper.server.user.{NotFriends, ValidationError, WishNotFound}
 import com.google.common.net.UrlEscapers
 import org.joda.time.LocalDate
 
@@ -25,6 +26,8 @@ import scala.concurrent.{ExecutionContext, Future}
 import scala.util.Try
 
 trait PublicApi {
+
+  def resendVerificationEmail(email: String, idToken: String): Future[Either[Error, Unit]]
 
   def verifyEmail(verificationToken: UUID): Either[Error, Unit]
 
@@ -390,5 +393,18 @@ class DelegatingPublicApi(commandProcessor: CommandProcessor,
     dataStore.verifyEmailToken(verificationToken).flatMap(token => {
       commandProcessor.validatedProcess(MarkEmailVerified, token.userId)
     })
+  }
+
+  override def resendVerificationEmail(email: String, idToken: String): Future[Either[Error, Unit]] = {
+    val token = UUID.randomUUID()
+    dataStore.userIdByEmail(email)
+      .fold[Future[Either[Error, Unit]]](Future.successful(Left(UserNotFound(email)))) { userId =>
+      val user = User.replay(dataStore.userEvents(userId))
+      EitherT(Future(firebaseAuth.validate(idToken)))
+        .subflatMap(data => dataStore.saveVerificationToken(VerificationToken(token, email, userId))
+          .flatMap(saved => Either.cond(saved, (), DatabaseSaveError("Error saving verification token"))))
+        .flatMapF(_ => emailSender.sendVerificationEmail(email, token.toString, user.userProfile.firstName.getOrElse("Unknown")))
+        .value
+    }
   }
 }

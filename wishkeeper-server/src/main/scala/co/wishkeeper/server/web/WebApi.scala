@@ -268,7 +268,7 @@ class WebApi(publicApi: PublicApi, managementApi: ManagementApi, clientRegistry:
     entity(as[CreateUserEmailFirebase]) { command =>
       onComplete(publicApi.createUserWithEmail(command)) {
         case Success(value) => handleCommandResult(value)
-        case Failure(exception) => complete(StatusCodes.InternalServerError, GeneralError(exception.getMessage))
+        case Failure(exception) => handleErrors(GeneralError(exception.getMessage))
       }
     }
   }
@@ -279,9 +279,19 @@ class WebApi(publicApi: PublicApi, managementApi: ManagementApi, clientRegistry:
     }
   }
 
+  val resendVerificationEmail: Route = (pathPrefix("resend-confirm-email") & post) {
+    entity(as[ResendVerificationEmail]) { resend =>
+      onComplete(publicApi.resendVerificationEmail(resend.email, resend.idToken)) {
+        case Success(v) => handleCommandResult(v)
+        case Failure(exception) => handleErrors(GeneralError(exception.getMessage))
+      }
+    }
+  }
+
   val createUser: Route = pathPrefix("new") {
     createUserByEmail ~
-      verifyEmail
+      verifyEmail ~
+      resendVerificationEmail
   }
 
   val connect: Route = pathPrefix("connect") {
