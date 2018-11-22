@@ -739,7 +739,8 @@ class RouteTest extends Specification with Specs2RouteTest with JMock {
       }
 
       Get(s"/connect/new/email-confirm?t=$verificationToken") ~> webApi.newUserRoute ~> check {
-        status must beEqualTo(StatusCodes.OK)
+        handled must beTrue
+        status must beEqualTo(StatusCodes.MovedPermanently)
       }
     }
 

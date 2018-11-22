@@ -169,6 +169,7 @@ case class CreateUserEmailFirebase(email: String, idToken: String, firstName: St
       EmailConnectStarted(user.id),
       UserFirstNameSet(user.id, firstName),
       UserLastNameSet(user.id, lastName),
+      UserNameSet(user.id, firstName + " " + lastName),
       DeviceNotificationIdSet(notificationId)
     ) ++ user.userProfile.email.fold(List(UserEmailSet(user.id, email)))(_ => Nil)
   }

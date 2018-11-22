@@ -275,7 +275,7 @@ class WebApi(publicApi: PublicApi, managementApi: ManagementApi, clientRegistry:
 
   val verifyEmail: Route = pathPrefix("email-confirm") {
     parameter('t.as[UUID]) { token =>
-      handleCommandResult(publicApi.verifyEmail(token))
+      publicApi.verifyEmail(token).fold(handleErrors, _ => redirect("https://wishkeeper.co/en/email-confirmed/", StatusCodes.MovedPermanently))
     }
   }
 
