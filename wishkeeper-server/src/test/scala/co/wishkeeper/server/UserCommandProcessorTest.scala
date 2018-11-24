@@ -390,6 +390,7 @@ class UserCommandProcessorTest extends Specification with JMock with MatcherMacr
       allowing(googleAuth).fetchAdditionalUserData(accessToken, googleUserId).willReturn(Right(GoogleUserData()))
       allowing(dataStore).saveUserEvents(having(any[UUID]), having(beNone), having(any[DateTime]), having(any)).willReturn(true)
       oneOf(eventProcessor).process(having(beAnInstanceOf[UserConnected]), having(any[UUID])).willReturn(Nil)
+      allowing(eventProcessor).process(having(not(beAnInstanceOf[UserConnected])), having(any[UUID])).willReturn(Nil)
     }
 
     commandProcessor.connectWithGoogle(ConnectGoogleUser(accessToken, idToken, sessionId))
