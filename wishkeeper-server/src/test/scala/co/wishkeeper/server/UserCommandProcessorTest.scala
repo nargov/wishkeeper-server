@@ -379,6 +379,21 @@ class UserCommandProcessorTest extends Specification with JMock with MatcherMacr
     commandProcessor.connectWithFirebase(sessionId, idToken, email) must beLeft[Error](EmailNotVerified(email))
   }
 
+  "Publish events after connecting with google" in new EventProcessorContext {
+    assumeNewUser()
+    ignoringSaveUserSession()
+
+    checking {
+      ignoring(dataStore).saveUserByEmail(having(any), having(any))
+      allowing(dataStore).userIdByEmail(email).willReturn(None)
+      allowing(googleAuth).validateIdToken(idToken).willReturn(Right(googleUser))
+      allowing(googleAuth).fetchAdditionalUserData(accessToken, googleUserId).willReturn(Right(GoogleUserData()))
+      allowing(dataStore).saveUserEvents(having(any[UUID]), having(beNone), having(any[DateTime]), having(any)).willReturn(true)
+      oneOf(eventProcessor).process(having(beAnInstanceOf[UserConnected]), having(any[UUID])).willReturn(Nil)
+    }
+
+    commandProcessor.connectWithGoogle(ConnectGoogleUser(accessToken, idToken, sessionId))
+  }
 
   trait Context extends Scope {
     val userId: UUID = UUID.randomUUID()
@@ -388,9 +403,23 @@ class UserCommandProcessorTest extends Specification with JMock with MatcherMacr
     val executor = new DeterministicExecutor
     implicit val ec = ExecutionContext.fromExecutor(executor)
     val commandProcessor: CommandProcessor = new UserCommandProcessor(dataStore, Nil, googleAuth, firebaseAuth)
+
     val sessionId: UUID = UUID.randomUUID()
     val facebookId = "facebook-id"
     val authToken = "auth-token"
+    val googleUserId = "google user id"
+    val email = "user@gmail.com"
+    val givenName = "Bob"
+    val familyName = "Hoskins"
+    val name = s"$givenName $familyName"
+    val photo = "https://lh4.googleusercontent.com/some-url/my-photo.jpg"
+    val accessToken = "access-token"
+    val idToken = "id-token"
+    val locale = "en-US"
+    val birthday = new LocalDate()
+
+    val googleUser = GoogleUser(googleUserId, Option(email), Option(true), Option(name), Option(photo), Option(locale),
+      Option(givenName), Option(familyName))
 
     def ignoringGoogleUserData() = checking {
       ignoring(googleAuth).fetchAdditionalUserData(having(any), having(any)).willReturn(Right(GoogleUserData()))
@@ -441,18 +470,6 @@ class UserCommandProcessorTest extends Specification with JMock with MatcherMacr
   }
 
   trait ConnectContext extends Context {
-    val googleUserId = "google user id"
-    val email = "user@gmail.com"
-    val givenName = "Bob"
-    val familyName = "Hoskins"
-    val name = s"$givenName $familyName"
-    val photo = "https://lh4.googleusercontent.com/some-url/my-photo.jpg"
-    val accessToken = "access-token"
-    val idToken = "id-token"
-    val locale = "en-US"
-    val birthday = new LocalDate()
-    val googleUser = GoogleUser(googleUserId, Option(email), Option(true), Option(name), Option(photo), Option(locale),
-      Option(givenName), Option(familyName))
 
     checking {
       allowing(googleAuth).fetchAdditionalUserData(accessToken, googleUserId)

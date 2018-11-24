@@ -112,6 +112,7 @@ class UserCommandProcessor(dataStore: DataStore, eventProcessors: List[EventProc
               data.gender.map(g => UserGenderSet2(g.gender, g.customGender, g.genderPronoun) :: Nil).getOrElse(Nil))(_ => Nil)
         }.toOption.getOrElse(Nil)
         val success = dataStore.saveUserEvents(user.id, dataStore.lastSequenceNum(user.id), time, events ++ googleDataEvents)
+        if(success) publishEvents(events ++ googleDataEvents, user.id)
         Either.cond(success, (), DbErrorEventsNotSaved)
       }
     }
