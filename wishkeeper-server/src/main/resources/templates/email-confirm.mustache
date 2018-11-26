@@ -5,28 +5,112 @@
 
     <link href="https://fonts.googleapis.com/css?family=Roboto" rel="stylesheet"/>
     <style type="text/css">
-        @import url('https://fonts.googleapis.com/css?family=Roboto');
+        @import url('https://fonts.googleapis.com/css?family=Roboto:400,700');
 
         div#root {
-            width: 768px;
             margin: 0 auto;
         }
 
-        div#container {
-            width: 490px;
-            margin: 0 auto;
-            font-family: Roboto, sans-serif;
-            font-size: 17px;
-            color: #717171;
+        @media all and (orientation: landscape) {
+            div#container {
+                width: 28vw;
+                margin: 0 auto;
+                font-family: Roboto, sans-serif;
+                font-size: 17px;
+                font-size: 0.9vw;
+                color: #717171;
+            }
+
+            #logo {
+                height: 10vh;
+                background: url('http://app.media.wishkeeper.co/email-assets/wishkeeper-logo-email-header@3x.png') no-repeat center center;
+                background-size: 10vw auto;
+            }
+
+            a.button {
+                height: 4vh;
+                line-height: 4vh;
+            }
+
+            div#social-buttons a {
+                display: inline-block;
+                width: 2.4vw;
+                height: 2.4vw;
+                margin: 0 0.5vw;
+            }
+
+            #social-buttons {
+                text-align: center;
+                margin-top: 4vw;
+            }
+
+            #footer {
+                text-align: center;
+                margin: 2.5vw;
+            }
+        }
+
+        @media all and (orientation: portrait) {
+            div#container {
+                width: 87.5vw;
+                margin: 0 auto;
+                font-family: Roboto, sans-serif;
+                font-size: 17px;
+                font-size: 4vw;
+                color: #717171;
+            }
+
+            #logo {
+                height: 15vh;
+                background: url('http://app.media.wishkeeper.co/email-assets/wishkeeper-logo-email-header@3x.png') no-repeat center center;
+                background-size: 50vw auto
+            }
+
+            a.button {
+                height: 6.7vh;
+                line-height: 6.7vh;
+            }
+
+            div#social-buttons a {
+                display: inline-block;
+                width: 12vw;
+                height: 12vw;
+                margin: 0 2.3vw;
+            }
+
+            #social-buttons {
+                text-align: center;
+                margin-top: 20vw;
+            }
+
+            #footer {
+                text-align: center;
+                margin: 10vw;
+            }
+        }
+
+        a#facebook-button {
+            background: url('http://app.media.wishkeeper.co/email-assets/facebook@3x.png') no-repeat center center;
+            background-size: contain;
+        }
+        a#twitter-button {
+            background: url('http://app.media.wishkeeper.co/email-assets/twitter@3x.png') no-repeat center center;
+            background-size: contain;
+        }
+        a#pinterest-button {
+            background: url('http://app.media.wishkeeper.co/email-assets/googleplus@3x.png') no-repeat center center;
+            background-size: contain;
+        }
+        a#instagram-button {
+            background: url('http://app.media.wishkeeper.co/email-assets/instagram@3x.png') no-repeat center center;
+            background-size: contain;
         }
 
         a.button {
             display: block;
-            height: 44px;
             background-color: #de284c;
             text-decoration: none;
             color: white;
-            line-height: 44px;
             text-align: center;
             font-weight: bold;
             border-radius: 4px;
@@ -37,32 +121,21 @@
             line-height: 1.59
         }
 
-        #social-buttons {
-            text-align: center;
-            margin-top: 72px
-        }
-
         #social-buttons img {
             margin: 0 8px;
-        }
-
-        #footer {
-            text-align: center;
-            margin: 42px 0 50px 0
         }
 
         #footer a {
             text-decoration: underline;
             color: #717171;
         }
+
     </style>
 </head>
 <body>
 <div id="root">
     <div id="container">
-        <div style="text-align: center;">
-            <img src="http://app.media.wishkeeper.co/email-assets/wishkeeper-logo-email-header.png" style="margin: 24px 0;"/>
-        </div>
+        <div id="logo"></div>
         <p>
             Hi {{firstName}},<br/>
             <br/>
@@ -74,10 +147,10 @@
             The Wishkeeper Team
         </p>
         <div id="social-buttons">
-            <a href="https://www.facebook.com/wishkeeper.co/"><img src="http://app.media.wishkeeper.co/email-assets/facebook.png"/></a>
-            <a href="https://twitter.com/wishkeeper"><img src="http://app.media.wishkeeper.co/email-assets/twitter.png"/></a>
-            <a href="https://www.pinterest.com/wishkeeperapp/"><img src="http://app.media.wishkeeper.co/email-assets/googleplus.png"/></a>
-            <a href="https://www.instagram.com/wishkeeperapp/"><img src="http://app.media.wishkeeper.co/email-assets/instagram.png"/></a>
+            <a id="facebook-button" href="https://www.facebook.com/wishkeeper.co/"></a>
+            <a id="twitter-button" href="https://twitter.com/wishkeeper"></a>
+            <a id="pinterest-button" href="https://www.pinterest.com/wishkeeperapp/"></a>
+            <a id="instagram-button" href="https://www.instagram.com/wishkeeperapp/"></a>
         </div>
         <p id="footer">
             Have a question?<br/>
@@ -87,7 +160,7 @@
 </div>
 <script>
     document.getElementById("submit-button").onclick = function() {
-      document.getElementById('confirm').submit();
+        document.getElementById('confirm').submit();
     }
 </script>
 </body>
