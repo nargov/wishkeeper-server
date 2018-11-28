@@ -18,9 +18,9 @@ class ReportingEventProcessor(reporter: Reporter, dataStore: DataStore,
     val userId = instance.userId
     val user = User.replay(dataStore.userEvents(userId))
     instance.event match {
-      case UserConnected(_, time, _) if user.created == time =>
-        user.userProfile.name.fold(reportLater(userId, u => UserFirstConnection(userId, time, u.userProfile.name)))(name =>
-          reportNow(UserFirstConnection(userId, time, Option(name))))
+      case UserConnected(_, _, _) if user.created == instance.time =>
+          user.userProfile.name.fold(reportLater(userId, u => UserFirstConnection(userId, instance.time, u.userProfile.name)))(name =>
+            reportNow(UserFirstConnection(userId, instance.time, Option(name))))
       case WishCreated(wishId, _, time) =>
         val wish = user.wishes(wishId)
         wish.name.fold(reportLater(userId, u => UserAddedWish(userId, user.userProfile.name, time, u.wishes(wishId).name)))(wishName =>

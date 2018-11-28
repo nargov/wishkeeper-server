@@ -4,7 +4,7 @@ import java.util.UUID
 import java.util.UUID.randomUUID
 import java.util.concurrent.TimeUnit.SECONDS
 
-import co.wishkeeper.server.{DataStore, UserEventInstance}
+import co.wishkeeper.server.{DataStore, UserEventInstance, UserEventInstant}
 import co.wishkeeper.server.Events._
 import co.wishkeeper.server.EventsTestHelper.EventsList
 import co.wishkeeper.server.FriendRequestStatus.Approved
@@ -26,7 +26,7 @@ class ReportingEventProcessorTest extends Spec with JMock {
       allowing(dataStore).userEvents(userId).will(returnValue(events.withName(userName).list))
     }
 
-    processor.process(UserEventInstance(userId, userConnected))
+    processor.process(UserEventInstance(userId, userConnected, userConnected.time))
     scheduler.runUntilIdle()
   }
 
@@ -39,7 +39,7 @@ class ReportingEventProcessorTest extends Spec with JMock {
       allowing(dataStore).userEvents(userId).will(returnValue(events.list), returnValue(events.withName(userName).list))
     }
 
-    processor.process(UserEventInstance(userId, userConnected))
+    processor.process(UserEventInstance(userId, userConnected, userConnected.time))
     scheduler.tick(delaySeconds, SECONDS)
   }
 
@@ -117,6 +117,24 @@ class ReportingEventProcessorTest extends Spec with JMock {
     scheduler.tick(delaySeconds, SECONDS)
   }
 
+  "Use time from event metadata" in new Context {
+    val userConnected = UserConnected(userId, sessionId = randomUUID())
+    val creationTime: DateTime = DateTime.now().minusSeconds(3)
+
+    println("creation time: "  + creationTime)
+    println("event time: " + userConnected.time)
+
+    checking {
+      allowing(dataStore).userEvents(userId).willReturn(List(
+        UserEventInstant(userConnected, creationTime),
+        UserEventInstant(UserNameSet(userId, "Roger Wilco"), DateTime.now())))
+      oneOf(reporter).report(having(any))
+    }
+
+    processor.process(UserEventInstance(userId, userConnected, creationTime))
+    scheduler.runUntilIdle()
+  }
+
   trait Context extends Scope {
     val dataStore = mock[DataStore]
     val reporter = mock[Reporter]
@@ -125,4 +143,5 @@ class ReportingEventProcessorTest extends Spec with JMock {
     val userId = randomUUID()
     val userName = Option("Leroy")
   }
+
 }
