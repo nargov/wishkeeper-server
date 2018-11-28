@@ -4,19 +4,20 @@ import java.util.UUID
 import java.util.concurrent.TimeUnit.SECONDS
 import java.util.concurrent.{Executors, ScheduledExecutorService}
 
-import co.wishkeeper.server.Events.{FriendRequestStatusChanged, UserConnected, WishCreated, WishReserved}
+import co.wishkeeper.server.Events._
 import co.wishkeeper.server.FriendRequestStatus.Approved
 import co.wishkeeper.server.notifications.ReportingEventProcessor.{delaySeconds, noDelay}
 import co.wishkeeper.server.reporting.Reporter
-import co.wishkeeper.server.{DataStore, EventProcessor, Events, User}
+import co.wishkeeper.server._
 import org.joda.time.DateTime
 
 class ReportingEventProcessor(reporter: Reporter, dataStore: DataStore,
                               scheduler: ScheduledExecutorService = Executors.newScheduledThreadPool(2)) extends EventProcessor {
 
-  override def process(event: Events.Event, userId: UUID): List[(UUID, Events.Event)] = {
+  override def process[E <: UserEvent](instance: UserEventInstance[E]): List[UserEventInstance[_ <: UserEvent]] = {
+    val userId = instance.userId
     val user = User.replay(dataStore.userEvents(userId))
-    event match {
+    instance.event match {
       case UserConnected(_, time, _) if user.created == time =>
         user.userProfile.name.fold(reportLater(userId, u => UserFirstConnection(userId, time, u.userProfile.name)))(name =>
           reportNow(UserFirstConnection(userId, time, Option(name))))

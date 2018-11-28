@@ -20,7 +20,7 @@ class DeviceIdEventProcessorTest extends Spec with JMock {
       oneOf(topicManager).subscribeTo(PushNotificationSender.periodicWakeup, event.id :: Nil)
     }
 
-    processor.process(event, randomUUID())
+    processor.process(UserEventInstance(randomUUID(), event))
   }
 
   "register all devices" in {

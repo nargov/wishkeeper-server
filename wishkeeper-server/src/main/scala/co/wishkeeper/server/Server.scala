@@ -9,7 +9,7 @@ import co.wishkeeper.server.image.{GoogleCloudStorageImageStore, ImageStore}
 import co.wishkeeper.server.messaging._
 import co.wishkeeper.server.notifications.{DeviceIdEventProcessor, ExecutorNotificationsScheduler, ReportingEventProcessor, ServerNotificationEventProcessor}
 import co.wishkeeper.server.projections._
-import co.wishkeeper.server.reporting.{NoOpReporter, Reporter, SlackBotReporter}
+import co.wishkeeper.server.reporting.{DebugReporter, NoOpReporter, Reporter, SlackBotReporter}
 import co.wishkeeper.server.search.SimpleScanUserSearchProjection
 import co.wishkeeper.server.web.WebApi
 import com.typesafe.config.ConfigFactory
@@ -57,7 +57,7 @@ class WishkeeperServer {
     if(config.hasPath(slackUrlConfigKey))
       new SlackBotReporter(config.getString(slackUrlConfigKey))
     else
-      NoOpReporter
+      DebugReporter
   }
 
   private val commandProcessor: CommandProcessor = new UserCommandProcessor(dataStore, List(

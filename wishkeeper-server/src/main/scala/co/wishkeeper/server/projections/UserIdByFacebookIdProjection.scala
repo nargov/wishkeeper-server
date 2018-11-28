@@ -2,8 +2,8 @@ package co.wishkeeper.server.projections
 
 import java.util.UUID
 
-import co.wishkeeper.server.Events.{Event, UserFacebookIdSet}
-import co.wishkeeper.server.{DataStore, EventProcessor}
+import co.wishkeeper.server.Events.{UserEvent, UserFacebookIdSet}
+import co.wishkeeper.server.{DataStore, EventProcessor, UserEventInstance}
 
 trait UserIdByFacebookIdProjection {
   def get(facebookIds: List[String]): Map[String, UUID]
@@ -13,9 +13,9 @@ class DataStoreUserIdByFacebookIdProjection(dataStore: DataStore) extends UserId
 
   override def get(facebookIds: List[String]): Map[String, UUID] = dataStore.userIdsByFacebookIds(facebookIds)
 
-  override def process(event: Event, userId: UUID): List[(UUID, Event)] = {
-    event match {
-      case UserFacebookIdSet(_, facebookId) => dataStore.saveUserIdByFacebookId(facebookId, userId)
+  override def process[E <: UserEvent](instance: UserEventInstance[E]): List[UserEventInstance[_ <: UserEvent]] = {
+    instance.event match {
+      case UserFacebookIdSet(_, facebookId) => dataStore.saveUserIdByFacebookId(facebookId, instance.userId)
       case _ =>
     }
     Nil

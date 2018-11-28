@@ -25,7 +25,7 @@ class ScanningUserHistoryProjectionTest extends Spec with JMock {
         having(===(ReservedWish(wishId, userId, userName, wishName, maybeLinks))), having(===(wishId))).willReturn(true)
     }
 
-    projection.process(WishReserved(wishId, reserver), userId)
+    projection.process(UserEventInstance(userId, WishReserved(wishId, reserver)))
   }
 
   "Saves user history event for having granted a wish" in new DataStoreContext {
@@ -42,7 +42,7 @@ class ScanningUserHistoryProjectionTest extends Spec with JMock {
         having(===(GrantedWish(wishId, userId, userName, wishName, maybeLinks))), having(===(wishId))).willReturn(true)
     }
 
-    projection.process(WishGranted(wishId), userId)
+    projection.process(UserEventInstance(userId, WishGranted(wishId)))
   }
 
   "Saves user history event for having been granted a wish" in new DataStoreContext {
@@ -58,7 +58,7 @@ class ScanningUserHistoryProjectionTest extends Spec with JMock {
         having(===(ReceivedWish(wishId, reserver, userName, wishName, maybeLinks))), having(===(wishId))).willReturn(true)
     }
 
-    projection.process(WishGranted(wishId), userId)
+    projection.process(UserEventInstance(userId, WishGranted(wishId)))
   }
 
   "Rebuilds projection" in new DataStoreContext {
@@ -81,7 +81,7 @@ class ScanningUserHistoryProjectionTest extends Spec with JMock {
       oneOf(notifier).sendTo(HistoryUpdated, reserver)
     }
 
-    projection.process(WishReserved(wishId, reserver), userId)
+    projection.process(UserEventInstance(userId, WishReserved(wishId, reserver)))
   }
 
   "Notify on added history event after wish granted" in new Context {
@@ -94,7 +94,7 @@ class ScanningUserHistoryProjectionTest extends Spec with JMock {
       oneOf(notifier).sendTo(HistoryUpdated, userId)
     }
 
-    projection.process(WishGranted(wishId), userId)
+    projection.process(UserEventInstance(userId, WishGranted(wishId)))
   }
 
   "Deletes history event on reserved wish if was unreserved" in new DataStoreContext {
@@ -103,7 +103,7 @@ class ScanningUserHistoryProjectionTest extends Spec with JMock {
       oneOf(dataStore).deleteWishHistoryEvent(reserver, wishId)
     }
 
-    projection.process(WishUnreserved(wishId), userId)
+    projection.process(UserEventInstance(userId, WishUnreserved(wishId)))
   }
 
   "Notify on deleted history event after unreserve" in new Context {
@@ -117,7 +117,7 @@ class ScanningUserHistoryProjectionTest extends Spec with JMock {
       oneOf(notifier).sendTo(HistoryUpdated, reserver)
     }
 
-    projection.process(event, userId)
+    projection.process(UserEventInstance(userId, event))
   }
 
   "Returns an ordered list of history events" in new Context {
@@ -149,7 +149,7 @@ class ScanningUserHistoryProjectionTest extends Spec with JMock {
       allowing(dataStore).deleteWishHistoryEvent(anotherReserver, wishId)
     }
 
-    projection.process(WishUnreserved(wishId), userId)
+    projection.process(UserEventInstance(userId, WishUnreserved(wishId)))
   }
 
   "return friend history" in new DataStoreContext {
@@ -178,7 +178,7 @@ class ScanningUserHistoryProjectionTest extends Spec with JMock {
         having(===(ReceivedWish(wishId, userId, userName, wishName, maybeLinks))), having(===(wishId))).willReturn(true)
     }
 
-    projection.process(WishGranted(wishId), userId)
+    projection.process(UserEventInstance(userId, WishGranted(wishId)))
   }
 
   trait DataStoreContext extends Context {

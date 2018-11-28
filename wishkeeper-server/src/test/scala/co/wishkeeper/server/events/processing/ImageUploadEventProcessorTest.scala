@@ -4,9 +4,9 @@ import java.io.InputStream
 import java.util.UUID
 import java.util.UUID.randomUUID
 
-import co.wishkeeper.server.Events.{Event, UserPictureSet}
-import co.wishkeeper.server.{DataStore, FileAdapter}
+import co.wishkeeper.server.Events.{UserEvent, UserPictureSet}
 import co.wishkeeper.server.image.{ImageData, ImageStore}
+import co.wishkeeper.server.{DataStore, FileAdapter, UserEventInstance}
 import com.wixpress.common.specs2.JMock
 import org.joda.time.DateTime
 import org.specs2.matcher.Matcher
@@ -27,7 +27,7 @@ class ImageUploadEventProcessorTest extends Specification with JMock {
       oneOf(imageStore).save(having(===(ImageData(inputStream, "image/png"))), having(aUUID))
     }
 
-    val events = processor.process(UserPictureSet(userId, imageUrl), userId)
+    val events: List[UserEventInstance[_ <: UserEvent]] = processor.process(UserEventInstance(userId, UserPictureSet(userId, imageUrl)))
     events must contain(aUserPictureSetTupleEventWith(userId, linkBase))
   }
 
@@ -36,7 +36,7 @@ class ImageUploadEventProcessorTest extends Specification with JMock {
       allowing(imageStore).imageLinkBase.willReturn(linkBase)
     }
 
-    processor.process(UserPictureSet(userId, linkBase + "some-image"), userId) must beEmpty
+    processor.process(UserEventInstance(userId, UserPictureSet(userId, linkBase + "some-image"))) must beEmpty
   }
 
   "should save new picture url in profile" in new Context {
@@ -49,7 +49,7 @@ class ImageUploadEventProcessorTest extends Specification with JMock {
         having(contain(exactly(aUserPictureSetEventWith(userId, linkBase)))))
     }
 
-    processor.process(UserPictureSet(userId, imageUrl), userId)
+    processor.process(UserEventInstance(userId, UserPictureSet(userId, imageUrl)))
   }
 
   trait Context extends Scope {
@@ -65,15 +65,18 @@ class ImageUploadEventProcessorTest extends Specification with JMock {
     }
   }
 
-  def aUUID: Matcher[String] = (str:String) => (Try{ UUID.fromString(str) }.isSuccess, s"$str is not a UUID")
+  def aUUID: Matcher[String] = (str: String) => (Try {
+    UUID.fromString(str)
+  }.isSuccess, s"$str is not a UUID")
 
-  def aUserPictureSetEventWith(userId: UUID, prefix: String): Matcher[Event] = (e:Event) => e match {
+  def aUserPictureSetEventWith(userId: UUID, prefix: String): Matcher[UserEvent] = (e: UserEvent) => e match {
     case UserPictureSet(id, link) => (userId == id && link.startsWith(prefix), "UserPictureSet event does not have required userId or prefix")
     case _ => (false, "Not a UserPictureSet event")
   }
 
-  def aUserPictureSetTupleEventWith(userId: UUID, prefix: String): Matcher[(UUID, Event)] = (t:(UUID,Event)) => t match {
-    case (_, UserPictureSet(id, link)) => (userId == id && link.startsWith(prefix), "UserPictureSet event does not have required userId or prefix")
-    case _ => (false, "Not a UserPictureSet event")
-  }
+  def aUserPictureSetTupleEventWith(userId: UUID, prefix: String): Matcher[UserEventInstance[_ <: UserEvent]] = (t: UserEventInstance[_ <: UserEvent]) =>
+    t.event match {
+      case UserPictureSet(id, link) => (userId == id && link.startsWith(prefix), "UserPictureSet event does not have required userId or prefix")
+      case _ => (false, "Not a UserPictureSet event")
+    }
 }

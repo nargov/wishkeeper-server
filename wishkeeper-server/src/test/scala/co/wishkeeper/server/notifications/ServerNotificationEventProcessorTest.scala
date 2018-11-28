@@ -8,8 +8,7 @@ import co.wishkeeper.server.EventsTestHelper.EventsList
 import co.wishkeeper.server.FriendRequestStatus.Approved
 import co.wishkeeper.server.NotificationsData.{EmailVerifiedNotification, FriendRequestAcceptedNotification, FriendRequestNotification, NotificationData}
 import co.wishkeeper.server.messaging._
-import co.wishkeeper.server.user.EmailNotVerified
-import co.wishkeeper.server.{DataStore, PushNotification, UserProfile}
+import co.wishkeeper.server.{DataStore, PushNotification, UserEventInstance, UserProfile}
 import com.wixpress.common.specs2.JMock
 import org.specs2.matcher.Matcher
 import org.specs2.mutable.Specification
@@ -33,7 +32,7 @@ class ServerNotificationEventProcessorTest extends Specification with JMock {
     checkingFriendsListUpdateNotificationSent()
 
     val friendId: UUID = randomUUID()
-    processor.process(FriendRequestStatusChanged(friendId, randomUUID(), userId, Approved), friendId)
+    processor.process(UserEventInstance(friendId, FriendRequestStatusChanged(friendId, randomUUID(), userId, Approved)))
   }
 
   "Send notifications updated notification when friend request notification created" in new Context {
@@ -78,9 +77,10 @@ class ServerNotificationEventProcessorTest extends Specification with JMock {
         withIncomingFriendRequest(friendId, requestId).list)
       allowing(dataStore).userEvents(friendId).willReturn(EventsList(friendId).withName(friendName).withFirstName(friendFirstName).
         withPic(friendPicture).list)
-      oneOf(pushNotifications).send(deviceToken, PushNotification(userId, notificationId, FriendRequestNotification(friendId, requestId, profile = Option(UserProfile(
-        name = Option(friendName), firstName = Option(friendFirstName), picture = Option(friendPicture)
-      )))))
+      oneOf(pushNotifications).send(deviceToken, PushNotification(userId, notificationId,
+        FriendRequestNotification(friendId, requestId, profile = Option(UserProfile(
+          name = Option(friendName), firstName = Option(friendFirstName), picture = Option(friendPicture)
+        )))))
     }
 
     processEvent(FriendRequestNotificationCreated(notificationId, userId, friendId, requestId))
@@ -143,7 +143,7 @@ class ServerNotificationEventProcessorTest extends Specification with JMock {
     }
 
 
-    def processEvent(event: Event) = processor.process(event, userId) must beEmpty
+    def processEvent(event: UserEvent) = processor.process(UserEventInstance(userId, event)) must beEmpty
   }
 
 }

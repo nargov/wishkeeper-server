@@ -1,12 +1,12 @@
 package co.wishkeeper.server.projections
 
-import java.util.UUID
 import java.util.UUID.randomUUID
 
-import co.wishkeeper.server.DataStore
 import co.wishkeeper.server.Events._
 import co.wishkeeper.server.EventsTestHelper.EventsList
 import co.wishkeeper.server.FriendRequestStatus.Approved
+import co.wishkeeper.server.UserEventTestHelpers.aUserEventInstance
+import co.wishkeeper.server.{DataStore, UserEventInstance, UserEventTestHelpers}
 import com.wixpress.common.specs2.JMock
 import org.joda.time.DateTime
 import org.specs2.mutable.Specification
@@ -21,7 +21,7 @@ class FriendRequestsEventProcessorTest extends Specification with JMock {
     expectSavedEvent(expectedEvent)
 
     val statusChanged = FriendRequestStatusChanged(userId, requestId, friendId, Approved)
-    notificationsProjection.process(statusChanged, userId)  must beEmpty
+    notificationsProjection.process(UserEventInstance(userId, statusChanged))  must beEmpty
   }
 
   "return a reciprocating FriendRemoved event" in new Context {
@@ -33,7 +33,8 @@ class FriendRequestsEventProcessorTest extends Specification with JMock {
     }
     expectSavedEvent(expectedEvent)
 
-    notificationsProjection.process(FriendRemoved(userId, friendId), userId) must beEqualTo((friendId, expectedEvent) :: Nil)
+    notificationsProjection.process(UserEventInstance(userId, FriendRemoved(userId, friendId))) must
+      contain(aUserEventInstance(===(expectedEvent), ===(friendId)))
   }
 
   "Not create a FriendRemoved event if not friends" in new Context {
@@ -44,7 +45,7 @@ class FriendRequestsEventProcessorTest extends Specification with JMock {
       allowing(dataStore).userEvents(friendId).willReturn(EventsList(friendId).list)
     }
 
-    notificationsProjection.process(FriendRemoved(userId, friendId), userId) must beEqualTo(Nil)
+    notificationsProjection.process(UserEventInstance(userId, FriendRemoved(userId, friendId))) must beEqualTo(Nil)
   }
 
   "save incoming friend request" in new Context {
@@ -60,7 +61,8 @@ class FriendRequestsEventProcessorTest extends Specification with JMock {
         having(contain(expectedEvent))).willReturn(true)
     }
 
-    notificationsProjection.process(friendRequestSent, userId) must beEqualTo((userId, expectedEvent) :: Nil)
+    notificationsProjection.process(UserEventInstance(userId, friendRequestSent)) must
+      contain(aUserEventInstance(===(expectedEvent), ===(userId)))
   }
 
   trait Context extends Scope {
@@ -78,7 +80,7 @@ class FriendRequestsEventProcessorTest extends Specification with JMock {
       allowing(dataStore).lastSequenceNum(userId).willReturn(Some(5L))
     }
 
-    def expectSavedEvent(event: Event) = checking {
+    def expectSavedEvent(event: UserEvent) = checking {
       oneOf(dataStore).saveUserEvents(
         having(===(friendId)),
         having(any[Option[Long]]),

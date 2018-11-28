@@ -33,9 +33,9 @@ class UserCommandProcessor(dataStore: DataStore, eventProcessors: List[EventProc
 
   //TODO unify as much as possible
   override def process(command: UserCommand, sessionId: Option[UUID]): Boolean = {
+    val now = DateTime.now()
     command match {
       case connectUser: ConnectFacebookUser =>
-        val now = DateTime.now()
         /* FIXME
            This check is not good enough since the save and read can be interleaved, creating two users with the same facebook id.
            Prevent this by saving into userIdByFacebookId with IF NOT EXISTS before saving the events. */
@@ -43,10 +43,10 @@ class UserCommandProcessor(dataStore: DataStore, eventProcessors: List[EventProc
         val (user: User, lastSeqNum: Option[Long]) = userId.map(id =>
           (User.replay(dataStore.userEvents(id)), dataStore.lastSequenceNum(id))
         ).getOrElse((User.createNew(), None))
-        val savedSession = dataStore.saveUserSession(user.id, connectUser.sessionId, now)
         val events = command.process(user)
         val savedEvents = dataStore.saveUserEvents(user.id, lastSeqNum, now, events)
-        if (savedEvents) publishEvents(events, user.id)
+        val savedSession = dataStore.saveUserSession(user.id, connectUser.sessionId, now)
+        if (savedEvents) publishEvents(UserEventInstance.list(user.id, now, events))
         savedEvents && savedSession
 
       case _ =>
@@ -57,32 +57,35 @@ class UserCommandProcessor(dataStore: DataStore, eventProcessors: List[EventProc
   }
 
   override def process(command: UserCommand, userId: UUID): Either[Error, Unit] = {
+    val now = DateTime.now()
     retry {
       val lastSeqNum = dataStore.lastSequenceNum(userId)
       val user = User.replay(dataStore.userEvents(userId))
       val events: List[UserEvent] = command.process(user)
-      val success = dataStore.saveUserEvents(userId, lastSeqNum, DateTime.now(), events)
-      if (success) publishEvents(events, user.id)
+      val success = dataStore.saveUserEvents(userId, lastSeqNum, now, events)
+      if (success) publishEvents(UserEventInstance.list(userId, now, events))
       Either.cond(success, (), DbErrorEventsNotSaved)
     }
   }
 
-  private def publishEvents(events: List[Event], userId: UUID): Unit = events.foreach(publishEvent(_, userId))
+  private def publishEvents(events: List[UserEventInstance[_ <: UserEvent]]): Unit = events.foreach(event => publishEvent(event))
 
-  private def publishEvent(event: Event, userId: UUID): Unit = eventProcessors.foreach(processor =>
-    processor.process(event, userId).foreach(newEvent => publishEvent(newEvent._2, newEvent._1)))
+  private def publishEvent[E <: UserEvent](event: UserEventInstance[E]): Unit = eventProcessors.foreach(processor =>
+    processor.process(event).foreach(event => publishEvent(event)))
 
-  override def validatedProcess[C <: UserCommand](command: C, userId: UUID)(implicit validator: UserCommandValidator[C]): Either[Error, Unit] =
+  override def validatedProcess[C <: UserCommand](command: C, userId: UUID)(implicit validator: UserCommandValidator[C]): Either[Error, Unit] = {
+    val now = DateTime.now()
     retry {
       val lastSeqNum = dataStore.lastSequenceNum(userId)
       val user = User.replay(dataStore.userEvents(userId))
       validator.validate(user, command).flatMap { _ =>
         val events: List[UserEvent] = command.process(user)
-        val success = dataStore.saveUserEvents(userId, lastSeqNum, DateTime.now(), events)
-        if (success) publishEvents(events, user.id)
+        val success = dataStore.saveUserEvents(userId, lastSeqNum, now, events)
+        if (success) publishEvents(UserEventInstance.list(userId, now, events))
         Either.cond(success, (), DbErrorEventsNotSaved)
       }
     }
+  }
 
   override def connectWithGoogle(command: ConnectGoogleUser): Either[Error, Unit] = {
     val googleAuthResult = google.validateIdToken(command.idToken)
@@ -112,7 +115,7 @@ class UserCommandProcessor(dataStore: DataStore, eventProcessors: List[EventProc
               data.gender.map(g => UserGenderSet2(g.gender, g.customGender, g.genderPronoun) :: Nil).getOrElse(Nil))(_ => Nil)
         }.toOption.getOrElse(Nil)
         val success = dataStore.saveUserEvents(user.id, dataStore.lastSequenceNum(user.id), time, events ++ googleDataEvents)
-        if(success) publishEvents(events ++ googleDataEvents, user.id)
+        if(success) publishEvents(UserEventInstance.list(user.id, time, events ++ googleDataEvents))
         Either.cond(success, (), DbErrorEventsNotSaved)
       }
     }
@@ -127,7 +130,7 @@ class UserCommandProcessor(dataStore: DataStore, eventProcessors: List[EventProc
           val events = UserConnected(userId, now, sessionId) :: Nil
           val savedEvents = dataStore.saveUserEvents(userId, dataStore.lastSequenceNum(userId), now, events)
           dataStore.saveUserSession(userId, sessionId, now)
-          if (savedEvents) publishEvents(events, userId)
+          if (savedEvents) publishEvents(UserEventInstance.list(userId, now, events))
           Either.cond(savedEvents, (), DbErrorEventsNotSaved)
         } else {
           Left(EmailNotVerified(email))
@@ -137,6 +140,7 @@ class UserCommandProcessor(dataStore: DataStore, eventProcessors: List[EventProc
   }
 
   override def connectWithEmail(command: CreateUserEmailFirebase, emailSender: EmailSender): EitherT[Future, Error, Unit] = {
+    val now = DateTime.now()
     val verificationToken = UUID.randomUUID()
 
     val maybeUserId = dataStore.userIdByEmail(command.email)
@@ -148,8 +152,8 @@ class UserCommandProcessor(dataStore: DataStore, eventProcessors: List[EventProc
 
     def saveEvents = retry {
       val events = command.process(user)
-      val saved = dataStore.saveUserEvents(user.id, None, DateTime.now(), events)
-      if (saved) publishEvents(events, user.id)
+      val saved = dataStore.saveUserEvents(user.id, None, now, events)
+      if (saved) publishEvents(UserEventInstance.list(user.id, now, events))
       Either.cond(saved, (), DbErrorEventsNotSaved)
     }
 
@@ -194,13 +198,13 @@ object CommandProcessor {
 }
 
 trait EventProcessor {
-  def process(event: Event, userId: UUID): List[(UUID, Event)] = Nil
+  def process[E <: UserEvent](instance: UserEventInstance[E]): List[UserEventInstance[_ <: UserEvent]] = Nil
 }
 
 class UserByEmailProjection(dataStore: DataStore) extends EventProcessor {
-  override def process(event: Event, userId: UUID): List[(UUID, Event)] = {
-    event match {
-      case UserEmailSet(_, email) => dataStore.saveUserByEmail(email, userId)
+  override def process[E <: UserEvent](instance: UserEventInstance[E]): List[UserEventInstance[_ <: UserEvent]] = {
+    instance.event match {
+      case UserEmailSet(_, email) => dataStore.saveUserByEmail(email, instance.userId)
       case _ =>
     }
     Nil

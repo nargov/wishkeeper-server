@@ -13,8 +13,9 @@ class ServerNotificationEventProcessor(notifier: ClientNotifier,
                                        pushNotifications: PushNotificationSender)
   extends EventProcessor {
 
-  override def process(event: Events.Event, userId: UUID): List[(UUID, Event)] = {
-    event match {
+  override def process[E <: UserEvent](instance: UserEventInstance[E]): List[UserEventInstance[_ <: UserEvent]] = {
+    val userId = instance.userId
+    instance.event match {
       case _: WishReserved |
            _: WishUnreserved =>
         notifier.sendTo(WishListUpdated, userId)
@@ -59,7 +60,7 @@ class ServerNotificationEventProcessor(notifier: ClientNotifier,
           notificationStillExists(userId, n.id))
       case _: EmailVerified =>
         val user = User.replay(dataStore.userEvents(userId))
-        user.settings.deviceNotificationId.foreach{deviceId =>
+        user.settings.deviceNotificationId.foreach { deviceId =>
           pushNotifications.send(deviceId, PushNotification(user.id, UUID.randomUUID(), EmailVerifiedNotification))
         }
       case _ =>

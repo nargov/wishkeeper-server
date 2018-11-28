@@ -9,7 +9,7 @@ import co.wishkeeper.server.Events.{DeviceNotificationIdSet, WishReservedNotific
 import co.wishkeeper.server.EventsTestHelper.EventsList
 import co.wishkeeper.server.NotificationsData.{PeriodicWakeup, WishReservedNotification, WishUnreservedNotification}
 import co.wishkeeper.server.messaging.{MemStateClientRegistry, NotificationsUpdated, PushNotificationSender, ServerNotification}
-import co.wishkeeper.server.{BroadcastNotification, DataStore, PushNotification}
+import co.wishkeeper.server.{BroadcastNotification, DataStore, PushNotification, UserEventInstance}
 import com.wixpress.common.specs2.JMock
 import org.jmock.lib.concurrent.DeterministicScheduler
 import org.joda.time.DateTime
@@ -25,7 +25,7 @@ class DelayedNotificationComponentTest extends Specification with JMock {
 
     userConnects()
 
-    serverNotificationEventProcessor.process(WishReservedNotificationCreated(randomUUID(), randomUUID(), randomUUID()), userId)
+    serverNotificationEventProcessor.process(UserEventInstance(userId, WishReservedNotificationCreated(randomUUID(), randomUUID(), randomUUID())))
 
     scheduler.tick(config.default.toSeconds - 1, SECONDS)
     message.get() must beNull
@@ -85,7 +85,7 @@ class DelayedNotificationComponentTest extends Specification with JMock {
 
     userConnects()
 
-    serverNotificationEventProcessor.process(event, userId)
+    serverNotificationEventProcessor.process(UserEventInstance(userId, event))
     scheduler.tick(config.default.toSeconds, SECONDS)
 
     assertGotNotificationsUpdated()
@@ -112,7 +112,7 @@ class DelayedNotificationComponentTest extends Specification with JMock {
 
     userConnects()
 
-    serverNotificationEventProcessor.process(event, userId)
+    serverNotificationEventProcessor.process(UserEventInstance(userId, event))
     scheduler.tick(config.default.toSeconds, SECONDS)
 
     assertGotNotificationsUpdated()
@@ -133,8 +133,8 @@ class DelayedNotificationComponentTest extends Specification with JMock {
       never(pushNotifications).send(having(any), having(any))
     }
 
-    serverNotificationEventProcessor.process(reserveEvent, userId)
-    serverNotificationEventProcessor.process(unreserveEvent, userId)
+    serverNotificationEventProcessor.process(UserEventInstance(userId, reserveEvent))
+    serverNotificationEventProcessor.process(UserEventInstance(userId, unreserveEvent))
 
     scheduler.tick(config.default.toSeconds + 1, SECONDS)
   }

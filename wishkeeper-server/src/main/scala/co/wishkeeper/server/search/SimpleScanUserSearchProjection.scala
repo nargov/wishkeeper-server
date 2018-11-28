@@ -55,8 +55,9 @@ class SimpleScanUserSearchProjection(dataStore: DataStore) extends UserSearchPro
       500 - row.name.toLowerCase().indexOf(query)
   }
 
-  override def process(event: Event, userId: UUID): List[(UUID, Event)] = {
-    val rowToSave: Option[UserNameSearchRow] = event match {
+  override def process[E <: UserEvent](instance: UserEventInstance[E]): List[UserEventInstance[_ <: UserEvent]] = {
+    val userId = instance.userId
+    val rowToSave: Option[UserNameSearchRow] = instance.event match {
       case UserNameSet(_, name) =>
         val user = User.replay(dataStore.userEvents(userId))
         Option(UserNameSearchRow(userId, name, user.userProfile.picture, user.userProfile.firstName, user.userProfile.lastName))

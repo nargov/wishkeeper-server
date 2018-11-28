@@ -5,7 +5,7 @@ import java.util.UUID.randomUUID
 
 import co.wishkeeper.server.Events._
 import co.wishkeeper.server.EventsTestHelper.{EventsList, asEventInstances}
-import co.wishkeeper.server.{DataStore, UserNameSearchRow}
+import co.wishkeeper.server.{DataStore, UserEventInstance, UserNameSearchRow}
 import com.wixpress.common.specs2.JMock
 import org.specs2.matcher.Matcher
 import org.specs2.mutable.Specification
@@ -39,7 +39,7 @@ class SimpleScanUserSearchProjectionTest extends Specification with JMock {
         oneOf(dataStore).saveUserByName(UserNameSearchRow(joeId, joeFullName))
       }
 
-      searchProjection.process(UserNameSet(joeId, joeFullName), joeId)
+      searchProjection.process(UserEventInstance(joeId, UserNameSet(joeId, joeFullName)))
     }
 
     "Save a user's name along with existing data" in new Context {
@@ -49,7 +49,7 @@ class SimpleScanUserSearchProjectionTest extends Specification with JMock {
         oneOf(dataStore).saveUserByName(UserNameSearchRow(joeId, joeFullName, Option("pic"), Option("Joe"), Option("Satriani")))
       }
 
-      searchProjection.process(UserNameSet(joeId, joeFullName), joeId)
+      searchProjection.process(UserEventInstance(joeId, UserNameSet(joeId, joeFullName)))
     }
 
     "Save a user's first name for search" in new Context {
@@ -59,7 +59,7 @@ class SimpleScanUserSearchProjectionTest extends Specification with JMock {
         oneOf(dataStore).saveUserByName(UserNameSearchRow(joeId, joeFullName, Option("pic"), Option("Joe"), Option("Satriani")))
       }
 
-      searchProjection.process(UserFirstNameSet(joeId, "Joe"), joeId)
+      searchProjection.process(UserEventInstance(joeId, UserFirstNameSet(joeId, "Joe")))
     }
 
     "Save a user's last name for search" in new Context {
@@ -69,7 +69,7 @@ class SimpleScanUserSearchProjectionTest extends Specification with JMock {
         oneOf(dataStore).saveUserByName(UserNameSearchRow(joeId, joeFullName, Option("pic"), Option("Joe"), Option("Satriani")))
       }
 
-      searchProjection.process(UserLastNameSet(joeId, "Satriani"), joeId)
+      searchProjection.process(UserEventInstance(joeId, UserLastNameSet(joeId, "Satriani")))
     }
 
     "Save a user's picture for search" in new Context {
@@ -79,7 +79,7 @@ class SimpleScanUserSearchProjectionTest extends Specification with JMock {
         oneOf(dataStore).saveUserByName(UserNameSearchRow(joeId, joeFullName, Option("newPic"), Option("Joe"), Option("Satriani")))
       }
 
-      searchProjection.process(UserPictureSet(joeId, "newPic"), joeId)
+      searchProjection.process(UserEventInstance(joeId, UserPictureSet(joeId, "newPic")))
     }
 
     "Save name as first name if name is missing" in new Context {
@@ -88,7 +88,7 @@ class SimpleScanUserSearchProjectionTest extends Specification with JMock {
         oneOf(dataStore).saveUserByName(UserNameSearchRow(joeId, "Joe", None, Option("Joe"), None))
       }
 
-      searchProjection.process(UserFirstNameSet(joeId, "Joe"), joeId)
+      searchProjection.process(UserEventInstance(joeId, UserFirstNameSet(joeId, "Joe")))
     }
 
     "Save name as last name if name is missing" in new Context {
@@ -97,7 +97,7 @@ class SimpleScanUserSearchProjectionTest extends Specification with JMock {
         oneOf(dataStore).saveUserByName(UserNameSearchRow(joeId, "Satriani", None, None, Option("Satriani")))
       }
 
-      searchProjection.process(UserLastNameSet(joeId, "Satriani"), joeId)
+      searchProjection.process(UserEventInstance(joeId, UserLastNameSet(joeId, "Satriani")))
     }
 
     "Rebuild the view" in new Context {

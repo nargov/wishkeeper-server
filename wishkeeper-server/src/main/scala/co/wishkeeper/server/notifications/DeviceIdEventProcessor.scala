@@ -1,10 +1,8 @@
 package co.wishkeeper.server.notifications
 
-import java.util.UUID
-
-import co.wishkeeper.server.Events.DeviceNotificationIdSet
-import co.wishkeeper.server.messaging.{PushNotificationSender, TopicManager}
+import co.wishkeeper.server.Events.{DeviceNotificationIdSet, UserEvent}
 import co.wishkeeper.server._
+import co.wishkeeper.server.messaging.{PushNotificationSender, TopicManager}
 
 class DeviceIdEventProcessor(topicManager: TopicManager, dataStore: DataStore) extends EventProcessor {
   def resubscribeAll(): Unit = {
@@ -14,8 +12,8 @@ class DeviceIdEventProcessor(topicManager: TopicManager, dataStore: DataStore) e
     topicManager.subscribeTo(PushNotificationSender.periodicWakeup, deviceIds.toList)
   }
 
-  override def process(event: Events.Event, userId: UUID): List[(UUID, Events.Event)] = {
-    event match {
+  override def process[E <: UserEvent](instance: UserEventInstance[E]): List[UserEventInstance[_ <: UserEvent]] = {
+    instance.event match {
       case DeviceNotificationIdSet(id) => topicManager.subscribeTo(PushNotificationSender.periodicWakeup, id :: Nil)
       case _ =>
     }

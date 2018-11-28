@@ -4,7 +4,7 @@ import java.util.UUID
 import java.util.UUID.randomUUID
 import java.util.concurrent.TimeUnit.SECONDS
 
-import co.wishkeeper.server.DataStore
+import co.wishkeeper.server.{DataStore, UserEventInstance}
 import co.wishkeeper.server.Events._
 import co.wishkeeper.server.EventsTestHelper.EventsList
 import co.wishkeeper.server.FriendRequestStatus.Approved
@@ -26,7 +26,7 @@ class ReportingEventProcessorTest extends Spec with JMock {
       allowing(dataStore).userEvents(userId).will(returnValue(events.withName(userName).list))
     }
 
-    processor.process(userConnected, userId)
+    processor.process(UserEventInstance(userId, userConnected))
     scheduler.runUntilIdle()
   }
 
@@ -39,7 +39,7 @@ class ReportingEventProcessorTest extends Spec with JMock {
       allowing(dataStore).userEvents(userId).will(returnValue(events.list), returnValue(events.withName(userName).list))
     }
 
-    processor.process(userConnected, userId)
+    processor.process(UserEventInstance(userId, userConnected))
     scheduler.tick(delaySeconds, SECONDS)
   }
 
@@ -53,7 +53,7 @@ class ReportingEventProcessorTest extends Spec with JMock {
       allowing(dataStore).userEvents(userId).will(returnValue(events.withWish(wishAdded.wishId, wishNameSet.name).list))
     }
 
-    processor.process(wishAdded, userId)
+    processor.process(UserEventInstance(userId, wishAdded))
     scheduler.runUntilIdle()
   }
 
@@ -67,7 +67,7 @@ class ReportingEventProcessorTest extends Spec with JMock {
       allowing(dataStore).userEvents(userId).will(returnValue(events.list), returnValue(events.withEvent(wishNameSet).list))
     }
 
-    processor.process(wishAdded, userId)
+    processor.process(UserEventInstance(userId, wishAdded))
     scheduler.tick(delaySeconds, SECONDS)
   }
 
@@ -84,7 +84,7 @@ class ReportingEventProcessorTest extends Spec with JMock {
       allowing(dataStore).userEvents(reserverId).willReturn(EventsList(reserverId).withName(reserverName).list)
     }
 
-    processor.process(wishReserved, userId)
+    processor.process(UserEventInstance(userId, wishReserved))
     scheduler.runUntilIdle()
   }
 
@@ -100,7 +100,7 @@ class ReportingEventProcessorTest extends Spec with JMock {
       allowing(dataStore).userEvents(friendId).willReturn(friendEvents)
     }
 
-    processor.process(FriendRequestStatusChanged(friendId, randomUUID(), userId, Approved), userId)
+    processor.process(UserEventInstance(userId, FriendRequestStatusChanged(friendId, randomUUID(), userId, Approved)))
     scheduler.runUntilIdle()
   }
 
@@ -113,7 +113,7 @@ class ReportingEventProcessorTest extends Spec with JMock {
       allowing(dataStore).userEvents(userId).will(returnValue(events.list))
     }
 
-    processor.process(userConnected, userId)
+    processor.process(UserEventInstance(userId, userConnected))
     scheduler.tick(delaySeconds, SECONDS)
   }
 

@@ -2,11 +2,10 @@ package co.wishkeeper.server.projections
 
 import java.util.UUID
 
-import co.wishkeeper.server.Events.{WishGranted, WishReserved, WishUnreserved}
+import co.wishkeeper.server.Events.{UserEvent, WishGranted, WishReserved, WishUnreserved}
+import co.wishkeeper.server._
 import co.wishkeeper.server.messaging.{ClientNotifier, HistoryUpdated}
 import co.wishkeeper.server.user.events.history._
-import co.wishkeeper.server.{DataStore, EventProcessor, Events, User}
-import org.joda.time.DateTime
 
 trait UserHistoryProjection extends Projection {
   def friendHistory(friendId: UUID): List[HistoryEventInstance]
@@ -15,15 +14,12 @@ trait UserHistoryProjection extends Projection {
 }
 
 class ScanningUserHistoryProjection(dataStore: DataStore, clientNotifier: ClientNotifier) extends UserHistoryProjection with EventProcessor {
-  override def process(event: Events.Event, userId: UUID): List[(UUID, Events.Event)] = {
-    process(event, userId, DateTime.now())
-    Nil
-  }
-
   val unnamed = "Unnamed"
 
-  private def process(event: Events.Event, userId: UUID, time: DateTime): Unit = {
-    event match {
+  override def process[E <: UserEvent](instance: UserEventInstance[E]): List[UserEventInstance[_ <: UserEvent]] = {
+    val userId = instance.userId
+    val time = instance.time
+    instance.event match {
       case WishReserved(wishId, reserverId) =>
         val user = User.replay(dataStore.userEvents(userId))
         val maybeWish = user.wishes.get(wishId)
@@ -60,6 +56,7 @@ class ScanningUserHistoryProjection(dataStore: DataStore, clientNotifier: Client
         }
       case _ =>
     }
+    Nil
   }
 
   implicit val historyOrdering: Ordering[HistoryEventInstance] = Ordering.fromLessThan[HistoryEventInstance]((i1, i2) => i1.time.isAfter(i2.time))
@@ -71,7 +68,6 @@ class ScanningUserHistoryProjection(dataStore: DataStore, clientNotifier: Client
 
   override def rebuild(): Unit = {
     dataStore.truncateHistory()
-    dataStore.allUserEvents(classOf[WishReserved], classOf[WishUnreserved], classOf[WishGranted])
-      .foreach(instance => process(instance.event, instance.userId, instance.time))
+    dataStore.allUserEvents(classOf[WishReserved], classOf[WishUnreserved], classOf[WishGranted]).foreach(instance => process(instance))
   }
 }

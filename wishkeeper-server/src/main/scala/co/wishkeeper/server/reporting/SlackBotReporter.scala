@@ -1,5 +1,6 @@
 package co.wishkeeper.server.reporting
 
+import java.io.{PrintWriter, StringWriter}
 import java.util.concurrent.Executors
 
 import akka.actor.ActorSystem
@@ -8,11 +9,14 @@ import akka.http.scaladsl.model._
 import akka.http.scaladsl.model.headers._
 import akka.stream.ActorMaterializer
 import co.wishkeeper.server
+import co.wishkeeper.server.GeneralError
 import co.wishkeeper.server.notifications.{UserAddedWish, UserFirstConnection, UsersBecameFriends, WishWasReserved}
 import io.circe.generic.auto._
 import io.circe.syntax._
+import org.slf4j.LoggerFactory
 
 import scala.concurrent.{ExecutionContext, Future}
+import scala.util.Try
 
 trait Reporter {
   def report(payload: Any): Future[Either[server.Error, Unit]]
@@ -51,6 +55,15 @@ class SlackBotReporter(slackWebHookUri: String, ec: ExecutionContext = Execution
 
 object NoOpReporter extends Reporter {
   override def report(payload: Any): Future[Either[server.Error, Unit]] = Future.successful(Right(()))
+}
+
+object DebugReporter extends Reporter {
+  private val log = LoggerFactory.getLogger(getClass.getName)
+  override def report(payload: Any): Future[Either[server.Error, Unit]] =
+    Future.successful(Try{log.debug(payload.toString)}.toEither.left.map(t => {
+      t.printStackTrace()
+      GeneralError(t.getMessage)
+    }))
 }
 
 case class SlackData(text: String)

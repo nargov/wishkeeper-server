@@ -17,6 +17,6 @@ class UserByEmailProjectionTest extends Specification with JMock {
       oneOf(dataStore).saveUserByEmail(email, userId)
     }
 
-    new UserByEmailProjection(dataStore).process(UserEmailSet(userId, email), userId) must beEmpty
+    new UserByEmailProjection(dataStore).process(UserEventInstance(userId, UserEmailSet(userId, email))) must beEmpty
   }
 }

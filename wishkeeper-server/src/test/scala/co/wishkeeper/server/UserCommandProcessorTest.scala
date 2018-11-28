@@ -4,13 +4,14 @@ import java.util.UUID
 
 import co.wishkeeper.server.Events._
 import co.wishkeeper.server.EventsTestHelper.{EventsList, asEventInstants, userConnectEvent}
+import co.wishkeeper.server.UserEventTestHelpers.aUserEventInstance
 import co.wishkeeper.server.messaging.{EmailProvider, EmailSender, TemplateEngineAdapter}
 import co.wishkeeper.server.user.commands._
 import co.wishkeeper.server.user.{DummyError, EmailNotVerified, Gender}
 import com.wixpress.common.specs2.JMock
 import org.jmock.lib.concurrent.DeterministicExecutor
 import org.joda.time.{DateTime, LocalDate}
-import org.specs2.matcher.{Matcher, MatcherMacros}
+import org.specs2.matcher.{MatchFailure, MatchResult, Matcher, MatcherMacros, MustThrownMatchers}
 import org.specs2.mutable.Specification
 import org.specs2.specification.Scope
 
@@ -26,7 +27,7 @@ class UserCommandProcessorTest extends Specification with JMock with MatcherMacr
     ignoringSaveUserEvents()
 
     checking {
-      atLeast(1).of(eventProcessor).process(having(any[Event]), having(any[UUID])).willReturn(Nil)
+      atLeast(1).of(eventProcessor).process(having(aUserEventInstance(any[UserEvent], any[UUID]))).willReturn(Nil)
     }
 
     processConnectWithFacebook()
@@ -39,7 +40,7 @@ class UserCommandProcessorTest extends Specification with JMock with MatcherMacr
     ignoringSaveUserSession()
 
     checking {
-      oneOf(eventProcessor).process(having(any[UserConnected]), having(any[UUID])).willReturn(Nil)
+      oneOf(eventProcessor).process(having(any[UserEventInstance[UserConnected]])).willReturn(Nil)
     }
 
     processConnectWithFacebook()
@@ -53,10 +54,11 @@ class UserCommandProcessorTest extends Specification with JMock with MatcherMacr
     ignoringProcessFacebookIdSet()
 
     checking {
-      oneOf(eventProcessor).process(having(aUserConnectedEventFor(userId)), having(===(userId))).willReturn(Nil)
+      oneOf(eventProcessor).process(having(aUserEventInstance(aUserConnectedEventFor(userId), ===(userId)))).willReturn(Nil)
     }
 
     processConnectWithFacebook()
+
   }
 
   "load user if session exists" in new Context {
@@ -106,7 +108,7 @@ class UserCommandProcessorTest extends Specification with JMock with MatcherMacr
     checking {
       allowing(dataStore).saveUserEvents(having(===(userId)), having(beSome(3L)), having(any[DateTime]), having(contain(any[UserEvent]))).
         will(returnValue(false), returnValue(true))
-      oneOf(eventProcessor).process(having(any[Event]), having(===(userId))).willReturn(Nil)
+      oneOf(eventProcessor).process(having(aUserEventInstance(any[UserEvent], ===(userId)))).willReturn(Nil)
     }
 
     commandProcessor.process(SetFacebookUserInfo(name = Option("name")), Some(sessionId))
@@ -135,8 +137,8 @@ class UserCommandProcessorTest extends Specification with JMock with MatcherMacr
     val expectedEvent = UserFirstNameSet(userId, "Roger")
 
     checking {
-      allowing(eventProcessor).process(NoOp, userId).willReturn((userId, expectedEvent) :: Nil)
-      oneOf(eventProcessor).process(expectedEvent, userId).willReturn(Nil)
+      allowing(eventProcessor).process(having(aUserEventInstance(===(NoOp), ===(userId)))).willReturn(UserEventInstance(userId, expectedEvent) :: Nil)
+      oneOf(eventProcessor).process(having(aUserEventInstance(===(expectedEvent), ===(userId)))).willReturn(Nil)
     }
 
     commandProcessor.validatedProcess(DummyCommand(NoOp :: Nil), userId)(alwaysValid)
@@ -389,8 +391,8 @@ class UserCommandProcessorTest extends Specification with JMock with MatcherMacr
       allowing(googleAuth).validateIdToken(idToken).willReturn(Right(googleUser))
       allowing(googleAuth).fetchAdditionalUserData(accessToken, googleUserId).willReturn(Right(GoogleUserData()))
       allowing(dataStore).saveUserEvents(having(any[UUID]), having(beNone), having(any[DateTime]), having(any)).willReturn(true)
-      oneOf(eventProcessor).process(having(beAnInstanceOf[UserConnected]), having(any[UUID])).willReturn(Nil)
-      allowing(eventProcessor).process(having(not(beAnInstanceOf[UserConnected])), having(any[UUID])).willReturn(Nil)
+      oneOf(eventProcessor).process(having(aUserEventInstance(beAnInstanceOf[UserConnected], any[UUID]))).willReturn(Nil)
+      allowing(eventProcessor).process(having(aUserEventInstance(not(beAnInstanceOf[UserConnected]), any[UUID]))).willReturn(Nil)
     }
 
     commandProcessor.connectWithGoogle(ConnectGoogleUser(accessToken, idToken, sessionId))
@@ -449,11 +451,11 @@ class UserCommandProcessorTest extends Specification with JMock with MatcherMacr
     }
 
     def ignoringSaveUserEvents() = checking {
-      ignoring(dataStore).saveUserEvents(having(any[UUID]), having(any), having(any[DateTime]), having(any[Seq[Event]])).willReturn(true)
+      ignoring(dataStore).saveUserEvents(having(any[UUID]), having(any), having(any[DateTime]), having(any[Seq[UserEvent]])).willReturn(true)
     }
 
     def ignoringSaveUserSession() = checking {
-      ignoring(dataStore).saveUserSession(having(any[UUID]), having(any[UUID]), having(any[DateTime]))
+      ignoring(dataStore).saveUserSession(having(any[UUID]), having(any[UUID]), having(any[DateTime])).willReturn(true)
     }
 
     def assumeNewUser() = checking {
@@ -466,7 +468,7 @@ class UserCommandProcessorTest extends Specification with JMock with MatcherMacr
     override val commandProcessor = new UserCommandProcessor(dataStore, eventProcessor :: Nil, googleAuth, firebaseAuth)
 
     def ignoringProcessFacebookIdSet() = checking {
-      ignoring(eventProcessor).process(having(any[UserFacebookIdSet]), having(any[UUID])).willReturn(Nil)
+      ignoring(eventProcessor).process(having(aUserEventInstance(any[UserFacebookIdSet], any[UUID]))).willReturn(Nil)
     }
   }
 
@@ -484,4 +486,12 @@ class UserCommandProcessorTest extends Specification with JMock with MatcherMacr
 
 case class DummyCommand(eventsToReturn: List[UserEvent] = Nil) extends UserCommand {
   override def process(user: User): List[UserEvent] = eventsToReturn
+}
+
+object UserEventTestHelpers extends MustThrownMatchers {
+  def aUserEventInstance[E <: UserEvent](event: Matcher[E], userId: Matcher[UUID]): Matcher[UserEventInstance[_ <: UserEvent]] =
+    (instance: UserEventInstance[_ <: UserEvent]) => instance match {
+      case UserEventInstance(uId, ev: E, _) => userId(createExpectable(uId)) and event(createExpectable(ev))
+      case _ => MatchFailure("Not the expected event", "Is the expected event", createExpectable(instance.event))
+    }
 }
