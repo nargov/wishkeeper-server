@@ -11,7 +11,7 @@ class EmailSender(emailProvider: EmailProvider, templateEngineAdapter: TemplateE
       Map("token" -> token, "firstName" -> firstName)).toEither.left.map(t => GeneralError(t.getMessage))
 
     template.fold(err => Future.successful(Left(err)),
-      emailProvider.sendEmail(to, "do-not-replay@wishkeeper.co", EmailSender.verificationEmailSubject, "", _))
+      emailProvider.sendEmail(to, "Wishkeeper <hello@wishkeeper.co>", EmailSender.verificationEmailSubject, "", _))
   }
 }
 
