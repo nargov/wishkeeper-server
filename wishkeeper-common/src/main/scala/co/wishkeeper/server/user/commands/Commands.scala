@@ -167,11 +167,16 @@ case class CreateUserEmailFirebase(email: String, idToken: String, firstName: St
   override def process(user: User): List[UserEvent] = {
     List(
       EmailConnectStarted(user.id),
-      UserFirstNameSet(user.id, firstName),
-      UserLastNameSet(user.id, lastName),
-      UserNameSet(user.id, firstName + " " + lastName),
       DeviceNotificationIdSet(notificationId)
-    ) ++ user.userProfile.email.fold(List(UserEmailSet(user.id, email)))(_ => Nil)
+    ) ++ user.userProfile.email.fold(List(UserEmailSet(user.id, email)))(_ => Nil) ++
+      user.userProfile.firstName.fold(List(UserFirstNameSet(user.id, firstName)))(_ => Nil) ++
+      user.userProfile.lastName.fold(List(UserLastNameSet(user.id, lastName)))(_ => Nil) ++
+      ((user.userProfile.firstName, user.userProfile.lastName) match {
+        case (None, None) => List(UserNameSet(user.id, firstName + " " + lastName))
+        case (None, Some(n)) => List(UserNameSet(user.id, firstName + " " + n))
+        case (Some(n), None) => List(UserNameSet(user.id, n + " " + lastName))
+        case _ => Nil
+      })
   }
 }
 
@@ -181,6 +186,7 @@ object CreateUserEmailFirebase {
 
 case object MarkEmailVerified extends UserCommand {
   override def process(user: User): List[UserEvent] = user.userProfile.email.fold[List[UserEvent]](Nil)(email => List(EmailVerified(email)))
+
   implicit val validator: UserCommandValidator[MarkEmailVerified.type] = Always
 }
 
