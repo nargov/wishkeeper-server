@@ -13,19 +13,12 @@ trait UserSearchProjection {
 class SimpleScanUserSearchProjection(dataStore: DataStore) extends UserSearchProjection with EventProcessor with Projection {
 
   override def rebuild(): Unit = {
-    val eventInstances = dataStore.allUserEvents(classOf[UserNameSet], classOf[UserFirstNameSet], classOf[UserLastNameSet], classOf[UserPictureSet])
-    val rows = eventInstances.foldLeft(Map.empty[UUID, UserNameSearchRow])((m, instance) => instance match {
-      case UserEventInstance(userId, UserNameSet(_, name), _) =>
-        m.updated(userId, m.get(userId).map(_.copy(name = name)).getOrElse(UserNameSearchRow(userId, name)))
-      case UserEventInstance(userId, UserFirstNameSet(_, name), _) =>
-        m.updated(userId, m.get(userId).map(_.copy(firstName = Option(name))).getOrElse(UserNameSearchRow(userId, name, firstName = Option(name))))
-      case UserEventInstance(userId, UserLastNameSet(_, name), _) =>
-        m.updated(userId, m.get(userId).map(_.copy(lastName = Option(name))).getOrElse(UserNameSearchRow(userId, name, lastName = Option(name))))
-      case UserEventInstance(userId, UserPictureSet(_, link), _) =>
-        m.updated(userId, m.get(userId).map(_.copy(picture = Option(link))).getOrElse(UserNameSearchRow(userId, "", picture = Option(link))))
-      case _ => m
-    }).values.toList
-    dataStore.saveUserByName(rows)
+    dataStore.userEmails.foreach(pair => {
+      val userId = pair._2
+      val user = User.replay(dataStore.userEvents(userId))
+      val profile = user.userProfile
+      profile.name.foreach(name => dataStore.saveUserByName(UserNameSearchRow(userId, name, profile.picture, profile.firstName, profile.lastName)))
+    })
   }
 
   def byName(userId: UUID, query: String): UserSearchResults = {
@@ -57,24 +50,32 @@ class SimpleScanUserSearchProjection(dataStore: DataStore) extends UserSearchPro
 
   override def process[E <: UserEvent](instance: UserEventInstance[E]): List[UserEventInstance[_ <: UserEvent]] = {
     val userId = instance.userId
-    val rowToSave: Option[UserNameSearchRow] = instance.event match {
+    instance.event match {
       case UserNameSet(_, name) =>
-        val user = User.replay(dataStore.userEvents(userId))
-        Option(UserNameSearchRow(userId, name, user.userProfile.picture, user.userProfile.firstName, user.userProfile.lastName))
+        doIfValidUser(userId, user =>
+          UserNameSearchRow(userId, name, user.userProfile.picture, user.userProfile.firstName, user.userProfile.lastName))
       case UserFirstNameSet(_, name) =>
-        val user = User.replay(dataStore.userEvents(userId))
-        val fullName = user.userProfile.name.getOrElse(name)
-        Option(UserNameSearchRow(userId, fullName, user.userProfile.picture, Option(name), user.userProfile.lastName))
+        doIfValidUser(userId, user => {
+          val fullName = user.userProfile.name.getOrElse(name)
+          UserNameSearchRow(userId, fullName, user.userProfile.picture, Option(name), user.userProfile.lastName)
+        })
       case UserLastNameSet(_, name) =>
-        val user = User.replay(dataStore.userEvents(userId))
-        val fullName = user.userProfile.name.getOrElse(name)
-        Option(UserNameSearchRow(userId, fullName, user.userProfile.picture, user.userProfile.firstName, Option(name)))
+        doIfValidUser(userId, user => {
+          val fullName = user.userProfile.name.getOrElse(name)
+          UserNameSearchRow(userId, fullName, user.userProfile.picture, user.userProfile.firstName, Option(name))
+        })
       case UserPictureSet(_, link) =>
-        val user = User.replay(dataStore.userEvents(userId))
-        Option(UserNameSearchRow(userId, user.userProfile.name.get, Option(link), user.userProfile.firstName, user.userProfile.lastName))
-      case _ => None
+        doIfValidUser(userId, user =>
+          UserNameSearchRow(userId, user.userProfile.name.get, Option(link), user.userProfile.firstName, user.userProfile.lastName))
+      case _ =>
     }
-    rowToSave.foreach(dataStore.saveUserByName)
     Nil
+  }
+
+  private def doIfValidUser(userId: UUID, row: User => UserNameSearchRow) = {
+    val user = User.replay(dataStore.userEvents(userId))
+    if (user.flags.everConnected) {
+      dataStore.saveUserByName(row(user))
+    }
   }
 }

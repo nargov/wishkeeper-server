@@ -86,7 +86,8 @@ class UserTest extends Specification with MatcherMacros with JMock with Notifica
       UserEventInstant(UserConnected(user.id, time, randomUUID()), time),
       UserEventInstant(UserNameSet(user.id, name), time)
     )
-    User.replay(events) must beEqualTo(User(user.id, created = time, userProfile = UserProfile(name = Option(name))))
+    User.replay(events) must beEqualTo(User(user.id, created = time, userProfile = UserProfile(name = Option(name)),
+      flags = Flags(everConnected = true)))
   }
 
   "throw exception if first event is not UserConnected" in {
@@ -433,6 +434,10 @@ class UserTest extends Specification with MatcherMacros with JMock with Notifica
     val flags: Flags = events.foldLeft(user)(_.applyEvent(_)).flags
     flags.haveOpenEmailConnect must beFalse
     flags.emailVerified must beTrue
+  }
+
+  "User Connected event marks flag" in new Context {
+    EventsList(user.id).list.foldLeft(user)(_.applyEvent(_)).flags.everConnected must beTrue
   }
 
   trait Context extends Scope {

@@ -106,6 +106,7 @@ case class User(id: UUID,
     case UserEventInstant(e@UserAnniversarySet(_), time) => handleEventWithHandler(e, time)
     case UserEventInstant(e@EmailConnectStarted(_), time) => handleEventWithHandler(e, time)
     case UserEventInstant(e@EmailVerified(_), time) => handleEventWithHandler(e, time)
+    case UserEventInstant(e@UserConnected(_, _, _), time) => handleEventWithHandler(e, time)
     case _ => this
   }
 
@@ -147,7 +148,9 @@ case class Friends(current: List[UUID] = Nil,
                    receivedRequests: List[FriendRequest] = Nil)
 
 case class Flags(seenFacebookFriendsList: Boolean = false, seenGoogleFriendsList: Boolean = false, haveOpenEmailConnect: Boolean = false,
-                 emailVerified: Boolean = false)
+                 emailVerified: Boolean = false, everConnected: Boolean = false) {
+
+}
 
 case class Settings(deviceNotificationId: Option[String] = None, general: GeneralSettings = GeneralSettings())
 

@@ -4,7 +4,7 @@ import java.util.UUID
 import java.util.UUID.randomUUID
 
 import co.wishkeeper.server.Events._
-import co.wishkeeper.server.EventsTestHelper.{EventsList, asEventInstances}
+import co.wishkeeper.server.EventsTestHelper.{EventsList, asEventInstants}
 import co.wishkeeper.server.{DataStore, UserEventInstance, UserNameSearchRow}
 import com.wixpress.common.specs2.JMock
 import org.specs2.matcher.Matcher
@@ -22,7 +22,7 @@ class SimpleScanUserSearchProjectionTest extends Specification with JMock {
     }
 
     "return multiple matches" in new Context {
-      searchFor("jo")must contain(exactly(aUser(joeId), aUser(jonathanId), aUser(bobbyboobriId)))
+      searchFor("jo") must contain(exactly(aUser(joeId), aUser(jonathanId), aUser(bobbyboobriId)))
     }
 
     "return first name matches before last name matches" in new Context {
@@ -101,24 +101,18 @@ class SimpleScanUserSearchProjectionTest extends Specification with JMock {
     }
 
     "Rebuild the view" in new Context {
-      val joePic = "Joe's pic"
       val bobLastName = "Dylan"
       val bobName = s"Bob $bobLastName"
       val jonathanName = "Jonathan Strange"
+
       checking {
-        allowing(dataStore).allUserEvents(classOf[UserNameSet], classOf[UserFirstNameSet], classOf[UserLastNameSet], classOf[UserPictureSet])
-          .willReturn(asEventInstances(List(
-            (joeId, UserNameSet(joeId, joeFullName)),
-            (bobbyId, UserNameSet(bobbyId, bobName)),
-            (jonathanId, UserNameSet(jonathanId, jonathanName)),
-            (joeId, UserPictureSet(joeId, joePic)),
-            (bobbyId, UserLastNameSet(bobbyId, bobLastName))
-          )).toIterator)
-        oneOf(dataStore).saveUserByName(List(
-          UserNameSearchRow(joeId, joeFullName, Option(joePic)),
-          UserNameSearchRow(bobbyId, bobName, lastName = Option(bobLastName)),
-          UserNameSearchRow(jonathanId, jonathanName)
-        ))
+        allowing(dataStore).userEmails.willReturn(List(joeEmail -> joeId, "bobbyEmail" -> bobbyId, "jonathanEmail" -> jonathanId).iterator)
+        allowing(dataStore).userEvents(joeId).will(returnValue(EventsList(joeId).withName(joeFullName).withPic(joePic).list))
+        allowing(dataStore).userEvents(bobbyId).willReturn(EventsList(bobbyId).withName(bobName).withLastName(bobLastName).list)
+        allowing(dataStore).userEvents(jonathanId).willReturn(EventsList(jonathanId).withName(jonathanName).list)
+        oneOf(dataStore).saveUserByName(UserNameSearchRow(joeId, joeFullName, Option(joePic)))
+        oneOf(dataStore).saveUserByName(UserNameSearchRow(bobbyId, bobName, lastName = Option(bobLastName)))
+        oneOf(dataStore).saveUserByName(UserNameSearchRow(jonathanId, jonathanName))
       }
 
       searchProjection.rebuild()
@@ -132,13 +126,35 @@ class SimpleScanUserSearchProjectionTest extends Specification with JMock {
       searchFor("bb jo") must contain(exactly(
         UserSearchResult(bobbyboobriId, "Bobbyboobri Jones", firstName = Option("Bobbyboobri"), isDirectFriend = true)))
     }
+
+    "Not add user to search if never connected" in new Context {
+      checking {
+        never(dataStore).saveUserByName(having(any[UserNameSearchRow]))
+        never(dataStore).saveUserByName(having(any[List[UserNameSearchRow]]))
+        allowing(dataStore).userEvents(joeId).willReturn(asEventInstants(List(EmailConnectStarted(joeId))))
+      }
+
+      searchProjection.process(UserEventInstance(joeId, UserNameSet(joeId, joeFullName)))
+    }
+
+    "Not add user to search if never connected on rebuild" in new Context {
+      checking {
+        allowing(dataStore).userEmails.willReturn(List(joeEmail -> joeId).iterator)
+        allowing(dataStore).userEvents(joeId).willReturn(EventsList(joeId).withEvent(EmailConnectStarted(joeId)).withEmail(joeEmail).list)
+        never(dataStore).saveUserByName(having[List[UserNameSearchRow]](contain(aRowFor(joeId))))
+      }
+      searchProjection.rebuild()
+    }
   }
+
+  def aRowFor(id: UUID): Matcher[UserNameSearchRow] = ===(id) ^^ ((_: UserNameSearchRow).userId)
 
   def aUser(id: UUID): Matcher[UserSearchResult] = ===(id) ^^ ((_: UserSearchResult).userId)
 
   trait Context extends Scope {
     val userId = randomUUID()
     val joeId = randomUUID()
+    val joeEmail = "joeEmail"
     val bobbyId = randomUUID()
     val bobbyboobriId = randomUUID()
     val jonathanId = randomUUID()
@@ -147,6 +163,7 @@ class SimpleScanUserSearchProjectionTest extends Specification with JMock {
     val dataStore = mock[DataStore]
     val searchProjection = new SimpleScanUserSearchProjection(dataStore)
     val joeFullName = "Joe Satriani"
+    val joePic = "Joe's picture"
 
     def searchFor(term: String): List[UserSearchResult] = {
       searchProjection.byName(userId, term).users
@@ -154,7 +171,7 @@ class SimpleScanUserSearchProjectionTest extends Specification with JMock {
 
     checking {
       allowing(dataStore).userNames().willReturn(List(
-        UserNameSearchRow(joeId, joeFullName, Option("Joe's picture"), Option("Joe"), Option("Satriani")),
+        UserNameSearchRow(joeId, joeFullName, Option(joePic), Option("Joe"), Option("Satriani")),
         UserNameSearchRow(bobbyId, "Bobby Briggs", None, Option("Bobby"), Option("Briggs")),
         UserNameSearchRow(bobbyboobriId, "Bobbyboobri Jones", None, Option("Bobbyboobri"), Option("Jones")),
         UserNameSearchRow(jonathanId, "Jonathan Price", None, Option("Jonathan"), Option("Price")),
