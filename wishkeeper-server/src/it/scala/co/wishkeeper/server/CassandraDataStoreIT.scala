@@ -165,6 +165,12 @@ class CassandraDataStoreIT extends FlatSpec with Matchers with BeforeAndAfterAll
     dataStore.verifyEmailToken(token.token) shouldBe Right(token.copy(verified = true))
   }
 
+  it should "truncate the user by name table" in {
+    dataStore.saveUserByName(UserNameSearchRow(randomUUID(), "name"))
+    dataStore.truncateUserByName()
+    dataStore.userNames() should have size 0
+  }
+
   val dataStoreTestHelper = DataStoreTestHelper()
 
   override protected def beforeAll(): Unit = {

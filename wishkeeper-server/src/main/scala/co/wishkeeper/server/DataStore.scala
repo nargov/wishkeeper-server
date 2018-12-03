@@ -64,6 +64,8 @@ trait DataStore {
 
   def userEvents(userId: UUID): List[UserEventInstant[_ <: UserEvent]]
 
+  def truncateUserByName(): Boolean
+
   def connect(): Unit
 
   def close(): Unit
@@ -113,6 +115,7 @@ class CassandraDataStore(dataStoreConfig: DataStoreConfig) extends DataStore {
     s"insert into $emailTokensTable (emailToken, email, userId, time, verified) values (:emailToken, :email, :userId, :time, :verified)")
   private lazy val selectVerificationToken = session.prepare(s"select * from $emailTokensTable where emailToken = :emailToken")
   private lazy val setTokenVerified = session.prepare(s"update $emailTokensTable set verified = true where emailToken = :emailToken")
+  private lazy val truncateUserByNameTable = session.prepare(s"truncate table $userByNameTable")
 
 
   override def saveUserEvents(userId: UUID, lastSeqNum: Option[Long], time: DateTime, events: Seq[UserEvent]): Boolean = {
@@ -244,6 +247,8 @@ class CassandraDataStore(dataStoreConfig: DataStoreConfig) extends DataStore {
         lastName = Option(row.getString("last_name"))
       )).toList
   }
+
+  override def truncateUserByName(): Boolean = session.execute(truncateUserByNameTable.bind()).wasApplied()
 
   override def allUserEvents(eventTypes: Class[_ <: UserEvent]*): Iterator[UserEventInstance[_ <: UserEvent]] = {
     session.execute(selectAllUserEvents.bind()).iterator().asScala.map(rowToEventInstance).

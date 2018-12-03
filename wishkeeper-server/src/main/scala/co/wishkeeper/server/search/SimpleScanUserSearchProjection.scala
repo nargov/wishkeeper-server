@@ -13,6 +13,7 @@ trait UserSearchProjection {
 class SimpleScanUserSearchProjection(dataStore: DataStore) extends UserSearchProjection with EventProcessor with Projection {
 
   override def rebuild(): Unit = {
+    dataStore.truncateUserByName()
     dataStore.userEmails.foreach(pair => {
       val userId = pair._2
       val user = User.replay(dataStore.userEvents(userId))

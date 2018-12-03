@@ -110,6 +110,7 @@ class SimpleScanUserSearchProjectionTest extends Specification with JMock {
         allowing(dataStore).userEvents(joeId).will(returnValue(EventsList(joeId).withName(joeFullName).withPic(joePic).list))
         allowing(dataStore).userEvents(bobbyId).willReturn(EventsList(bobbyId).withName(bobName).withLastName(bobLastName).list)
         allowing(dataStore).userEvents(jonathanId).willReturn(EventsList(jonathanId).withName(jonathanName).list)
+        oneOf(dataStore).truncateUserByName()
         oneOf(dataStore).saveUserByName(UserNameSearchRow(joeId, joeFullName, Option(joePic)))
         oneOf(dataStore).saveUserByName(UserNameSearchRow(bobbyId, bobName, lastName = Option(bobLastName)))
         oneOf(dataStore).saveUserByName(UserNameSearchRow(jonathanId, jonathanName))
@@ -141,6 +142,7 @@ class SimpleScanUserSearchProjectionTest extends Specification with JMock {
       checking {
         allowing(dataStore).userEmails.willReturn(List(joeEmail -> joeId).iterator)
         allowing(dataStore).userEvents(joeId).willReturn(EventsList(joeId).withEvent(EmailConnectStarted(joeId)).withEmail(joeEmail).list)
+        allowing(dataStore).truncateUserByName()
         never(dataStore).saveUserByName(having[List[UserNameSearchRow]](contain(aRowFor(joeId))))
       }
       searchProjection.rebuild()
