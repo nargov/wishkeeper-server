@@ -74,3 +74,8 @@ case class EmailNotVerified(email: String) extends ValidationError {
   override val message: String = s"Email $email is not verified."
   override val code: String = "user.profile.email.not-verified"
 }
+
+case object EmailTokenAlreadyVerified extends ValidationError {
+  override val message: String = ""
+  override val code: String = "email.token.already-verified"
+}

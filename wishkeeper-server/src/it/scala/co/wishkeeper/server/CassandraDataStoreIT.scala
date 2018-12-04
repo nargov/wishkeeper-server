@@ -7,7 +7,7 @@ import co.wishkeeper.DataStoreTestHelper
 import co.wishkeeper.server.Events.{UserConnected, UserNameSet}
 import co.wishkeeper.server.EventsTestHelper.EventsList
 import co.wishkeeper.server.image.ContentTypes
-import co.wishkeeper.server.user.VerificationToken
+import co.wishkeeper.server.user.{EmailTokenAlreadyVerified, VerificationToken}
 import co.wishkeeper.server.user.events.history.{HistoryEventInstance, ReceivedWish, ReservedWish}
 import org.joda.time.DateTime
 import org.scalatest.enablers.Containing
@@ -169,6 +169,14 @@ class CassandraDataStoreIT extends FlatSpec with Matchers with BeforeAndAfterAll
     dataStore.saveUserByName(UserNameSearchRow(randomUUID(), "name"))
     dataStore.truncateUserByName()
     dataStore.userNames() should have size 0
+  }
+
+  it should "fail marking email verified if already verified" in {
+    val token = randomUUID()
+    val verificationToken = VerificationToken(token, "test.email@example.com", randomUUID())
+    dataStore.saveVerificationToken(verificationToken)
+    dataStore.verifyEmailToken(token) shouldBe Right(verificationToken.copy(verified = true))
+    dataStore.verifyEmailToken(token) shouldBe Left(EmailTokenAlreadyVerified)
   }
 
   val dataStoreTestHelper = DataStoreTestHelper()

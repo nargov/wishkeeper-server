@@ -6,7 +6,7 @@ import java.util.concurrent.atomic.AtomicReference
 
 import co.wishkeeper.json._
 import co.wishkeeper.server.Events.UserEvent
-import co.wishkeeper.server.user.VerificationToken
+import co.wishkeeper.server.user.{EmailTokenAlreadyVerified, VerificationToken}
 import co.wishkeeper.server.user.events.history.{HistoryEvent, HistoryEventInstance}
 import com.datastax.driver.core._
 import io.circe.generic.extras
@@ -114,7 +114,8 @@ class CassandraDataStore(dataStoreConfig: DataStoreConfig) extends DataStore {
   private lazy val insertVerificationToken = session.prepare(
     s"insert into $emailTokensTable (emailToken, email, userId, time, verified) values (:emailToken, :email, :userId, :time, :verified)")
   private lazy val selectVerificationToken = session.prepare(s"select * from $emailTokensTable where emailToken = :emailToken")
-  private lazy val setTokenVerified = session.prepare(s"update $emailTokensTable set verified = true where emailToken = :emailToken")
+  private lazy val setTokenVerified = session.prepare(
+    s"update $emailTokensTable set verified = true where emailToken = :emailToken if verified = false")
   private lazy val truncateUserByNameTable = session.prepare(s"truncate table $userByNameTable")
 
 
@@ -308,7 +309,7 @@ class CassandraDataStore(dataStoreConfig: DataStoreConfig) extends DataStore {
   override def verifyEmailToken(token: UUID): Either[Error, VerificationToken] = Try {
     session.execute(setTokenVerified.bind().setUUID("emailToken", token)).wasApplied()
   }.toEither.left.map(x => DatabaseError(x.getMessage, x))
-    .flatMap(wasApplied => Either.cond[Error, Unit](wasApplied, (), DatabaseSaveError("Error saving verified email token status")))
+    .flatMap(wasApplied => Either.cond[Error, Unit](wasApplied, (), EmailTokenAlreadyVerified))
     .flatMap(_ => readVerificationToken(token))
 
   override def close(): Unit = {

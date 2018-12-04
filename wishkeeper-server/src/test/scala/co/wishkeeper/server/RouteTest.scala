@@ -755,6 +755,20 @@ class RouteTest extends Specification with Specs2RouteTest with JMock {
         status must beEqualTo(StatusCodes.OK)
       }
     }
+
+    "redirect to error page when trying to verify email with used token" in new NotLoggedInContext {
+      val verificationToken = randomUUID()
+
+      checking {
+        allowing(publicApi).verifyEmail(verificationToken).willReturn(Left(EmailTokenAlreadyVerified))
+      }
+
+      Get(s"/connect/new/email-confirm?t=$verificationToken") ~> webApi.newUserRoute ~> check {
+        handled must beTrue
+        status must beEqualTo(StatusCodes.MovedPermanently)
+        header("Location").map(_.value() must beEqualTo(WebApi.emailConfirmationAlreadyVerified))
+      }
+    }
   }
 
   trait BaseContext extends Scope {
