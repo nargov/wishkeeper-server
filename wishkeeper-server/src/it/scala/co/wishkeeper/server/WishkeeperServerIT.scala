@@ -46,7 +46,7 @@ class WishkeeperServerIT(implicit ee: ExecutionEnv) extends Specification with B
   var testUsers: List[TestFacebookUser] = _
 
   "User should be able to send a friend request" in new Context {
-    val connectRequests: Seq[ConnectFacebookUser] = testUsers.map(user => ConnectFacebookUser(user.id, user.access_token, randomUUID()))
+    val connectRequests: Seq[ConnectFacebookUser] = testUsers.map(user => ConnectFacebookUser(user.id, user.access_token, randomUUID(), user.email))
     val user1Connect :: user2Connect :: Nil = connectRequests
     Future.sequence(connectRequests.map(Post.async(s"$usersEndpoint/connect/facebook", _))) must forall(beOk).await(20, 0.5.seconds)
 
@@ -70,7 +70,7 @@ class WishkeeperServerIT(implicit ee: ExecutionEnv) extends Specification with B
     val facebookUser = testUsers.head
     val sessionId = randomUUID()
 
-    Post(s"$usersEndpoint/connect/facebook", ConnectFacebookUser(facebookUser.id, facebookUser.access_token, sessionId))
+    Post(s"$usersEndpoint/connect/facebook", ConnectFacebookUser(facebookUser.id, facebookUser.access_token, sessionId, facebookUser.email))
     val userId = Get(s"$usersManagementEndpoint/facebook/${facebookUser.id}").to[UUID]
 
     val wish = Wish(userId).withName("Expected Name")
@@ -88,7 +88,7 @@ class WishkeeperServerIT(implicit ee: ExecutionEnv) extends Specification with B
     val wishId = randomUUID()
     val imageId = new UUID(0, 0)
 
-    Post(s"$usersEndpoint/connect/facebook", ConnectFacebookUser(facebookUser.id, facebookUser.access_token, sessionId))
+    Post(s"$usersEndpoint/connect/facebook", ConnectFacebookUser(facebookUser.id, facebookUser.access_token, sessionId, facebookUser.email))
 
     ImagePost(s"$usersEndpoint/wishes/$wishId/image", testImage, imageId, Map(
       sessionIdHeader -> sessionId.toString,
@@ -106,7 +106,7 @@ class WishkeeperServerIT(implicit ee: ExecutionEnv) extends Specification with B
   }
 
   "Get a notification when friend approves friend request" in new Context {
-    val connectRequests: Seq[ConnectFacebookUser] = testUsers.map(user => ConnectFacebookUser(user.id, user.access_token, randomUUID()))
+    val connectRequests: Seq[ConnectFacebookUser] = testUsers.map(user => ConnectFacebookUser(user.id, user.access_token, randomUUID(), user.email))
     val user1Connect :: user2Connect :: Nil = connectRequests
     Future.sequence(connectRequests.map(Post.async(s"$usersEndpoint/connect/facebook", _))) must forall(beOk).await(20, 0.5.seconds)
 
@@ -126,7 +126,7 @@ class WishkeeperServerIT(implicit ee: ExecutionEnv) extends Specification with B
   }
 
   "receive notification through web socket" in new Context {
-    val connectRequests: Seq[ConnectFacebookUser] = testUsers.map(user => ConnectFacebookUser(user.id, user.access_token, randomUUID()))
+    val connectRequests: Seq[ConnectFacebookUser] = testUsers.map(user => ConnectFacebookUser(user.id, user.access_token, randomUUID(), user.email))
     val user1Connect :: user2Connect :: Nil = connectRequests
     Future.sequence(connectRequests.map(Post.async(s"$usersEndpoint/connect/facebook", _))) must forall(beOk).await(20, 0.5.seconds)
     val user1SessionId: String = user1Connect.sessionId.toString
@@ -153,7 +153,7 @@ class WishkeeperServerIT(implicit ee: ExecutionEnv) extends Specification with B
   }
 
   "Search for a user by name" in new Context {
-    val connectRequests: Seq[ConnectFacebookUser] = testUsers.map(user => ConnectFacebookUser(user.id, user.access_token, randomUUID()))
+    val connectRequests: Seq[ConnectFacebookUser] = testUsers.map(user => ConnectFacebookUser(user.id, user.access_token, randomUUID(), user.email))
     val user1Connect :: user2Connect :: Nil = connectRequests
     Future.sequence(connectRequests.map(Post.async(s"$usersEndpoint/connect/facebook", _))) must forall(beOk).await(20, 0.5.seconds)
     val user1SessionId: String = user1Connect.sessionId.toString

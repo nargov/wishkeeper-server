@@ -81,7 +81,7 @@ class TestUsersHelper(server: String = s"http://localhost:12300/users",
   private def sendConnectRequests(usersWithSessionIds: Future[List[TestFacebookUser]]) = {
     usersWithSessionIds.flatMap { userList =>
       val connectRequests: Seq[ConnectFacebookUser] = userList.map(user =>
-        ConnectFacebookUser(user.id, user.access_token, user.sessionId.getOrElse(randomUUID())))
+        ConnectFacebookUser(user.id, user.access_token, user.sessionId.getOrElse(randomUUID()), user.email))
       Future.sequence(connectRequests.map(Post.async(s"$usersEndpoint/connect/facebook", _)))
     }
   }

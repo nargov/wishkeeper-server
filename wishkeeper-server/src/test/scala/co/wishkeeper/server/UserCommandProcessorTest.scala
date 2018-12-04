@@ -11,7 +11,7 @@ import co.wishkeeper.server.user.{DummyError, EmailNotVerified, Gender}
 import com.wixpress.common.specs2.JMock
 import org.jmock.lib.concurrent.DeterministicExecutor
 import org.joda.time.{DateTime, LocalDate}
-import org.specs2.matcher.{MatchFailure, MatchResult, Matcher, MatcherMacros, MustThrownMatchers}
+import org.specs2.matcher.{MatchFailure, Matcher, MatcherMacros, MustThrownMatchers}
 import org.specs2.mutable.Specification
 import org.specs2.specification.Scope
 
@@ -23,6 +23,7 @@ class UserCommandProcessorTest extends Specification with JMock with MatcherMacr
 
   "notify event processors on new events" in new EventProcessorContext {
     assumeNoSuchUserForFacebookId()
+    assumeNoSuchUserForEmail()
     ignoringSaveUserSession()
     ignoringSaveUserEvents()
 
@@ -35,6 +36,7 @@ class UserCommandProcessorTest extends Specification with JMock with MatcherMacr
 
   "create new user on ConnectFacebookUser if user doesn't exist" in new EventProcessorContext {
     assumeNoSuchUserForFacebookId()
+    assumeNoSuchUserForEmail()
     ignoringSaveUserEvents()
     ignoringProcessFacebookIdSet()
     ignoringSaveUserSession()
@@ -398,6 +400,22 @@ class UserCommandProcessorTest extends Specification with JMock with MatcherMacr
     commandProcessor.connectWithGoogle(ConnectGoogleUser(accessToken, idToken, sessionId))
   }
 
+  "Connect with existing user if email exists" in new EventProcessorContext {
+    assumeNoSuchUserForFacebookId()
+    assumeHasSequenceNum()
+    ignoringSaveUserEvents()
+    ignoringSaveUserSession()
+    ignoringProcessFacebookIdSet()
+
+    checking {
+      allowing(dataStore).userIdByEmail(email).willReturn(Option(userId))
+      oneOf(dataStore).userEvents(userId).willReturn(EventsList(userId).withEmail(email).list)
+      oneOf(eventProcessor).process(having(aUserEventInstance(aUserConnectedEventFor(userId), ===(userId)))).willReturn(Nil)
+    }
+
+    processConnectWithFacebook()
+  }
+
   trait Context extends Scope {
     val userId: UUID = UUID.randomUUID()
     val dataStore: DataStore = mock[DataStore]
@@ -446,8 +464,12 @@ class UserCommandProcessorTest extends Specification with JMock with MatcherMacr
       allowing(dataStore).userIdByFacebookId(facebookId).willReturn(None)
     }
 
+    def assumeNoSuchUserForEmail() = checking {
+      allowing(dataStore).userIdByEmail(email).willReturn(None)
+    }
+
     def processConnectWithFacebook() = {
-      commandProcessor.process(ConnectFacebookUser(facebookId, authToken, sessionId))
+      commandProcessor.process(ConnectFacebookUser(facebookId, authToken, sessionId, email))
     }
 
     def ignoringSaveUserEvents() = checking {

@@ -8,7 +8,7 @@ import org.joda.time.DateTime
 
 trait FacebookUserCommand extends UserCommand
 
-case class ConnectFacebookUser(facebookId: String, authToken: String, sessionId: UUID) extends FacebookUserCommand {
+case class ConnectFacebookUser(facebookId: String, authToken: String, sessionId: UUID, email: String) extends FacebookUserCommand {
   override def process(user: User): List[UserEvent] = {
     val now = DateTime.now()
     val userConnectedEvent = UserConnected(user.id, now, sessionId)

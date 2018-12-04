@@ -793,9 +793,9 @@ class RouteTest extends Specification with Specs2RouteTest with JMock {
 
   trait NotLoggedInContext extends BaseContext {
     val token = "auth-token"
-    val connectFacebookUser = ConnectFacebookUser("facebook-id", token, randomUUID())
-    val idToken = "id-token"
     val email = "email"
+    val connectFacebookUser = ConnectFacebookUser("facebook-id", token, randomUUID(), email)
+    val idToken = "id-token"
   }
 
   def aPotentialFriendWith(id: UUID, name: String): Matcher[PotentialFriend] =
