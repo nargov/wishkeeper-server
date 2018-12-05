@@ -39,8 +39,7 @@ class UserCommandProcessor(dataStore: DataStore, eventProcessors: List[EventProc
         /* FIXME
            This check is not good enough since the save and read can be interleaved, creating two users with the same facebook id.
            Prevent this by saving into userIdByFacebookId with IF NOT EXISTS before saving the events. */
-        val userId = dataStore.userIdByFacebookId(connectUser.facebookId).orElse(dataStore.userIdByEmail(connectUser.email))
-        println("USER ID IS " + userId)
+        val userId = dataStore.userIdByFacebookId(connectUser.facebookId).orElse(connectUser.email.flatMap(dataStore.userIdByEmail))
         val (user: User, lastSeqNum: Option[Long]) = userId.map(id =>
           (User.replay(dataStore.userEvents(id)), dataStore.lastSequenceNum(id))
         ).getOrElse((User.createNew(), None))

@@ -469,7 +469,7 @@ class UserCommandProcessorTest extends Specification with JMock with MatcherMacr
     }
 
     def processConnectWithFacebook() = {
-      commandProcessor.process(ConnectFacebookUser(facebookId, authToken, sessionId, email))
+      commandProcessor.process(ConnectFacebookUser(facebookId, authToken, sessionId, Option(email)))
     }
 
     def ignoringSaveUserEvents() = checking {
