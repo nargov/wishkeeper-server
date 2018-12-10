@@ -6,8 +6,6 @@ import java.net.{URL, URLConnection}
 import scala.util.Try
 
 trait FileAdapter {
-  def emailTemplate(str: String): Try[String]
-
   def inputStreamFor(str: String): Try[InputStream]
 }
 
@@ -19,6 +17,4 @@ class JavaFileAdapter extends FileAdapter {
       connection.getInputStream
     }
   }
-
-  override def emailTemplate(str: String): Try[String] = ???
 }

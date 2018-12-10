@@ -141,7 +141,7 @@ class DelegatingPublicApi(commandProcessor: CommandProcessor,
                           emailSender: EmailSender)
                          (implicit actorSystem: ActorSystem, ec: ExecutionContext, am: ActorMaterializer) extends PublicApi {
 
-  private val imageUploader = new ImageUploader(imageStore, new ScrimageImageProcessor)
+  private val imageUploader = new ImageUploader(imageStore, userImageStore, new ScrimageImageProcessor)
 
   override def deleteWish(userId: UUID, wishId: UUID): Either[Error, Unit] = commandProcessor.validatedProcess(DeleteWish(wishId), userId)
 
@@ -338,9 +338,10 @@ class DelegatingPublicApi(commandProcessor: CommandProcessor,
 
   override def uploadProfileImage(inputStream: InputStream, metadata: ImageMetadata, userId: UUID): Either[Error, Unit] = {
     Try {
-      userImageStore.save(ImageData(inputStream, metadata.contentType), metadata.fileName)
-    }.toEither.left.map[Error](t => GeneralError(t.getMessage)).flatMap { _ =>
-      commandProcessor.validatedProcess(SetUserPicture(userImageStore.imageLinkBase + "/" + metadata.fileName), userId)
+      imageUploader.uploadProfileImage(inputStream, metadata)
+    }.toEither.left.map[Error](t => GeneralError(t.getMessage)).flatMap { links =>
+      val event = SetUserPicture(links.links.last.url)
+      commandProcessor.validatedProcess(event, userId)
     }
   }
 

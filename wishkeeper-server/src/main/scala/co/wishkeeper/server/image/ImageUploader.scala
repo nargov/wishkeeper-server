@@ -1,33 +1,36 @@
 package co.wishkeeper.server.image
 
-import java.nio.file.{Files, Path}
+import java.io.InputStream
+import java.nio.file.{Files, Path, Paths}
 import java.util.concurrent.atomic.AtomicInteger
 import java.util.concurrent.{Executors, ThreadFactory}
 
 import akka.actor.ActorSystem
 import akka.stream.ActorMaterializer
-import co.wishkeeper.server.{Error, ImageLink, ImageLinks, ImageProcessor}
+import co.wishkeeper.server.{ImageLink, ImageLinks, ImageProcessor}
 import org.slf4j.LoggerFactory
 
 import scala.concurrent.duration._
 import scala.concurrent.{Await, ExecutionContext, Future}
 
-class ImageUploader(imageStore: ImageStore, imageProcessor: ImageProcessor, maxUploadThreads: Int = 20)
+class ImageUploader(imageStore: ImageStore, userImageStore: ImageStore, imageProcessor: ImageProcessor, maxUploadThreads: Int = 20)
                    (implicit actorSystem: ActorSystem, am: ActorMaterializer) {
+
 
   private implicit val ec = ExecutionContext.fromExecutorService(Executors.newFixedThreadPool(maxUploadThreads, new ThreadFactory {
     private val threadIdCounter = new AtomicInteger(0)
-    override def newThread(r: Runnable): Thread = new Thread(r, s"wish-images-${threadIdCounter.getAndIncrement()}")
+
+    override def newThread(r: Runnable): Thread = new Thread(r, s"image-uploader-${threadIdCounter.getAndIncrement()}")
   }))
 
   private val log = LoggerFactory.getLogger(getClass)
 
 
-  def uploadImageAndResizedCopies(imageMetadata: ImageMetadata, origFile: Path, timeout: Duration = 2.minutes,
-                                  toImageStore: ImageStore = imageStore): ImageLinks = {
+  def uploadImageAndResizedCopies(imageMetadata: ImageMetadata, origFile: Path, timeout: Duration = 2.minutes, toImageStore: ImageStore = imageStore,
+                                  extensions: List[(String, Int)] = ImageUploader.sizeExtensions): ImageLinks = {
 
     log.debug(s"Image Metadata: $imageMetadata")
-    val sizesAndExtensions = (".full", imageMetadata.width) :: ImageUploader.sizeExtensions
+    val sizesAndExtensions = (".full", imageMetadata.width) :: extensions
 
     val eventualLinks: List[Future[ImageLink]] = sizesAndExtensions.filter {
       case (_, width) => width <= imageMetadata.width
@@ -40,10 +43,10 @@ class ImageUploader(imageStore: ImageStore, imageProcessor: ImageProcessor, maxU
         val fileName = file.getFileName.toString
         val (_, height) = imageProcessor.dimensions(file)
         log.debug(s"Uploading $fileName to cloud Storage")
-        imageStore.save(ImageData(Files.newInputStream(file), ContentTypes.jpeg), fileName)
+        toImageStore.save(ImageData(Files.newInputStream(file), ContentTypes.jpeg), fileName)
         log.debug(s"Done uploading $fileName to cloud Storage")
         Files.deleteIfExists(file)
-        ImageLink(s"${imageStore.imageLinkBase}/$fileName", width, height, ContentTypes.jpeg)
+        ImageLink(s"${toImageStore.imageLinkBase}/$fileName", width, height, ContentTypes.jpeg)
       }
     }
 
@@ -53,6 +56,17 @@ class ImageUploader(imageStore: ImageStore, imageProcessor: ImageProcessor, maxU
 
     ImageLinks(imageLinks)
   }
+
+  def uploadProfileImage(inputStream: InputStream, imageMetadata: ImageMetadata): ImageLinks = {
+    val tempFile = Paths.get(ImageProcessor.tempDir.toString, imageMetadata.fileName)
+    Files.copy(inputStream, tempFile)
+    val meta = if (imageMetadata.width > 0 && imageMetadata.height > 0) imageMetadata
+    else {
+      val (width, height) = imageProcessor.dimensions(tempFile)
+      imageMetadata.copy(width = width, height = height)
+    }
+    uploadImageAndResizedCopies(meta, tempFile, toImageStore = userImageStore, extensions = ImageUploader.profilePicSizeExtensions)
+  }
 }
 
 object ImageUploader {
@@ -61,6 +75,8 @@ object ImageUploader {
     (".hfhd", 540),
     (".qfhd", 270)
   )
+
+  val profilePicSizeExtensions = List(".small" -> 200)
 }
 
 object ContentTypes {
