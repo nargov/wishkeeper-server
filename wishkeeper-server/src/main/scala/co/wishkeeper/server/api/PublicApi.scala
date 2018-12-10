@@ -340,8 +340,8 @@ class DelegatingPublicApi(commandProcessor: CommandProcessor,
     Try {
       imageUploader.uploadProfileImage(inputStream, metadata)
     }.toEither.left.map[Error](t => GeneralError(t.getMessage)).flatMap { links =>
-      val event = SetUserPicture(links.links.last.url)
-      commandProcessor.validatedProcess(event, userId)
+      val command = SetUserPicture(links.links.last.url)
+      commandProcessor.validatedProcess(command, userId)
     }
   }
 
