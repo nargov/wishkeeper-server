@@ -34,8 +34,8 @@ class SlackBotReporter(slackWebHookUri: String, ec: ExecutionContext = Execution
       case UserAddedWish(userId, userName, time, name) =>
         send(s"User ${userName.getOrElse(s"N/A ($userId)")} added a new wish [${name.getOrElse("N/A")}] at $time")
       case WishWasReserved(wishId, wishName, userId, userName, reserverId, reserverName) =>
-        send(s"User ${userName.getOrElse(s"N/A ($userId)")}'s Wish ${wishName.getOrElse(s"N/A ($wishId)")} was reserved by " +
-          s"${reserverName.getOrElse(s"N/A ($reserverId)")}")
+        send(s"${reserverName.getOrElse(s"N/A ($reserverId)")} reserved Wish [${wishName.getOrElse(s"N/A ($wishId)")}] from " +
+          s"${userName.getOrElse(s"N/A ($userId)")}'s wishlist")
       case UsersBecameFriends(userId, userName, friendId, friendName) =>
         send(s"User ${userName.getOrElse(s"N/A ($userId)")} and User ${friendName.getOrElse(s"N/A ($friendId)")} are now Friends!")
     }
