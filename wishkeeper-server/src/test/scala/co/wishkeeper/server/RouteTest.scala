@@ -769,6 +769,16 @@ class RouteTest extends Specification with Specs2RouteTest with JMock {
         header("Location").map(_.value() must beEqualTo(WebApi.emailConfirmationAlreadyVerified))
       }
     }
+
+    "return list of friends with upcoming birthday" in new LoggedInUserContext {
+      checking {
+        allowing(publicApi).friendsWithUpcomingBirthdays(userId).willReturn(Right(UpcomingBirthdayFriends()))
+      }
+
+      Get("/me/friends/bday-up").withHeaders(sessionIdHeader) ~> webApi.newUserRoute ~> check {
+        responseAs[UpcomingBirthdayFriends] must beEqualTo(UpcomingBirthdayFriends())
+      }
+    }
   }
 
   trait BaseContext extends Scope {

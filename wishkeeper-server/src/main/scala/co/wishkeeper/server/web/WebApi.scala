@@ -161,11 +161,16 @@ class WebApi(publicApi: PublicApi, managementApi: ManagementApi, clientRegistry:
     }
   }
 
+  val upcomingBirthdays: UUID => Route = userId => (pathPrefix("bday-up") & get) {
+    publicApi.friendsWithUpcomingBirthdays(userId).fold(handleErrors, complete(_))
+  }
+
   val friends: UUID => Route = userId => pathPrefix("friends") {
     sendFriendRequest(userId) ~
       removeFriend(userId) ~
       birthdayToday(userId) ~
-      potentialFriends(userId)
+      potentialFriends(userId) ~
+      upcomingBirthdays(userId)
   }
 
   val setNotificationId: UUID => Route = userId => (post & pathPrefix("id") & formField("id")) { notificationId =>

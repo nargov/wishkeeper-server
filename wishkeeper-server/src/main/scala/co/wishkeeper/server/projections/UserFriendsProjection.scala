@@ -2,15 +2,19 @@ package co.wishkeeper.server.projections
 
 import java.util.UUID
 
+import co.wishkeeper.server.WishStatus.Active
 import co.wishkeeper.server.projections.UserRelation.{DirectFriend, IncomingRequest, RequestedFriend}
-import co.wishkeeper.server.{DataStore, Error, FacebookConnector, FriendRequest, GeneralError, GoogleAuthAdapter, User}
-import org.joda.time.DateTime
+import co.wishkeeper.server.{DataStore, Error, FacebookConnector, FriendRequest, GeneralError, GoogleAuthAdapter, User, Wish}
+import org.joda.time.{DateTime, LocalDate}
 import org.joda.time.format.DateTimeFormat
 
 import scala.concurrent.{ExecutionContext, Future}
 import scala.util.Try
 
 trait UserFriendsProjection {
+
+  def friendsWithUpcomingBirthday(userId: UUID, birthdayMarginDays: Int = 14, maxWishes: Int = 7,
+                                  today: LocalDate = new LocalDate()): Either[Error, UpcomingBirthdayFriends]
 
   def friendsBornToday(userId: UUID, date: DateTime = DateTime.now()): Either[Error, FriendBirthdaysResult]
 
@@ -103,8 +107,40 @@ class EventBasedUserFriendsProjection(facebookConnector: FacebookConnector,
         GeneralError(t.getMessage)
       }
     }
+
+  override def friendsWithUpcomingBirthday(userId: UUID, birthdayMarginDays: Int = 14, maxWishes: Int = 7,
+                                           today: LocalDate = new LocalDate()): Either[Error, UpcomingBirthdayFriends] = {
+    val user = User.replay(dataStore.userEvents(userId))
+    val friends = user.friends.current.flatMap(friendId => {
+      val friend = User.replay(dataStore.userEvents(friendId))
+      if (isRelevantFriend(userId, birthdayMarginDays, friend, today)) {
+        val friendProfile = friend.userProfile
+        val activeWishesByDate = friend.activeWishesByDate
+        Some(FriendWishlistPreview(Friend(friendId, friendProfile.name, friendProfile.picture, friendProfile.firstName, Option(DirectFriend)),
+          friendProfile.birthday, activeWishesByDate.take(maxWishes), activeWishesByDate.size > maxWishes))
+      }
+      else {
+        None
+      }
+    })
+    Right(UpcomingBirthdayFriends(friends))
+  }
+
+  private val isRelevantFriend: (UUID, Int, User, LocalDate) => Boolean = (userId, birthdayMarginDays, f, today) => {
+    val wishlist = f.wishes.values
+    wishlist.exists(_.status == Active) &&
+      !wishlist.exists(_.reserver.contains(userId)) &&
+      f.userProfile.birthday.exists(d => {
+        val birthDate = DateTimeFormat.shortDate().parseLocalDate(d).withYear(today.getYear)
+        val nextBirthday = if(birthDate.isBefore(today)) birthDate.plusYears(1) else birthDate
+        nextBirthday.minusDays(birthdayMarginDays).isBefore(today)
+      })
+  }
 }
 
+case class FriendWishlistPreview(friend: Friend, birthday: Option[String], wishlist: List[Wish], hasMoreWishes: Boolean = false)
+
+case class UpcomingBirthdayFriends(friends: List[FriendWishlistPreview] = List.empty)
 
 case class Friend(userId: UUID, name: Option[String] = None, image: Option[String] = None, firstName: Option[String] = None,
                   relation: Option[UserRelation] = None) {
@@ -139,6 +175,7 @@ object UserRelation {
   case object RequestedFriend extends UserRelation
 
   case class IncomingRequest(id: UUID) extends UserRelation
+
 }
 
 case class IncomingFriendRequest(id: UUID, friend: Friend)

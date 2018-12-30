@@ -27,6 +27,8 @@ import scala.util.Try
 
 trait PublicApi {
 
+  def friendsWithUpcomingBirthdays(userId: UUID): Either[Error, UpcomingBirthdayFriends]
+
   def resendVerificationEmail(email: String, idToken: String): Future[Either[Error, Unit]]
 
   def verifyEmail(verificationToken: UUID): Either[Error, Unit]
@@ -191,27 +193,14 @@ class DelegatingPublicApi(commandProcessor: CommandProcessor,
 
   override def wishListFor(sessionId: UUID): Option[UserWishes] = {
     dataStore.userBySession(sessionId).map { userId =>
-      UserWishes(activeWishesByDate(replayUser(userId)))
+      UserWishes(replayUser(userId).shownWishesByDate)
     }
-  }
-
-  private val isShownInWishlist: WishStatus => Boolean = {
-    case Active | Reserved(_) => true
-    case _ => false
-  }
-
-  private def activeWishesByDate(user: User) = {
-    val wishList = user.wishes.values.toList
-    wishList.
-      filter(w => isShownInWishlist(w.status)).
-      sortBy(_.creationTime.getMillis).
-      reverse
   }
 
   override def wishListFor(sessionId: UUID, friendId: UUID): Either[ValidationError, UserWishes] = withValidSession(sessionId) { userId =>
     val user = replayUser(userId)
     if (user.hasFriend(friendId))
-      Right(UserWishes(activeWishesByDate(replayUser(friendId))))
+      Right(UserWishes(replayUser(friendId).shownWishesByDate))
     else
       Left(NotFriends)
   }
@@ -408,4 +397,7 @@ class DelegatingPublicApi(commandProcessor: CommandProcessor,
         .value
     }
   }
+
+  override def friendsWithUpcomingBirthdays(userId: UUID): Either[Error, UpcomingBirthdayFriends] =
+    userFriendsProjection.friendsWithUpcomingBirthday(userId)
 }

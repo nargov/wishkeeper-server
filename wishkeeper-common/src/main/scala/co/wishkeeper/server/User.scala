@@ -5,6 +5,7 @@ import java.util.UUID
 import co.wishkeeper.server.Events._
 import co.wishkeeper.server.FriendRequestStatus.{Approved, Pending}
 import co.wishkeeper.server.NotificationsData.{FriendRequestAcceptedNotification, FriendRequestNotification}
+import co.wishkeeper.server.WishStatus.{Active, Reserved, WishStatus}
 import co.wishkeeper.server.user.events.NotificationEventHandlers._
 import co.wishkeeper.server.user.events.SettingsEventHandlers._
 import co.wishkeeper.server.user.events.ProfileEventHandlers._
@@ -127,6 +128,21 @@ case class User(id: UUID,
   lazy val facebookId: Option[String] = userProfile.socialData.flatMap(_.facebookId)
 
   def friendRequestId(friendId: UUID): Option[UUID] = friends.receivedRequests.find(_.from == friendId).map(_.id)
+
+  private val isShownInWishlist: WishStatus => Boolean = {
+    case Active | Reserved(_) => true
+    case _ => false
+  }
+
+  def shownWishesByDate = wishes.values.toList.
+    filter(w => isShownInWishlist(w.status)).
+    sortBy(_.creationTime.getMillis).
+    reverse
+
+  def activeWishesByDate = wishes.values.toList.
+    filter(_.status == Active).
+    sortBy(_.creationTime.getMillis).
+    reverse
 }
 
 object User {

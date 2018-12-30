@@ -9,7 +9,7 @@ import co.wishkeeper.server.FriendRequestStatus.Approved
 import co.wishkeeper.server.projections.UserRelation.DirectFriend
 import co.wishkeeper.server.projections._
 import com.wixpress.common.specs2.JMock
-import org.joda.time.DateTime
+import org.joda.time.{DateTime, LocalDate}
 import org.joda.time.format.DateTimeFormat
 import org.specs2.concurrent.ExecutionEnv
 import org.specs2.matcher.Matcher
@@ -239,7 +239,138 @@ class EventBasedUserFriendsProjectionTest(implicit ee: ExecutionEnv) extends Spe
     userFriendsProjection.potentialGoogleFriends(userId, accessToken) must beRight(potentialFriends)
   }
 
+  "friendsWithUpcomingBirthday" should {
 
+    "return friends that have their birthday in the next n days" in new Context {
+      val friend2Id = randomUUID()
+
+      checking {
+        allowing(dataStore).userEvents(userId).willReturn(EventsList(userId).withFriend(friendId).withFriend(friend2Id).list)
+        allowing(dataStore).userEvents(friendId).willReturn(EventsList(friendId).withName("Han Solo").withWish(randomUUID(), "Shoes")
+          .withBirthday(DateTime.now().toLocalDate.plusDays(2).minusYears(30).toString(DateTimeFormat.shortDate())).list)
+        allowing(dataStore).userEvents(friend2Id).willReturn(EventsList(friend2Id).withName("Ben Kenoby").withWish(randomUUID(), "Pen")
+          .withBirthday(DateTime.now().toLocalDate.plusDays(5).minusYears(25).toString(DateTimeFormat.shortDate())).list)
+      }
+
+      userFriendsProjection.friendsWithUpcomingBirthday(userId, 3) must beRight(haveUpcomingBirthdayFor(friendId)) and
+        beRight(not(haveUpcomingBirthdayFor(friend2Id)))
+    }
+
+    "return only friends that have unreserved wishes" in new Context {
+      checking {
+        allowing(dataStore).userEvents(userId).willReturn(EventsList(userId).withFriend(friendId).list)
+        allowing(dataStore).userEvents(friendId).willReturn(EventsList(userId)
+          .withBirthday(DateTime.now().toLocalDate.plusDays(2).toString(DateTimeFormat.shortDate()))
+          .withName("Han Solo")
+          .withReservedWish(randomUUID(), "Shoes", randomUUID()).list)
+      }
+
+      userFriendsProjection.friendsWithUpcomingBirthday(userId) must beRight(UpcomingBirthdayFriends())
+    }
+
+    "not return friends that the user already has a reserved wish for" in new Context {
+      checking {
+        allowing(dataStore).userEvents(userId).willReturn(EventsList(userId).withFriend(friendId).list)
+        allowing(dataStore).userEvents(friendId).willReturn(EventsList(userId).withName("Han Solo")
+          .withBirthday(DateTime.now().toLocalDate.plusDays(2).toString(DateTimeFormat.shortDate()))
+          .withReservedWish(randomUUID(), "Shoes", userId).withWish(randomUUID(), "Hat").list)
+      }
+
+      userFriendsProjection.friendsWithUpcomingBirthday(userId) must beRight(UpcomingBirthdayFriends())
+    }
+
+    "return only last n wishes" in new Context {
+      val maxWishes = 4
+
+      checking {
+        allowing(dataStore).userEvents(userId).willReturn(EventsList(userId).withFriend(friendId).list)
+        allowing(dataStore).userEvents(friendId).willReturn(EventsList(userId).withName("Han Solo")
+          .withBirthday(DateTime.now().toLocalDate.plusDays(2).toString(DateTimeFormat.shortDate()))
+          .withWish(randomUUID(), "Shoes")
+          .withWish(randomUUID(), "Bits")
+          .withWish(randomUUID(), "Bobs")
+          .withWish(randomUUID(), "Stuff")
+          .withWish(randomUUID(), "Things")
+          .list)
+      }
+
+      userFriendsProjection.friendsWithUpcomingBirthday(userId, maxWishes = maxWishes).map(_.friends.head.wishlist.length) must beRight(maxWishes)
+    }
+
+    "return the friend's birthday & name" in new Context {
+      val birthday = DateTime.now().toLocalDate.plusDays(2).toString(DateTimeFormat.shortDate())
+      val firstName = "Han"
+      val fullName = "Han Solo"
+      val picture = "picture"
+
+      checking {
+        allowing(dataStore).userEvents(userId).willReturn(EventsList(userId).withFriend(friendId).list)
+        allowing(dataStore).userEvents(friendId).willReturn(EventsList(userId)
+          .withBirthday(birthday)
+          .withName(fullName)
+          .withFirstName(firstName)
+          .withPic(picture)
+          .withWish(randomUUID(), "Shoes").list)
+      }
+
+      val upcomingBirthdaysOrError: Either[Error, UpcomingBirthdayFriends] = userFriendsProjection.friendsWithUpcomingBirthday(userId)
+      upcomingBirthdaysOrError.map(_.friends.head.friend) must beRight(
+        Friend(friendId, Option(fullName), Option(picture), Option(firstName), Option(UserRelation.DirectFriend)))
+      upcomingBirthdaysOrError.map(_.friends.head.birthday) must beRight(beSome(birthday))
+    }
+
+    "return whether the friend has more active wishes than the display maximum" in new Context {
+      val maxWishes = 4
+
+      checking {
+        allowing(dataStore).userEvents(userId).willReturn(EventsList(userId).withFriend(friendId).list)
+        allowing(dataStore).userEvents(friendId).willReturn(EventsList(userId).withName("Han Solo")
+          .withBirthday(DateTime.now().toLocalDate.plusDays(2).toString(DateTimeFormat.shortDate()))
+          .withWish(randomUUID(), "Shoes")
+          .withWish(randomUUID(), "Bits")
+          .withWish(randomUUID(), "Bobs")
+          .withWish(randomUUID(), "Stuff")
+          .withWish(randomUUID(), "Things")
+          .list)
+      }
+
+      userFriendsProjection.friendsWithUpcomingBirthday(userId, maxWishes = maxWishes).map(_.friends.head.hasMoreWishes) must beRight(beTrue)
+    }
+
+    "return only active wishes" in new Context {
+      checking {
+        allowing(dataStore).userEvents(userId).willReturn(EventsList(userId).withFriend(friendId).list)
+        allowing(dataStore).userEvents(friendId).willReturn(EventsList(userId).withName("Han Solo")
+          .withBirthday(DateTime.now().toLocalDate.plusDays(2).toString(DateTimeFormat.shortDate()))
+          .withReservedWish(randomUUID(), "Shoes", randomUUID())
+          .withDeletedWish(randomUUID(), "Bits")
+          .withWish(randomUUID(), "Bobs")
+          .withWish(randomUUID(), "Stuff")
+          .withWish(randomUUID(), "Things")
+          .list)
+      }
+
+      userFriendsProjection.friendsWithUpcomingBirthday(userId).map(_.friends.head.wishlist.length) must beRight(3)
+    }
+
+    "only return friends whose birthday is in n days, accounting for year change" in new Context {
+      checking {
+        allowing(dataStore).userEvents(userId).willReturn(EventsList(userId).withFriend(friendId).list)
+        allowing(dataStore).userEvents(friendId).willReturn(EventsList(userId).withName("Han Solo")
+          .withBirthday("01/01/1956")
+          .withWish(randomUUID(), "Stuff")
+          .list)
+      }
+
+      val today = new LocalDate(2010, 12, 30)
+      userFriendsProjection.friendsWithUpcomingBirthday(userId, today = today) must beRight(haveUpcomingBirthdayFor(friendId))
+    }
+
+  }
+
+
+  def haveUpcomingBirthdayFor(friendId: UUID): Matcher[UpcomingBirthdayFriends] =
+    ((_: UpcomingBirthdayFriends).friends.exists(_.friend.userId == friendId), s"required friend $friendId not found")
 
   def aFriend(id: UUID): Matcher[Friend] = ===(id) ^^ ((_: Friend).userId)
 
