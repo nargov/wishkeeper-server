@@ -382,6 +382,19 @@ class EventBasedUserFriendsProjectionTest(implicit ee: ExecutionEnv) extends Spe
 
       userFriendsProjection.friendsWithUpcomingBirthday(userId).map(_.friends.map(_.friend.userId)) must beRight[List[UUID]](List(friend2Id, friendId))
     }
+
+    "return friend if birthday is exactly in days margin" in new Context {
+      checking {
+        allowing(dataStore).userEvents(userId).willReturn(EventsList(userId).withFriend(friendId).list)
+        allowing(dataStore).userEvents(friendId).willReturn(EventsList(userId).withName("Han Solo")
+          .withBirthday("12/23/1956")
+          .withWish(randomUUID(), "Stuff")
+          .list)
+      }
+
+      val today = new LocalDate(2010, 12, 20)
+      userFriendsProjection.friendsWithUpcomingBirthday(userId, birthdayMarginDays = 3, today = today) must beRight(haveUpcomingBirthdayFor(friendId))
+    }
   }
 
 

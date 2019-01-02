@@ -133,7 +133,8 @@ class EventBasedUserFriendsProjection(facebookConnector: FacebookConnector,
       f.userProfile.birthday.exists(d => {
         val birthDate = DateTimeFormat.shortDate().parseLocalDate(d).withYear(today.getYear)
         val nextBirthday = if(birthDate.isBefore(today)) birthDate.plusYears(1) else birthDate
-        nextBirthday.minusDays(birthdayMarginDays).isBefore(today)
+        val checkDate = nextBirthday.minusDays(birthdayMarginDays)
+        checkDate.isBefore(today) || checkDate.isEqual(today)
       })
   }
 }
