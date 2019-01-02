@@ -366,6 +366,22 @@ class EventBasedUserFriendsProjectionTest(implicit ee: ExecutionEnv) extends Spe
       userFriendsProjection.friendsWithUpcomingBirthday(userId, today = today) must beRight(haveUpcomingBirthdayFor(friendId))
     }
 
+    "Return friends in birthday ascending order" in new Context {
+      val friend2Id = randomUUID()
+      val today = LocalDate.now()
+
+      checking {
+        allowing(dataStore).userEvents(userId).willReturn(EventsList(userId).withFriend(friendId).withFriend(friend2Id).list)
+        allowing(dataStore).userEvents(friendId).willReturn(EventsList(friendId)
+          .withBirthday(today.plusDays(4).toString("MM/dd/yyyy"))
+          .withWish(randomUUID(), "Things").list)
+        allowing(dataStore).userEvents(friend2Id).willReturn(EventsList(friend2Id)
+          .withBirthday(today.plusDays(2).toString("MM/dd/yyyy"))
+          .withWish(randomUUID(), "Stuff").list)
+      }
+
+      userFriendsProjection.friendsWithUpcomingBirthday(userId).map(_.friends.map(_.friend.userId)) must beRight[List[UUID]](List(friend2Id, friendId))
+    }
   }
 
 

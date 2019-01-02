@@ -122,7 +122,7 @@ class EventBasedUserFriendsProjection(facebookConnector: FacebookConnector,
       else {
         None
       }
-    })
+    }).sortBy(_.birthday)
     Right(UpcomingBirthdayFriends(friends))
   }
 
