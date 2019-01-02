@@ -373,10 +373,10 @@ class EventBasedUserFriendsProjectionTest(implicit ee: ExecutionEnv) extends Spe
       checking {
         allowing(dataStore).userEvents(userId).willReturn(EventsList(userId).withFriend(friendId).withFriend(friend2Id).list)
         allowing(dataStore).userEvents(friendId).willReturn(EventsList(friendId)
-          .withBirthday(today.plusDays(4).toString("MM/dd/yyyy"))
+          .withBirthday(today.plusDays(4).minusYears(20).toString("MM/dd/yyyy"))
           .withWish(randomUUID(), "Things").list)
         allowing(dataStore).userEvents(friend2Id).willReturn(EventsList(friend2Id)
-          .withBirthday(today.plusDays(2).toString("MM/dd/yyyy"))
+          .withBirthday(today.plusDays(2).minusYears(25).toString("MM/dd/yyyy"))
           .withWish(randomUUID(), "Stuff").list)
       }
 
