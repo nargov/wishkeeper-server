@@ -55,7 +55,7 @@ class WebApi(publicApi: PublicApi, managementApi: ManagementApi, clientRegistry:
 
   val handleErrors: Error => Route = {
     case err: WishNotFound => complete(StatusCodes.NotFound, err)
-    case err: InvalidStatusChange => complete(StatusCodes.Conflict, err)
+    case err: InvalidStatusChange => complete(StatusCodes.Conflict, validationErrorEncoder(err).noSpaces)
     case EmailTokenAlreadyVerified => redirect(WebApi.emailConfirmationAlreadyVerified, StatusCodes.MovedPermanently)
     case err: ValidationError => complete(StatusCodes.InternalServerError, err)
     case err@NotFriends => complete(StatusCodes.Forbidden, err)

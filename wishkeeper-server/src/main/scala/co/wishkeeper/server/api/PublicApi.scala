@@ -10,7 +10,6 @@ import akka.stream.ActorMaterializer
 import cats.data.EitherT
 import cats.implicits._
 import co.wishkeeper.server.FriendRequestStatus.{Approved, Ignored}
-import co.wishkeeper.server.WishStatus.{Active, Reserved, WishStatus}
 import co.wishkeeper.server._
 import co.wishkeeper.server.image._
 import co.wishkeeper.server.messaging.EmailSender
