@@ -18,7 +18,7 @@ case class Wish(id: UUID,
                 status: WishStatus = WishStatus.Active,
                 statusLastUpdate: Option[DateTime] = None,
                 reserver: Option[UUID] = None,
-                pastReservers: List[UUID] = Nil) {
+                pastReservers: Set[UUID] = Set.empty) {
 
   def withName(name: String): Wish = this.copy(name = Option(name))
   def withLink(link: String): Wish = this.copy(link = Option(link))
@@ -31,7 +31,7 @@ case class Wish(id: UUID,
   def withCreator(creator: UUID): Wish = this.copy(creator = Option(creator))
   def withImage(imageLinks: ImageLinks): Wish = this.copy(image = Option(imageLinks.copy(links = imageLinks.links.sortBy(_.width))))
   def withStatus(status: WishStatus, time: DateTime): Wish = this.copy(status = status, statusLastUpdate = Option(time))
-  def withReserver(reserver: UUID): Wish = this.copy(reserver = Option(reserver), pastReservers = pastReservers :+ reserver)
+  def withReserver(reserver: UUID): Wish = this.copy(reserver = Option(reserver), pastReservers = pastReservers + reserver)
   def withNoReserver: Wish = this.copy(reserver = None)
 }
 
