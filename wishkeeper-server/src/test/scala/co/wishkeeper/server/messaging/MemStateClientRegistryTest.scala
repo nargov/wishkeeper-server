@@ -4,8 +4,11 @@ import java.util.UUID
 import java.util.concurrent.atomic.AtomicReference
 
 import com.wixpress.common.specs2.JMock
+import org.jmock.lib.concurrent.DeterministicExecutor
 import org.specs2.mutable.Specification
 import org.specs2.specification.Scope
+
+import scala.concurrent.ExecutionContext
 
 class MemStateClientRegistryTest extends Specification with JMock {
   type MessageDispatcher = String => Unit
@@ -19,6 +22,7 @@ class MemStateClientRegistryTest extends Specification with JMock {
       }
 
       sendMessageToUser()
+      executor.runUntilIdle()
     }
 
     "Remove registered connection" in new Context {
@@ -48,6 +52,7 @@ class MemStateClientRegistryTest extends Specification with JMock {
       }
 
       sendMessageToUser()
+      executor.runUntilIdle()
     }
 
     "Decrement number of connected clients on remove" in new Context {
@@ -78,6 +83,8 @@ class MemStateClientRegistryTest extends Specification with JMock {
   trait Context extends Scope {
     val expectedMessage = ServerNotification.toJson(NotificationsUpdated)
     val dispatcherSpy = mock[MessageDispatcher]
+    val executor = new DeterministicExecutor
+    implicit val context = ExecutionContext.fromExecutor(executor)
     val registry = new MemStateClientRegistry
     val userId = UUID.randomUUID()
 

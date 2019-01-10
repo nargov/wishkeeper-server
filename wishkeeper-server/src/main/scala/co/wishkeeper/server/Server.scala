@@ -1,5 +1,7 @@
 package co.wishkeeper.server
 
+import java.util.concurrent.Executors
+
 import akka.actor.ActorSystem
 import akka.stream.ActorMaterializer
 import co.wishkeeper.json._
@@ -15,7 +17,7 @@ import co.wishkeeper.server.web.WebApi
 import com.typesafe.config.ConfigFactory
 
 import scala.collection.JavaConverters._
-import scala.concurrent.ExecutionContextExecutor
+import scala.concurrent.{ExecutionContext, ExecutionContextExecutor}
 
 
 class WishkeeperServer {
@@ -28,7 +30,7 @@ class WishkeeperServer {
   private val dataStoreConfig = DataStoreConfig(config.getStringList("wishkeeper.datastore.urls").asScala.toList)
   private val dataStore: DataStore = new CassandraDataStore(dataStoreConfig)
 
-  private val clientRegistry = new MemStateClientRegistry
+  private val clientRegistry = new MemStateClientRegistry()(ExecutionContext.fromExecutor(Executors.newFixedThreadPool(5)))
 
   private val fileAdapter = new JavaFileAdapter
   private val wishImageStore: ImageStore = new GoogleCloudStorageImageStore(config.getString("wishkeeper.image-store.bucket-name"))

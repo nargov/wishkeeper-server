@@ -11,12 +11,13 @@ import co.wishkeeper.server.NotificationsData.{PeriodicWakeup, WishReservedNotif
 import co.wishkeeper.server.messaging.{MemStateClientRegistry, NotificationsUpdated, PushNotificationSender, ServerNotification}
 import co.wishkeeper.server.{BroadcastNotification, DataStore, PushNotification, UserEventInstance}
 import com.wixpress.common.specs2.JMock
-import org.jmock.lib.concurrent.DeterministicScheduler
+import org.jmock.lib.concurrent.{DeterministicExecutor, DeterministicScheduler}
 import org.joda.time.DateTime
 import org.specs2.matcher.Matcher
 import org.specs2.mutable.Specification
 import org.specs2.specification.Scope
 
+import scala.concurrent.ExecutionContext
 import scala.concurrent.duration._
 
 class DelayedNotificationComponentTest extends Specification with JMock {
@@ -156,6 +157,7 @@ class DelayedNotificationComponentTest extends Specification with JMock {
     val dataStore = mock[DataStore]
     val pushNotifications = mock[PushNotificationSender]
     val scheduler = new DeterministicScheduler
+    implicit val context = ExecutionContext.fromExecutor(scheduler)
     val clientRegistry = new MemStateClientRegistry()
     val config = NotificationDelayConfig(default = 5.seconds)
     val notificationsScheduler = new ExecutorNotificationsScheduler(config, scheduler, clientRegistry, dataStore, pushNotifications)
