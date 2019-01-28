@@ -1,16 +1,19 @@
 package co.wishkeeper.server.api
 
-import java.io.ByteArrayInputStream
 import java.util.UUID
 import java.util.UUID.randomUUID
 
-import co.wishkeeper.server.Events.{EmailConnectStarted, FacebookFriendsListSeen, UserConnected, UserGenderSet2}
+import cats.data.EitherT
+import cats.implicits._
+import co.wishkeeper.server.Events._
 import co.wishkeeper.server.EventsTestHelper.{EventsList, anEventsListFor}
 import co.wishkeeper.server.FriendRequestStatus.{Approved, Ignored}
 import co.wishkeeper.server.NotificationsData.{FriendRequestNotification, NotificationData}
+import co.wishkeeper.server.UserEventInstant.UserEventInstants
+import co.wishkeeper.server.UserTestHelper._
 import co.wishkeeper.server.WishStatus.WishStatus
 import co.wishkeeper.server._
-import co.wishkeeper.server.image.{ImageData, ImageMetadata, ImageStore}
+import co.wishkeeper.server.image.ImageStore
 import co.wishkeeper.server.messaging.{EmailProvider, EmailSender, TemplateEngineAdapter}
 import co.wishkeeper.server.projections._
 import co.wishkeeper.server.search.SimpleScanUserSearchProjection
@@ -19,12 +22,13 @@ import co.wishkeeper.server.user.commands._
 import co.wishkeeper.server.user.events.history.{HistoryEventInstance, ReceivedWish}
 import com.wixpress.common.specs2.JMock
 import org.jmock.lib.concurrent.DeterministicExecutor
-import org.joda.time.DateTime
+import org.joda.time.{DateTime, LocalDate}
 import org.specs2.concurrent.ExecutionEnv
 import org.specs2.matcher.Matcher
 import org.specs2.mutable.Specification
 import org.specs2.specification.Scope
 
+import scala.concurrent.duration._
 import scala.concurrent.{ExecutionContext, Future}
 import scala.util.Success
 
@@ -260,19 +264,19 @@ class DelegatingPublicApiTest(implicit ee: ExecutionEnv) extends Specification w
 
   // TODO: do this as an IT, or refactor to use file system adapter to be able to unit test.
 
-//  "upload user profile image" in new LoggedInContext {
-//    val imageMetadata = ImageMetadata("image/jpeg", "file-name", 1, 1)
-//    val inputStream = new ByteArrayInputStream(Array[Byte](1))
-//    val base = "http://www.example.com"
-//
-//    checking {
-//      allowing(userImageStore).imageLinkBase.willReturn(base)
-//      oneOf(userImageStore).save(having(any[ImageData]), having(===(imageMetadata.fileName + ".full")))
-//      oneOf(commandProcessor).validatedProcess(SetUserPicture(base + imageMetadata.fileName + ".small"), userId)
-//    }
-//
-//    api.uploadProfileImage(inputStream, imageMetadata, userId)
-//  }
+  //  "upload user profile image" in new LoggedInContext {
+  //    val imageMetadata = ImageMetadata("image/jpeg", "file-name", 1, 1)
+  //    val inputStream = new ByteArrayInputStream(Array[Byte](1))
+  //    val base = "http://www.example.com"
+  //
+  //    checking {
+  //      allowing(userImageStore).imageLinkBase.willReturn(base)
+  //      oneOf(userImageStore).save(having(any[ImageData]), having(===(imageMetadata.fileName + ".full")))
+  //      oneOf(commandProcessor).validatedProcess(SetUserPicture(base + imageMetadata.fileName + ".small"), userId)
+  //    }
+  //
+  //    api.uploadProfileImage(inputStream, imageMetadata, userId)
+  //  }
 
   "return friend wish" in new LoggedInContext {
     val wishName = "The Wish"
@@ -344,7 +348,111 @@ class DelegatingPublicApiTest(implicit ee: ExecutionEnv) extends Specification w
     executor.runUntilIdle()
   }
 
-  def userWishesWith(wishId: UUID, wishName: String): Matcher[UserWishes] = contain(aWishWith(wishId, wishName)) ^^ {(_: UserWishes).wishes}
+  "return friends with upcoming birthdays in home data" in new Context {
+    val friendEvents: EitherT[Future, Error, List[UserEventInstant[_ <: Events.UserEvent]]] = EitherT.right(Future.successful(EventsList(friendId)
+      .withBirthday(LocalDate.now().plusDays(1).toString("MM/dd/yyyy"))
+      .withWish(wishId, "Wish").list))
+
+    checking {
+      allowing(dataStore).userEvents(userId).willReturn(EventsList(userId).withFriend(friendId).list)
+      allowing(dataStore).userEventsAsync(friendId).willReturn(friendEvents)
+    }
+
+    val result = apiWithStoreOnly.homeScreenData(userId).value
+    result must beRight(homeScreenDataWithBirthdayFriend).await(20, 20.millis)
+  }
+
+  "return friends with recently changed wishlist in home data" in new Context {
+    val otherFriendId: UUID = randomUUID()
+    val friendEvents: EitherT[Future, Error, UserEventInstants] = EitherT.right(Future.successful(EventsList(friendId)
+      .withName("FRIEND").withWish(wishId, "Wish").list))
+    val otherFriendEvents: EitherT[Future, Error, UserEventInstants] = EitherT.right(Future.successful(EventsList(otherFriendId)
+      .withName("OTHER FRIEND").withWish(randomUUID(), "Some Wish", DateTime.now().minusDays(40)).list))
+
+    checking {
+      allowing(dataStore).userEvents(userId).willReturn(EventsList(userId).withFriend(friendId).withFriend(otherFriendId).list)
+      allowing(dataStore).userEventsAsync(friendId).willReturn(friendEvents)
+      allowing(dataStore).userEventsAsync(otherFriendId).willReturn(otherFriendEvents)
+    }
+
+    val result: Future[Either[Error, HomeScreenData]] = apiWithStoreOnly.homeScreenData(userId).value
+    result must beRight(homeScreenDataWithUpdatedFriendWishlist(friendId)).await(20, 20.millis) and
+      not(beRight(homeScreenDataWithUpdatedFriendWishlist(otherFriendId)).await(20, 20.millis))
+  }
+
+  "return friend with upcoming birthday but not in recently changed wishlist" in new Context {
+    val friendEvents: EitherT[Future, Error, UserEventInstants] = EitherT.right(Future.successful(EventsList(friendId)
+      .withWish(wishId, "Wish")
+      .withBirthday(LocalDate.now().plusDays(1).minusYears(20).toString("MM/dd/yyyy"))
+      .list))
+
+    checking {
+      allowing(dataStore).userEvents(userId).willReturn(EventsList(userId).withFriend(friendId).list)
+      allowing(dataStore).userEventsAsync(friendId).willReturn(friendEvents)
+    }
+
+    val result: Future[Either[Error, HomeScreenData]] = apiWithStoreOnly.homeScreenData(userId).value
+    result must beRight(homeScreenDataWithBirthdayFriend).await(20, 20.millis) and
+      not(beRight(homeScreenDataWithUpdatedFriendWishlist(friendId))).await(20, 20.millis)
+  }
+
+  "return friends with recently changed wishlist only if have wishes" in new Context {
+    val now: DateTime = DateTime.now()
+    val otherFriendId: UUID = randomUUID()
+    val friendEvents: EitherT[Future, Error, UserEventInstants] = EitherT.right(Future.successful(EventsList(friendId)
+      .withWish(wishId, "Wish", now.minusDays(5)).list))
+    val deletedWish: UUID = randomUUID()
+    val otherFriendEvents: EitherT[Future, Error, UserEventInstants] = EitherT.right(Future.successful(EventsList(otherFriendId)
+      .withWish(deletedWish, "SHOULD NOT BE HERE", now.minusDays(20))
+      .withEvent(WishDeleted(deletedWish), now.minusDays(10)).list))
+
+    checking {
+      allowing(dataStore).userEvents(userId).willReturn(EventsList(userId).withFriend(friendId).withFriend(otherFriendId).list)
+      allowing(dataStore).userEventsAsync(friendId).willReturn(friendEvents)
+      allowing(dataStore).userEventsAsync(otherFriendId).willReturn(otherFriendEvents)
+    }
+
+    val result: Future[Either[Error, HomeScreenData]] = apiWithStoreOnly.homeScreenData(userId).value
+    result must beRight(homeScreenDataWithUpdatedFriendWishlist(friendId)).await(20, 20.millis) and
+      not(beRight(homeScreenDataWithUpdatedFriendWishlist(otherFriendId)).await(20, 20.millis))
+  }
+
+  "return friends with recently changed wishlist ordered by wishlist update date" in new Context {
+    val now: DateTime = DateTime.now()
+    val otherFriendId = randomUUID()
+    val yetAnotherFriendId = randomUUID()
+    val friendEvents: EitherT[Future, Error, UserEventInstants] = EitherT.right(Future.successful(EventsList(friendId)
+      .withWish(wishId, "Wish", now.minusDays(5)).list))
+    val deletedWish: UUID = randomUUID()
+    val otherFriendEvents: EitherT[Future, Error, UserEventInstants] = EitherT.right(Future.successful(EventsList(otherFriendId)
+      .withWish(deletedWish, "Another wish", now.minusDays(10)).list))
+    val yetAnotherFriendEvents: EitherT[Future, Error, UserEventInstants] = EitherT.right(Future.successful(EventsList(yetAnotherFriendId)
+      .withWish(randomUUID(), "Yet another wish", now.minusDays(3)).list))
+
+    checking {
+      allowing(dataStore).userEvents(userId).willReturn(EventsList(userId).withFriend(friendId).withFriend(otherFriendId)
+        .withFriend(yetAnotherFriendId).list)
+      allowing(dataStore).userEventsAsync(friendId).willReturn(friendEvents)
+      allowing(dataStore).userEventsAsync(otherFriendId).willReturn(otherFriendEvents)
+      allowing(dataStore).userEventsAsync(yetAnotherFriendId).willReturn(yetAnotherFriendEvents)
+    }
+
+    val result: Future[Either[Error, HomeScreenData]] = apiWithStoreOnly.homeScreenData(userId).value
+    result must beRight(haveUpdatedWishlistsForFriends(List(yetAnotherFriendId, friendId, otherFriendId))).await(20, 20.millis)
+  }
+
+  def haveUpdatedWishlistsForFriends(friendsIds: List[UUID]): Matcher[HomeScreenData] = (data: HomeScreenData) =>
+    (data.updatedWishlists.friends.map(_.friend.userId) == friendsIds, "Friend IDs do not match ids of updated wishlist friends")
+
+  def homeScreenDataWithUpdatedFriendWishlist(friendId: UUID): Matcher[HomeScreenData] = (data: HomeScreenData) =>
+    (data.updatedWishlists.friends.exists(_.friend.userId == friendId), "Does not contain a friends with an updated wishlist")
+
+  def homeScreenDataWithBirthdayFriend: Matcher[HomeScreenData] = (data: HomeScreenData) =>
+    (data.birthdays.friends.exists(_.wishlist.exists(_.name.contains("Wish"))), "Does not contain a friend with a wish with upcoming birthday")
+
+  def userWishesWith(wishId: UUID, wishName: String): Matcher[UserWishes] = contain(aWishWith(wishId, wishName)) ^^ {
+    (_: UserWishes).wishes
+  }
 
   def aWishWith(id: UUID, name: String): Matcher[Wish] = (wish: Wish) =>
     (wish.id == id && wish.name.isDefined && wish.name.get == name, s"Wish $wish does not match name $name and id $id")
@@ -389,6 +497,11 @@ class DelegatingPublicApiTest(implicit ee: ExecutionEnv) extends Specification w
     val friendRequestId = randomUUID()
     val notificationData = FriendRequestNotification(friendId, friendRequestId)
     val wishId = randomUUID()
+
+    val apiWithStoreOnly = new DelegatingPublicApi(null, dataStore, null, null,
+      new EventBasedUserFriendsProjection(null, null, null, dataStore),
+      null, null, null, null, null, null, null,
+      null)(null, ee.executionContext, null)
   }
 
   trait LoggedInContext extends Context {

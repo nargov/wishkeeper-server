@@ -102,9 +102,13 @@ object Events {
 }
 
 case class UserEventInstant[E <: UserEvent](event: E, time: DateTime)
+object UserEventInstant {
+  type UserEventInstants = List[UserEventInstant[_ <: UserEvent]]
+}
 
 case class UserEventInstance[E <: UserEvent](userId: UUID, event: E, time: DateTime = DateTime.now())
 object UserEventInstance {
   def list(userId: UUID, time: DateTime, events: List[UserEvent]): List[UserEventInstance[UserEvent]] =
     events.map(UserEventInstance(userId, _, time))
 }
+

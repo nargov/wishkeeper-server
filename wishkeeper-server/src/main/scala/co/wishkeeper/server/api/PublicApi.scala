@@ -10,6 +10,7 @@ import akka.stream.ActorMaterializer
 import cats.data.EitherT
 import cats.implicits._
 import co.wishkeeper.server.FriendRequestStatus.{Approved, Ignored}
+import co.wishkeeper.server.UserRelation.DirectFriend
 import co.wishkeeper.server._
 import co.wishkeeper.server.image._
 import co.wishkeeper.server.messaging.EmailSender
@@ -19,14 +20,16 @@ import co.wishkeeper.server.user._
 import co.wishkeeper.server.user.commands._
 import co.wishkeeper.server.user.events.history.HistoryEventInstance
 import com.google.common.net.UrlEscapers
-import org.joda.time.LocalDate
+import org.joda.time.{DateTime, LocalDate}
 
 import scala.concurrent.{ExecutionContext, Future}
 import scala.util.Try
 
 trait PublicApi {
 
-  def friendsWithUpcomingBirthdays(userId: UUID): Either[Error, UpcomingBirthdayFriends]
+  def homeScreenData(userId: UUID): EitherT[Future, Error, HomeScreenData]
+
+  def friendsWithUpcomingBirthdays(userId: UUID): Either[Error, FriendsWishlistPreviews]
 
   def resendVerificationEmail(email: String, idToken: String): Future[Either[Error, Unit]]
 
@@ -397,6 +400,33 @@ class DelegatingPublicApi(commandProcessor: CommandProcessor,
     }
   }
 
-  override def friendsWithUpcomingBirthdays(userId: UUID): Either[Error, UpcomingBirthdayFriends] =
+  override def friendsWithUpcomingBirthdays(userId: UUID): Either[Error, FriendsWishlistPreviews] =
     userFriendsProjection.friendsWithUpcomingBirthday(userId)
+
+  private val toPreview: Int => List[User] => FriendsWishlistPreviews = maxWishes => users => FriendsWishlistPreviews(users.map(user => {
+    val activeWishesByDate = user.activeWishesByDate
+    val profile = user.userProfile
+    FriendWishlistPreview(Friend(user.id, profile.name, profile.picture, profile.firstName, Option(DirectFriend)),
+      profile.birthday, activeWishesByDate.take(maxWishes), activeWishesByDate.size > maxWishes, profile.genderData)
+  }))
+
+  implicit private val dateTimeOrder: Ordering[Option[DateTime]] = Ordering.Option(Ordering.fromLessThan(_.isBefore(_)))
+
+  private val orderByLastUpdate: List[User] => List[User] = _.sortBy(_.lastWishlistChange)(dateTimeOrder.reverse)
+
+  override def homeScreenData(userId: UUID): EitherT[Future, Error, HomeScreenData] = {
+    val maxWishes = 7
+    val friends: EitherT[Future, Error, List[User]] = userFriendsProjection.fullFriendsFor(userId)
+    val filterRelevantBirthdayFriends: List[User] => List[User] = _.filter(userFriendsProjection.upcomingBirthday(userId))
+    val filterUpdatedWishlists: List[User] => List[User] =
+      _.filter(user => user.lastWishlistChange.fold(false)(_.toLocalDate.isAfter(LocalDate.now().minusDays(30))) &&
+        user.activeWishesByDate.nonEmpty)
+    val birthdays: EitherT[Future, Error, FriendsWishlistPreviews] = friends.map(filterRelevantBirthdayFriends andThen toPreview(maxWishes))
+    val updatedWishlists = friends.map(filterUpdatedWishlists andThen orderByLastUpdate andThen toPreview(maxWishes))
+    birthdays.flatMap { bs =>
+      updatedWishlists.map { ws =>
+        HomeScreenData(bs, ws.copy(ws.friends.diff(bs.friends)))
+      }
+    }
+  }
 }

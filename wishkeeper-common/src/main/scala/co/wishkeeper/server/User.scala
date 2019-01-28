@@ -5,12 +5,14 @@ import java.util.UUID
 import co.wishkeeper.server.Events._
 import co.wishkeeper.server.FriendRequestStatus.{Approved, Pending}
 import co.wishkeeper.server.NotificationsData.{FriendRequestAcceptedNotification, FriendRequestNotification}
+import co.wishkeeper.server.UserEventInstant.UserEventInstants
 import co.wishkeeper.server.WishStatus.{Active, Reserved, WishStatus}
 import co.wishkeeper.server.user.events.NotificationEventHandlers._
 import co.wishkeeper.server.user.events.SettingsEventHandlers._
 import co.wishkeeper.server.user.events.ProfileEventHandlers._
 import co.wishkeeper.server.user.events.UserEventHandler
 import co.wishkeeper.server.user.events.FlagsHandlers._
+import co.wishkeeper.server.user.events.WishlistEventHandlers._
 import org.joda.time.DateTime
 
 
@@ -22,8 +24,8 @@ case class User(id: UUID,
                 notifications: List[Notification] = Nil,
                 pendingNotifications: List[Notification] = Nil,
                 settings: Settings = Settings(),
-                created: DateTime = DateTime.now()) {
-
+                created: DateTime = DateTime.now(),
+                lastWishlistChange: Option[DateTime] = None) {
 
   def applyEvent[E <: UserEvent](event: UserEventInstant[E]): User = event match {
     case UserEventInstant(UserFirstNameSet(_, value), _) => this.copy(userProfile = this.userProfile.copy(firstName = Option(value)))
@@ -45,8 +47,7 @@ case class User(id: UUID,
       friends = this.friends.copy(sentRequests = this.friends.sentRequests :+ FriendRequest(requestId, friendId, id)))).getOrElse(this)
     case UserEventInstant(FriendRequestReceived(_, friendId, reqId), _) => reqId.map(requestId => this.copy(
       friends = this.friends.copy(receivedRequests = this.friends.receivedRequests :+ FriendRequest(requestId, id, friendId)))).getOrElse(this)
-    case UserEventInstant(WishCreated(wishId, creator, creationTime), _) =>
-      updateWishProperty(wishId, _.withCreationTime(creationTime).withCreator(creator))
+    case UserEventInstant(e@WishCreated(_, _, _), time) => handleEventWithHandler(e, time)
     case UserEventInstant(WishNameSet(wishId, name), _) => updateWishProperty(wishId, _.withName(name))
     case UserEventInstant(WishLinkSet(wishId, link), _) => updateWishProperty(wishId, _.withLink(link))
     case UserEventInstant(WishPriceSet(wishId, price), _) => updateWishProperty(wishId, _.withPrice(price))
@@ -55,7 +56,7 @@ case class User(id: UUID,
     case UserEventInstant(WishOtherInfoSet(wishId, info), _) => updateWishProperty(wishId, _.withOtherInfo(info))
     case UserEventInstant(WishImageSet(wishId, imageLinks), _) => updateWishProperty(wishId, _.withImage(imageLinks))
     case UserEventInstant(WishImageDeleted(wishId), _) => updateWishProperty(wishId, _.withoutImage)
-    case UserEventInstant(WishDeleted(wishId), time) => updateWishProperty(wishId, _.withStatus(WishStatus.Deleted, time))
+    case UserEventInstant(e@WishDeleted(_), time) => handleEventWithHandler(e, time)
     case UserEventInstant(WishGranted(wishId), time) =>
       val granter = wishes(wishId).status match {
         case WishStatus.Reserved(reserver) => Option(reserver)
@@ -146,7 +147,7 @@ case class User(id: UUID,
 }
 
 object User {
-  def replay(events: List[UserEventInstant[_ <: UserEvent]]): User = {
+  def replay(events: UserEventInstants): User = {
     events match {
       case UserEventInstant(UserConnected(userId, _, _), time) :: _ =>
         events.foldLeft(User(userId, created = time))((user, eventInstant) => user.applyEvent(eventInstant))
@@ -171,3 +172,4 @@ case class Flags(seenFacebookFriendsList: Boolean = false, seenGoogleFriendsList
 case class Settings(deviceNotificationId: Option[String] = None, general: GeneralSettings = GeneralSettings())
 
 case class GeneralSettings(pushNotificationsEnabled: Boolean = true, vibrate: Boolean = true)
+

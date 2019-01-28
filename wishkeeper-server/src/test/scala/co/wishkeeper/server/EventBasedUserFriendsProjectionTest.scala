@@ -3,14 +3,18 @@ package co.wishkeeper.server
 import java.util.UUID
 import java.util.UUID.randomUUID
 
+import cats.data.EitherT
+import cats.implicits._
 import co.wishkeeper.server.Events._
 import co.wishkeeper.server.EventsTestHelper.{EventsList, asEventInstants, userConnectEvent}
 import co.wishkeeper.server.FriendRequestStatus.Approved
-import co.wishkeeper.server.projections.UserRelation.DirectFriend
+import co.wishkeeper.server.UserEventInstant.UserEventInstants
+import co.wishkeeper.server.UserRelation.DirectFriend
+import co.wishkeeper.server.UserTestHelper._
 import co.wishkeeper.server.projections._
 import com.wixpress.common.specs2.JMock
-import org.joda.time.{DateTime, LocalDate}
 import org.joda.time.format.DateTimeFormat
+import org.joda.time.{DateTime, LocalDate}
 import org.specs2.concurrent.ExecutionEnv
 import org.specs2.matcher.Matcher
 import org.specs2.mutable.Specification
@@ -265,7 +269,7 @@ class EventBasedUserFriendsProjectionTest(implicit ee: ExecutionEnv) extends Spe
           .withReservedWish(randomUUID(), "Shoes", randomUUID()).list)
       }
 
-      userFriendsProjection.friendsWithUpcomingBirthday(userId) must beRight(UpcomingBirthdayFriends())
+      userFriendsProjection.friendsWithUpcomingBirthday(userId) must beRight(FriendsWishlistPreviews())
     }
 
     "not return friends that the user already has a reserved wish for" in new Context {
@@ -276,7 +280,7 @@ class EventBasedUserFriendsProjectionTest(implicit ee: ExecutionEnv) extends Spe
           .withReservedWish(randomUUID(), "Shoes", userId).withWish(randomUUID(), "Hat").list)
       }
 
-      userFriendsProjection.friendsWithUpcomingBirthday(userId) must beRight(UpcomingBirthdayFriends())
+      userFriendsProjection.friendsWithUpcomingBirthday(userId) must beRight(FriendsWishlistPreviews())
     }
 
     "return only last n wishes" in new Context {
@@ -313,7 +317,7 @@ class EventBasedUserFriendsProjectionTest(implicit ee: ExecutionEnv) extends Spe
           .withWish(randomUUID(), "Shoes").list)
       }
 
-      val upcomingBirthdaysOrError: Either[Error, UpcomingBirthdayFriends] = userFriendsProjection.friendsWithUpcomingBirthday(userId)
+      val upcomingBirthdaysOrError: Either[Error, FriendsWishlistPreviews] = userFriendsProjection.friendsWithUpcomingBirthday(userId)
       upcomingBirthdaysOrError.map(_.friends.head.friend) must beRight(
         Friend(friendId, Option(fullName), Option(picture), Option(firstName), Option(UserRelation.DirectFriend)))
       upcomingBirthdaysOrError.map(_.friends.head.birthday) must beRight(beSome(birthday))
@@ -395,11 +399,51 @@ class EventBasedUserFriendsProjectionTest(implicit ee: ExecutionEnv) extends Spe
       val today = new LocalDate(2010, 12, 20)
       userFriendsProjection.friendsWithUpcomingBirthday(userId, birthdayMarginDays = 3, today = today) must beRight(haveUpcomingBirthdayFor(friendId))
     }
+
+    "return a populated list of friends" in new Context {
+      val friend2Id = randomUUID()
+      val friendEvents = EitherT[Future, Error, UserEventInstants](Future.successful(Right(EventsList(friendId).withName("Joe").list)))
+      val friend2Events = EitherT[Future, Error, UserEventInstants](Future.successful(Right(EventsList(friend2Id).withName("Bill").list)))
+
+      checking {
+        allowing(dataStore).userEvents(userId).willReturn(EventsList(userId).withFriend(friendId).withFriend(friend2Id).list)
+        allowing(dataStore).userEventsAsync(friendId).willReturn(friendEvents)
+        allowing(dataStore).userEventsAsync(friend2Id).willReturn(friend2Events)
+      }
+
+      userFriendsProjection.fullFriendsFor(userId).value must beRight(contain(
+        allOf(aUserWithName(friendId, "Joe"), aUserWithName(friend2Id, "Bill"))))
+        .await(10, 10.millis)
+    }
+
+    "filter list of users by upcoming birthday" in new Context {
+      val users = List(
+        aUser.withBirthday(LocalDate.now().plusDays(1)).withWish(),
+        aUser.withBirthday(LocalDate.now().plusDays(1)).withWish().withReservedWish(reserver = randomUUID()),
+        aUser.withBirthday(LocalDate.now().plusDays(1)).withWish().withReservedWish(reserver = userId),
+        aUser.withBirthday(LocalDate.now().plusMonths(3)).withWish()
+      )
+
+      users.filter(userFriendsProjection.upcomingBirthday(userId)) must contain(exactly(users.head, users(1)))
+    }
+
+    "filter list of users by updated wishlists" in new Context {
+      val users = List(
+        aUser.withWish(time = DateTime.now().minusDays(1)),
+        aUser.withDeletedWish(time = DateTime.now().minusDays(3)),
+        aUser.withWish(time = DateTime.now().minusDays(40)),
+        aUser.withDeletedWish(time = DateTime.now().minusDays(35))
+      )
+
+      users.filter(userFriendsProjection.wishlistRecentlyChanged) must contain(exactly(users.head, users(1)))
+    }
   }
 
+  def aUserWithName(userId: UUID, name: String): Matcher[User] = (user: User) =>
+    (user.id == userId && user.userProfile.name.contains(name), "Not a user with the given id/name")
 
-  def haveUpcomingBirthdayFor(friendId: UUID): Matcher[UpcomingBirthdayFriends] =
-    ((_: UpcomingBirthdayFriends).friends.exists(_.friend.userId == friendId), s"required friend $friendId not found")
+  def haveUpcomingBirthdayFor(friendId: UUID): Matcher[FriendsWishlistPreviews] =
+    ((_: FriendsWishlistPreviews).friends.exists(_.friend.userId == friendId), s"required friend $friendId not found")
 
   def aFriend(id: UUID): Matcher[Friend] = ===(id) ^^ ((_: Friend).userId)
 

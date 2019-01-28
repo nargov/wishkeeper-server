@@ -4,16 +4,19 @@ import java.util.UUID
 import java.util.UUID.randomUUID
 
 import co.wishkeeper.DataStoreTestHelper
-import co.wishkeeper.server.Events.{UserConnected, UserNameSet}
+import co.wishkeeper.server.Events.{UserConnected, UserEvent, UserNameSet}
 import co.wishkeeper.server.EventsTestHelper.EventsList
+import co.wishkeeper.server.UserEventInstant.UserEventInstants
 import co.wishkeeper.server.image.ContentTypes
-import co.wishkeeper.server.user.{EmailTokenAlreadyVerified, VerificationToken}
 import co.wishkeeper.server.user.events.history.{HistoryEventInstance, ReceivedWish, ReservedWish}
+import co.wishkeeper.server.user.{EmailTokenAlreadyVerified, VerificationToken}
 import org.joda.time.DateTime
 import org.scalatest.enablers.Containing
-import org.scalatest.{BeforeAndAfterAll, FlatSpec, Matchers}
+import org.scalatest.{AsyncFlatSpec, BeforeAndAfterAll, EitherValues, Matchers}
 
-class CassandraDataStoreIT extends FlatSpec with Matchers with BeforeAndAfterAll {
+import scala.concurrent.Future
+
+class CassandraDataStoreIT extends AsyncFlatSpec with Matchers with BeforeAndAfterAll with EitherValues {
 
   var dataStore: CassandraDataStore = _
   val userId = randomUUID()
@@ -177,6 +180,15 @@ class CassandraDataStoreIT extends FlatSpec with Matchers with BeforeAndAfterAll
     dataStore.saveVerificationToken(verificationToken)
     dataStore.verifyEmailToken(token) shouldBe Right(verificationToken.copy(verified = true))
     dataStore.verifyEmailToken(token) shouldBe Left(EmailTokenAlreadyVerified)
+  }
+
+  it should "fetch user events async" in {
+    val user = randomUUID()
+    val event = UserNameSet(user, "Fred Flintstone")
+    val time = DateTime.now()
+    dataStore.saveUserEvents(user, None, time, List(event)) shouldBe true
+    val futureResult: Future[Either[Error, UserEventInstants]] = dataStore.userEventsAsync(user).value
+    futureResult.map(result => result.right.value should contain(UserEventInstant(event, time)))
   }
 
   val dataStoreTestHelper = DataStoreTestHelper()

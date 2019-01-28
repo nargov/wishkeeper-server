@@ -7,6 +7,7 @@ import akka.http.scaladsl.model.ContentTypes.`application/json`
 import akka.http.scaladsl.model._
 import akka.http.scaladsl.model.headers._
 import akka.http.scaladsl.testkit.Specs2RouteTest
+import cats.data.EitherT
 import co.wishkeeper.json._
 import co.wishkeeper.server.NotificationsData.FriendRequestNotification
 import co.wishkeeper.server.WishStatus.Deleted
@@ -772,11 +773,21 @@ class RouteTest extends Specification with Specs2RouteTest with JMock {
 
     "return list of friends with upcoming birthday" in new LoggedInUserContext {
       checking {
-        allowing(publicApi).friendsWithUpcomingBirthdays(userId).willReturn(Right(UpcomingBirthdayFriends()))
+        allowing(publicApi).friendsWithUpcomingBirthdays(userId).willReturn(Right(FriendsWishlistPreviews()))
       }
 
       Get("/me/friends/bday-up").withHeaders(sessionIdHeader) ~> webApi.newUserRoute ~> check {
-        responseAs[UpcomingBirthdayFriends] must beEqualTo(UpcomingBirthdayFriends())
+        responseAs[FriendsWishlistPreviews] must beEqualTo(FriendsWishlistPreviews())
+      }
+    }
+
+    "return home screen data" in new LoggedInUserContext {
+      checking {
+        allowing(publicApi).homeScreenData(userId).willReturn(EitherT[Future, Error, HomeScreenData](Future.successful(Right(HomeScreenData()))))
+      }
+
+      Get("/me/home").withHeaders(sessionIdHeader) ~> webApi.newUserRoute ~> check {
+        responseAs[HomeScreenData] must beEqualTo(HomeScreenData())
       }
     }
   }

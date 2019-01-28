@@ -440,6 +440,16 @@ class UserTest extends Specification with MatcherMacros with JMock with Notifica
     EventsList(user.id).list.foldLeft(user)(_.applyEvent(_)).flags.everConnected must beTrue
   }
 
+  "Return last wishlist change based on wish added" in new Context {
+    val creationTime: DateTime = DateTime.now().minusMinutes(5)
+    user.applyEvent(asEventInstant(WishCreated(wishId, user.id, creationTime), creationTime)).lastWishlistChange must beSome(creationTime)
+  }
+
+  "Return last wishlist change based on wish deleted" in new Context {
+    val time: DateTime = DateTime.now().minusMinutes(5)
+    user.applyEvent(asEventInstant(WishDeleted(wishId), time)).lastWishlistChange must beSome(time)
+  }
+
   trait Context extends Scope {
     val user: User = User.createNew()
     val wish: Wish = Wish(randomUUID())

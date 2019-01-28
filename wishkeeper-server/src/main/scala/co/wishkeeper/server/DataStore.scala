@@ -4,10 +4,12 @@ import java.nio.ByteBuffer
 import java.util.UUID
 import java.util.concurrent.atomic.AtomicReference
 
+import cats.data.EitherT
 import co.wishkeeper.json._
 import co.wishkeeper.server.Events.UserEvent
-import co.wishkeeper.server.user.{EmailTokenAlreadyVerified, VerificationToken}
+import co.wishkeeper.server.UserEventInstant.UserEventInstants
 import co.wishkeeper.server.user.events.history.{HistoryEvent, HistoryEventInstance}
+import co.wishkeeper.server.user.{EmailTokenAlreadyVerified, VerificationToken}
 import com.datastax.driver.core._
 import io.circe.generic.extras
 import io.circe.generic.extras.auto._
@@ -16,6 +18,7 @@ import io.circe.syntax._
 import org.joda.time.DateTime
 
 import scala.collection.JavaConverters._
+import scala.concurrent.{ExecutionContext, Future}
 import scala.util.Try
 
 
@@ -62,7 +65,9 @@ trait DataStore {
 
   def lastSequenceNum(userId: UUID): Option[Long]
 
-  def userEvents(userId: UUID): List[UserEventInstant[_ <: UserEvent]]
+  def userEvents(userId: UUID): UserEventInstants
+
+  def userEventsAsync(userId: UUID): EitherT[Future, Error, UserEventInstants]
 
   def truncateUserByName(): Boolean
 
@@ -73,9 +78,7 @@ trait DataStore {
 
 case class DataStoreConfig(addresses: List[String])
 
-class CassandraDataStore(dataStoreConfig: DataStoreConfig) extends DataStore {
-
-
+class CassandraDataStore(dataStoreConfig: DataStoreConfig)(implicit ec: ExecutionContext) extends DataStore {
   import CassandraDataStore._
 
   private implicit val circeConfig = extras.Configuration.default.withDefaults
@@ -151,10 +154,18 @@ class CassandraDataStore(dataStoreConfig: DataStoreConfig) extends DataStore {
       None
   }
 
-  override def userEvents(userId: UUID): List[UserEventInstant[_ <: UserEvent]] = {
+  override def userEvents(userId: UUID): UserEventInstants = {
     val resultSet: ResultSet = session.execute(selectUserEvents.bind().setUUID("userId", userId))
     resultSet.asScala.map(rowToEventInstant).toList
   }
+
+  override def userEventsAsync(userId: UUID): EitherT[Future, Error, UserEventInstants] = {
+    val result: Future[Either[Error, List[UserEventInstant[_ <: UserEvent]]]] = Future {
+      Right(userEvents(userId))
+    }
+    EitherT(result)
+  }
+
 
   private val rowToEventInstant: Row => UserEventInstant[_ <: UserEvent] = row => {
     val json = new String(row.getBytes("event").array())

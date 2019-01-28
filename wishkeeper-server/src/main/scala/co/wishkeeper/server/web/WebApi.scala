@@ -323,6 +323,13 @@ class WebApi(publicApi: PublicApi, managementApi: ManagementApi, clientRegistry:
     }
   }
 
+  val homeScreenData: UUID => Route = userId => (pathPrefix("home") & get) {
+    onComplete(publicApi.homeScreenData(userId).value) {
+      case Success(v) => v.fold(handleErrors, complete(_))
+      case Failure(e) => handleErrors(GeneralError(e.getMessage))
+    }
+  }
+
   val newUserRoute: Route =
     userIdFromSessionHeader { userId =>
       pathPrefix("me") {
@@ -333,7 +340,8 @@ class WebApi(publicApi: PublicApi, managementApi: ManagementApi, clientRegistry:
           profile(userId) ~
           settings(userId) ~
           history(userId, None) ~
-          flags(userId)
+          flags(userId) ~
+          homeScreenData(userId)
       } ~
         pathPrefix(JavaUUID) { friendId =>
           friendWishes(userId, friendId) ~

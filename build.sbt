@@ -36,7 +36,7 @@ lazy val commonSettings = Seq(
     "com.wix" %% "specs2-jmock" % "1.2.0" % Test
   ),
 
-  libraryDependencies += "org.typelevel" %% "cats-core" % "1.3.1",
+  libraryDependencies += "org.typelevel" %% "cats-core" % "1.5.0",
 
   libraryDependencies ++= Seq(
     "io.circe" %% "circe-core",
