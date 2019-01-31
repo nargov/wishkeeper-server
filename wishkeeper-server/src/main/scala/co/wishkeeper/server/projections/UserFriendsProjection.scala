@@ -6,7 +6,7 @@ import cats.data.EitherT
 import cats.implicits._
 import co.wishkeeper.server.UserEventInstant.UserEventInstants
 import co.wishkeeper.server.UserRelation.DirectFriend
-import co.wishkeeper.server.WishStatus.Active
+import co.wishkeeper.server.WishStatus.{Active, Reserved}
 import co.wishkeeper.server.{DataStore, Error, FacebookConnector, Friend, FriendRequest, FriendWishlistPreview, FriendsWishlistPreviews, GeneralError, GoogleAuthAdapter, User}
 import org.joda.time.format.DateTimeFormat
 import org.joda.time.{DateTime, LocalDate}
@@ -40,7 +40,7 @@ object UserFriendsProjection {
   private[projections] val isRelevantFriend: (UUID, Int, User, LocalDate) => Boolean = (userId, birthdayMarginDays, f, today) => {
     val wishlist = f.wishes.values
     wishlist.exists(_.status == Active) &&
-      !wishlist.exists(_.reserver.contains(userId)) &&
+      !wishlist.exists(w => w.status == Reserved(userId)) &&
       f.userProfile.birthday.exists(d => {
         val birthDate = DateTimeFormat.shortDate().parseLocalDate(d).withYear(today.getYear)
         val nextBirthday = if (birthDate.isBefore(today)) birthDate.plusYears(1) else birthDate

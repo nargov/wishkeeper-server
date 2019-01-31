@@ -437,6 +437,20 @@ class EventBasedUserFriendsProjectionTest(implicit ee: ExecutionEnv) extends Spe
 
       users.filter(userFriendsProjection.wishlistRecentlyChanged) must contain(exactly(users.head, users(1)))
     }
+
+    "Ignore reserver in birthday friend calculation if wish is not in reserved status" in new Context {
+      val wishId = randomUUID()
+
+      checking {
+        allowing(dataStore).userEvents(userId).willReturn(EventsList(userId).withFriend(friendId).list)
+        allowing(dataStore).userEvents(friendId).willReturn(EventsList(userId).withName("Han Solo")
+          .withBirthday(DateTime.now().toLocalDate.plusDays(2).toString(DateTimeFormat.shortDate()))
+          .withReservedWish(wishId, "Shoes", userId).withWish(randomUUID(), "Hat")
+          .withEvent(WishGranted(wishId)).list)
+      }
+
+      userFriendsProjection.friendsWithUpcomingBirthday(userId) must beRight(haveUpcomingBirthdayFor(friendId))
+    }
   }
 
   def aUserWithName(userId: UUID, name: String): Matcher[User] = (user: User) =>
