@@ -11,7 +11,7 @@ import co.wishkeeper.server.FriendRequestStatus.{Approved, Ignored}
 import co.wishkeeper.server.NotificationsData.{FriendRequestNotification, NotificationData}
 import co.wishkeeper.server.UserEventInstant.UserEventInstants
 import co.wishkeeper.server.UserTestHelper._
-import co.wishkeeper.server.WishStatus.WishStatus
+import co.wishkeeper.server.WishStatus.{Reserved, WishStatus}
 import co.wishkeeper.server._
 import co.wishkeeper.server.image.ImageStore
 import co.wishkeeper.server.messaging.{EmailProvider, EmailSender, TemplateEngineAdapter}
@@ -440,6 +440,38 @@ class DelegatingPublicApiTest(implicit ee: ExecutionEnv) extends Specification w
     val result: Future[Either[Error, HomeScreenData]] = apiWithStoreOnly.homeScreenData(userId).value
     result must beRight(haveUpdatedWishlistsForFriends(List(yetAnotherFriendId, friendId, otherFriendId))).await(20, 20.millis)
   }
+
+  "return reserved wishes in upcoming birthdays wishlists and recently changed wishlists in home screen data" in new Context {
+    val now: DateTime = DateTime.now()
+    val otherFriendId = randomUUID()
+    val friendEvents: EitherT[Future, Error, UserEventInstants] = EitherT.right(Future.successful(EventsList(friendId)
+      .withWish(wishId, "Wish", now.minusDays(5)).withReservedWish(randomUUID, "Reserved Wish", randomUUID())
+      .withBirthday(LocalDate.now().minusYears(20).plusDays(4).toString("MM/dd/yyyy")).list))
+    val otherFriendEvents: EitherT[Future, Error, UserEventInstants] = EitherT.right(Future.successful(EventsList(otherFriendId)
+      .withWish(randomUUID(), "A Wish", now.minusDays(1)).withReservedWish(randomUUID(), "Another Reserved Wish", randomUUID())
+      .list))
+
+    checking {
+      allowing(dataStore).userEvents(userId).willReturn(EventsList(userId).withFriend(friendId).withFriend(otherFriendId).list)
+      allowing(dataStore).userEventsAsync(friendId).willReturn(friendEvents)
+      allowing(dataStore).userEventsAsync(otherFriendId).willReturn(otherFriendEvents)
+    }
+
+    val result: Future[Either[Error, HomeScreenData]] = apiWithStoreOnly.homeScreenData(userId).value
+    result must beRight(haveReservedWishInUpcomingBirthday and haveReservedWishInUpdatedWishlist).await(20, 20.millis)
+  }
+
+  def haveReservedWishInUpcomingBirthday: Matcher[HomeScreenData] = (data: HomeScreenData) =>
+    (data.birthdays.friends.head.wishlist.exists(_.status match {
+      case Reserved(_) => true
+      case _ => false
+    }), "does not contain a reserved wish in upcoming birthday friends")
+
+  def haveReservedWishInUpdatedWishlist: Matcher[HomeScreenData] = (data: HomeScreenData) =>
+    (data.updatedWishlists.friends.head.wishlist.exists(_.status match {
+      case Reserved(_) => true
+      case _ => false
+    }), "does not contain a reserved wish in updated friend wishlist")
 
   def haveUpdatedWishlistsForFriends(friendsIds: List[UUID]): Matcher[HomeScreenData] = (data: HomeScreenData) =>
     (data.updatedWishlists.friends.map(_.friend.userId) == friendsIds, "Friend IDs do not match ids of updated wishlist friends")

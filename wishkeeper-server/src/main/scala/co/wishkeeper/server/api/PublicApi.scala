@@ -11,6 +11,7 @@ import cats.data.EitherT
 import cats.implicits._
 import co.wishkeeper.server.FriendRequestStatus.{Approved, Ignored}
 import co.wishkeeper.server.UserRelation.DirectFriend
+import co.wishkeeper.server.WishStatus.{Active, Reserved}
 import co.wishkeeper.server._
 import co.wishkeeper.server.image._
 import co.wishkeeper.server.messaging.EmailSender
@@ -404,10 +405,13 @@ class DelegatingPublicApi(commandProcessor: CommandProcessor,
     userFriendsProjection.friendsWithUpcomingBirthday(userId)
 
   private val toPreview: Int => List[User] => FriendsWishlistPreviews = maxWishes => users => FriendsWishlistPreviews(users.map(user => {
-    val activeWishesByDate = user.activeWishesByDate
+    val wishes = user.wishes.values.filter(_.status match {
+      case Active | Reserved(_) => true
+      case _ => false
+    }).toList.sortBy(w => -w.creationTime.getMillis)
     val profile = user.userProfile
     FriendWishlistPreview(Friend(user.id, profile.name, profile.picture, profile.firstName, Option(DirectFriend)),
-      profile.birthday, activeWishesByDate.take(maxWishes), activeWishesByDate.size > maxWishes, profile.genderData)
+      profile.birthday, wishes.take(maxWishes), wishes.size > maxWishes, profile.genderData)
   }))
 
   implicit private val dateTimeOrder: Ordering[Option[DateTime]] = Ordering.Option(Ordering.fromLessThan(_.isBefore(_)))
