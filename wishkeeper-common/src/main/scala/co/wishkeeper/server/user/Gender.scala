@@ -18,11 +18,13 @@ object Gender {
     case _ => Json.fromString("custom")
   }
 
-  implicit val decoder: Decoder[Gender] = (c: HCursor) => c.as[String].map {
-    case "female" => Female
-    case "male" => Male
-    case "custom" => Custom
+  val fromString: PartialFunction[String, Gender] = {
+    case "female" | "Female" => Female
+    case "male" | "Male" => Male
+    case "custom" | "Custom" | "other" | "Other" => Custom
   }
+
+  implicit val decoder: Decoder[Gender] = (c: HCursor) => c.as[String].map(fromString)
 }
 
 sealed trait GenderPronoun

@@ -34,7 +34,7 @@ case class User(id: UUID,
     case UserEventInstant(UserBirthdaySet(_, value), _) => this.copy(userProfile = this.userProfile.copy(birthday = Option(value)))
     case UserEventInstant(UserEmailSet(_, value), _) => this.copy(userProfile = this.userProfile.copy(email = Option(value)))
     case UserEventInstant(UserLocaleSet(_, value), _) => this.copy(userProfile = this.userProfile.copy(locale = Option(value)))
-    case UserEventInstant(UserGenderSet(_, value), _) => this.copy(userProfile = this.userProfile.copy(gender = Option(value)))
+    case UserEventInstant(e@UserGenderSet(_, _), time) => handleEventWithHandler(e, time)
     case UserEventInstant(UserTimeZoneSet(_, value), _) => this.copy(userProfile = this.userProfile.copy(timezone = Option(value)))
     case UserEventInstant(UserAgeRangeSet(_, min, max), _) => this.copy(userProfile = this.userProfile.copy(ageRange = Option(AgeRange(min, max))))
     case UserEventInstant(UserFacebookIdSet(_, fbId), _) => this.copy(userProfile = this.userProfile.copy(socialData =

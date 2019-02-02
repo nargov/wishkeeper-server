@@ -450,6 +450,12 @@ class UserTest extends Specification with MatcherMacros with JMock with Notifica
     user.applyEvent(asEventInstant(WishDeleted(wishId), time)).lastWishlistChange must beSome(time)
   }
 
+  "Return correct GenderData when only Gender string is set" in new Context {
+    user.withEvent(UserGenderSet(user.id, "male")).userProfile.genderData must beSome(GenderData(Gender.Male))
+    user.withEvent(UserGenderSet(user.id, "female")).userProfile.genderData must beSome(GenderData(Gender.Female))
+    user.withEvent(UserGenderSet(user.id, "other")).userProfile.genderData must beSome(GenderData(Gender.Custom))
+  }
+
   trait Context extends Scope {
     val user: User = User.createNew()
     val wish: Wish = Wish(randomUUID())
