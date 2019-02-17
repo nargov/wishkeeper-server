@@ -35,7 +35,7 @@ class GoogleCloudStorageImageStore(bucket: String) extends ImageStore {
 
   override def delete(id: String): Boolean = storage.delete(BlobId.of(bucket, id))
 
-  override def imageLinkBase = s"http://$bucket"
+  override def imageLinkBase = s"https://$bucket"
 }
 
 

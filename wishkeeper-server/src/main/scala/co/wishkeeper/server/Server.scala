@@ -11,7 +11,7 @@ import co.wishkeeper.server.image.{GoogleCloudStorageImageStore, ImageStore}
 import co.wishkeeper.server.messaging._
 import co.wishkeeper.server.notifications.{DeviceIdEventProcessor, ExecutorNotificationsScheduler, ReportingEventProcessor, ServerNotificationEventProcessor}
 import co.wishkeeper.server.projections._
-import co.wishkeeper.server.reporting.{DebugReporter, NoOpReporter, Reporter, SlackBotReporter}
+import co.wishkeeper.server.reporting.{DebugReporter, Reporter, SlackBotReporter}
 import co.wishkeeper.server.search.SimpleScanUserSearchProjection
 import co.wishkeeper.server.web.WebApi
 import com.typesafe.config.ConfigFactory
@@ -23,8 +23,8 @@ import scala.concurrent.{ExecutionContext, ExecutionContextExecutor}
 class WishkeeperServer {
   private val config = ConfigFactory.load()
 
-  private implicit val system = ActorSystem("web-api")
-  private implicit val materializer = ActorMaterializer()
+  private implicit val system: ActorSystem = ActorSystem("web-api")
+  private implicit val materializer: ActorMaterializer = ActorMaterializer()
   private implicit val executionContext: ExecutionContextExecutor = system.dispatcher
 
   private val dataStoreConfig = DataStoreConfig(config.getStringList("wishkeeper.datastore.urls").asScala.toList)
