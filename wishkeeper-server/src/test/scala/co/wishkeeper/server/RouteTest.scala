@@ -126,6 +126,16 @@ class RouteTest extends Specification with Specs2RouteTest with JMock {
         handled must beTrue
       }
     }
+
+    "Migrate http urls to https" in new ManagementContext {
+      checking {
+        oneOf(managementApi).migrateUrlsToHttp()
+      }
+
+      Post("/migrate-urls") ~> managementRoute ~> check {
+        handled must beTrue
+      }
+    }
   }
 
   "Route" should {

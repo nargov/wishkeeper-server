@@ -102,6 +102,10 @@ object ManagementRoute {
       periodicWakeup
     }
 
+    val migrateUrls = (pathPrefix("migrate-urls") & post) {
+      complete(managementApi.migrateUrlsToHttp())
+    }
+
     DebuggingDirectives.logRequestResult(LoggingMagnet(_ => printer)) {
       pathPrefix("users") {
         userByEmail ~
@@ -110,7 +114,8 @@ object ManagementRoute {
       } ~
         stats ~
       views ~
-      subscriptions
+      subscriptions ~
+      migrateUrls
     }
   }
 }

@@ -21,7 +21,7 @@ object EventsTestHelper {
 
   def anEventsListFor(userId: UUID) = EventsList(userId)
 
-  case class EventsList(userId: UUID, list: List[UserEventInstant[_ <: UserEvent]]) {
+  case class EventsList(userId: UUID, list: UserEventInstants) {
 
     def withFriends(friends: Seq[Friend]): EventsList = friends.foldLeft(this)(_.withFriend(_))
 

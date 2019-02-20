@@ -6,7 +6,6 @@ import co.wishkeeper.server.Events.UserEvent
 import co.wishkeeper.server._
 import co.wishkeeper.server.notifications.DeviceIdEventProcessor
 import co.wishkeeper.server.projections.{Projection, UserIdByFacebookIdProjection, UserProfileProjection}
-import co.wishkeeper.server.search.UserSearchProjection
 import co.wishkeeper.server.user.commands.{DeleteUserPicture, SetFlagFacebookFriendsListSeen}
 
 trait ManagementApi {
@@ -29,6 +28,8 @@ trait ManagementApi {
   def deleteUserPicture(userId: UUID): Either[Error, Unit]
 
   def userEvents(userId: UUID): List[UserEventInstant[_ <: UserEvent]]
+
+  def migrateUrlsToHttp(): Unit
 }
 
 class DelegatingManagementApi(userIdByFacebookIdProjection: UserIdByFacebookIdProjection,
@@ -39,6 +40,7 @@ class DelegatingManagementApi(userIdByFacebookIdProjection: UserIdByFacebookIdPr
                               deviceIdEventProcessor: DeviceIdEventProcessor,
                               historyProjection: Projection) extends ManagementApi {
 
+  override def migrateUrlsToHttp(): Unit = HttpToHttpsMigration.migrate(dataStore)
 
   override def userByEmail(email: String): Option[UUID] = dataStore.userIdByEmail(email)
 
