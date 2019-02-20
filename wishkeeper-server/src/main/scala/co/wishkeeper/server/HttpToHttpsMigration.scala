@@ -2,6 +2,9 @@ package co.wishkeeper.server
 
 import co.wishkeeper.server.Events.{UserEvent, UserPictureSet, WishImageSet}
 import org.joda.time.DateTime
+import org.slf4j.LoggerFactory
+
+import scala.util.Try
 
 object HttpToHttpsMigration {
 
@@ -31,12 +34,16 @@ object HttpToHttpsMigration {
 
   def migrate(dataStore: DataStore): Unit = {
     dataStore.userEmails.foreach { case (_, userId) =>
-      val user = User.replay(dataStore.userEvents(userId))
-      val userPicEvents: List[UserEvent] = migratedUserImage(user).toList
-      val wishImageEvents: List[UserEvent] = migratedWishImages(user)
-      val events = userPicEvents ++ wishImageEvents
-      if (events.nonEmpty)
-        dataStore.saveUserEvents(user.id, dataStore.lastSequenceNum(user.id), DateTime.now(), events)
+      Try {
+        val user = User.replay(dataStore.userEvents(userId))
+        val userPicEvents: List[UserEvent] = migratedUserImage(user).toList
+        val wishImageEvents: List[UserEvent] = migratedWishImages(user)
+        val events = userPicEvents ++ wishImageEvents
+        if (events.nonEmpty)
+          dataStore.saveUserEvents(user.id, dataStore.lastSequenceNum(user.id), DateTime.now(), events)
+      }.recover {
+        case e: Exception => LoggerFactory.getLogger(getClass).error(s"Error when processing user [$userId]", e)
+      }
     }
   }
 }
