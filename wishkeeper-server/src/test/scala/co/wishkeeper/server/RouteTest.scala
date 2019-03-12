@@ -8,6 +8,7 @@ import akka.http.scaladsl.model._
 import akka.http.scaladsl.model.headers._
 import akka.http.scaladsl.testkit.Specs2RouteTest
 import cats.data.EitherT
+import cats.implicits._
 import co.wishkeeper.json._
 import co.wishkeeper.server.NotificationsData.FriendRequestNotification
 import co.wishkeeper.server.WishStatus.Deleted
@@ -798,6 +799,33 @@ class RouteTest extends Specification with Specs2RouteTest with JMock {
 
       Get("/me/home").withHeaders(sessionIdHeader) ~> webApi.newUserRoute ~> check {
         responseAs[HomeScreenData] must beEqualTo(HomeScreenData())
+      }
+    }
+
+    "Return the dimensions of a remote image" in new LoggedInUserContext {
+      val url = "http://example.com/image"
+      val metadata = ImageMetadata("image/jpeg", "image", 100, 200)
+      val imageMetadata: EitherT[Future, Error, ImageMetadata] = EitherT.rightT(metadata)
+      checking {
+        allowing(publicApi).imageDimensionsFor(url).willReturn(imageMetadata)
+      }
+
+      Post(s"/image-dims?url=$url").withHeaders(sessionIdHeader) ~> webApi.newUserRoute ~> check {
+        responseAs[ImageMetadata] must beEqualTo(metadata)
+      }
+    }
+
+    "Upload a given image" in new LoggedInUserContext {
+      val url = "http://example.com/image"
+      val imageLinks = ImageLinks(List(ImageLink("https://wish-media.wishkeeper.co/12345678", 100, 200, "image/jpeg")))
+
+      checking {
+        allowing(publicApi).uploadImage(url).willReturn(
+          Right(imageLinks))
+      }
+
+      Post(s"/images?url=$url").withHeaders(sessionIdHeader) ~> webApi.newUserRoute ~> check {
+        responseAs[ImageLinks] must beEqualTo(imageLinks)
       }
     }
   }

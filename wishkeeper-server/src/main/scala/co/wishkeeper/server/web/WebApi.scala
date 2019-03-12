@@ -330,6 +330,21 @@ class WebApi(publicApi: PublicApi, managementApi: ManagementApi, clientRegistry:
     }
   }
 
+  val imageDimensions: Route = (pathPrefix("image-dims") & post) {
+    parameter('url) { url =>
+      onComplete(publicApi.imageDimensionsFor(url).value) {
+        case Success(v) => v.fold(handleErrors, complete(_))
+        case Failure(e) => handleErrors(GeneralError(e.getMessage))
+      }
+    }
+  }
+
+  val images: Route = pathPrefix("images") {
+    (post & parameter('url)) { url =>
+      publicApi.uploadImage(url).fold(handleErrors, complete(_))
+    }
+  }
+
   val newUserRoute: Route =
     userIdFromSessionHeader { userId =>
       pathPrefix("me") {
@@ -347,7 +362,9 @@ class WebApi(publicApi: PublicApi, managementApi: ManagementApi, clientRegistry:
           friendWishes(userId, friendId) ~
             history(userId, Option(friendId))
         } ~
-        search(userId)
+        search(userId) ~
+        imageDimensions ~
+        images
     } ~
       websocket ~
       connect

@@ -1,5 +1,6 @@
 package co.wishkeeper.server
 
+import java.net.{HttpURLConnection, URL}
 import java.nio.file.{Files, Path, Paths}
 
 import com.sksamuel.scrimage.Image
@@ -11,6 +12,8 @@ trait ImageProcessor {
   def resizeToWidth(src: Path, extension: String, width: Int): Path
 
   def dimensions(src: Path): (Int, Int)
+
+  def dimensions(url: String): (Int, Int)
 }
 
 object ImageProcessor {
@@ -21,6 +24,17 @@ class ScrimageImageProcessor extends ImageProcessor {
   
   override def dimensions(src: Path): (Int, Int) = {
     val image = Image.fromPath(src)
+    (image.width, image.height)
+  }
+
+  override def dimensions(url: String): (Int, Int) = {
+    val con = new URL(url).openConnection().asInstanceOf[HttpURLConnection]
+    val connection = if(con.getResponseCode == 301 || con.getResponseCode == 302)
+      new URL(con.getHeaderField("Location")).openConnection().asInstanceOf[HttpURLConnection]
+    else con
+    val image = Image.fromStream(connection.getInputStream)
+    con.disconnect()
+    connection.disconnect()
     (image.width, image.height)
   }
 

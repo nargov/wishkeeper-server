@@ -28,6 +28,8 @@ import scala.util.Try
 
 trait PublicApi {
 
+  def imageDimensionsFor(url: String): EitherT[Future, Error, ImageMetadata]
+
   def homeScreenData(userId: UUID): EitherT[Future, Error, HomeScreenData]
 
   def friendsWithUpcomingBirthdays(userId: UUID): Either[Error, FriendsWishlistPreviews]
@@ -124,6 +126,8 @@ trait PublicApi {
 
   def uploadImage(url: String, imageMetadata: ImageMetadata, wishId: UUID, sessionId: UUID): Try[Unit]
 
+  def uploadImage(url: String): Either[Error, ImageLinks]
+
   def deleteWishImage(sessionId: UUID, wishId: UUID): Unit
 
   def userIdForSession(sessionId: UUID): Option[UUID]
@@ -146,7 +150,8 @@ class DelegatingPublicApi(commandProcessor: CommandProcessor,
                           emailSender: EmailSender)
                          (implicit actorSystem: ActorSystem, ec: ExecutionContext, am: ActorMaterializer) extends PublicApi {
 
-  private val imageUploader = new ImageUploader(imageStore, userImageStore, new ScrimageImageProcessor)
+  private val imageProcessor: ImageProcessor = new ScrimageImageProcessor
+  private val imageUploader = new ImageUploader(imageStore, userImageStore, imageProcessor)
 
   override def deleteWish(userId: UUID, wishId: UUID): Either[Error, Unit] = commandProcessor.validatedProcess(DeleteWish(wishId), userId)
 
@@ -164,7 +169,7 @@ class DelegatingPublicApi(commandProcessor: CommandProcessor,
     }
   }
 
-  private def upload(inputStream: InputStream, imageMetadata: ImageMetadata, imageStore: Option[ImageStore] = None) = Try {
+  private def upload(inputStream: InputStream, imageMetadata: ImageMetadata, imageStore: Option[ImageStore] = None): Try[ImageLinks] = Try {
     val origFile = uploadedFilePath(imageMetadata)
     Files.copy(inputStream, origFile) //TODO move to adapter
     imageStore.fold(imageUploader.uploadImageAndResizedCopies(imageMetadata, origFile))(store =>
@@ -180,18 +185,33 @@ class DelegatingPublicApi(commandProcessor: CommandProcessor,
     connection
   }
 
+  private def connectionFollowingRedirectFor(url: String): HttpURLConnection = {
+    val escapedUrl = UrlEscapers.urlFragmentEscaper().escape(url)
+    val connection = connectionFor(escapedUrl)
+    val code = connection.getResponseCode
+    if (code == HttpURLConnection.HTTP_MOVED_PERM || code == HttpURLConnection.HTTP_MOVED_TEMP || code == HttpURLConnection.HTTP_SEE_OTHER) {
+      connectionFor(connection.getHeaderField("Location"))
+    }
+    else {
+      connection
+    }
+  }
+
   override def uploadImage(url: String, imageMetadata: ImageMetadata, wishId: UUID, sessionId: UUID): Try[Unit] = {
-    Try {
-      val escapedUrl = UrlEscapers.urlFragmentEscaper().escape(url)
-      val connection = connectionFor(escapedUrl)
-      val code = connection.getResponseCode
-      if (code == HttpURLConnection.HTTP_MOVED_PERM || code == HttpURLConnection.HTTP_MOVED_TEMP || code == HttpURLConnection.HTTP_SEE_OTHER) {
-        connectionFor(connection.getHeaderField("Location"))
-      }
-      else {
-        connection
-      }
-    }.flatMap(con => uploadImage(con.getInputStream, imageMetadata, wishId, sessionId))
+    Try(connectionFollowingRedirectFor(url))
+      .flatMap(con => uploadImage(con.getInputStream, imageMetadata, wishId, sessionId))
+  }
+
+  override def uploadImage(url: String): Either[Error, ImageLinks] = {
+    Try(connectionFollowingRedirectFor(UrlEscapers.urlFragmentEscaper().escape(url))).map(con => {
+      val tempFileName = UUID.randomUUID().toString
+      val tempFilePath = Paths.get(ImageProcessor.tempDir.toString, tempFileName)
+      Files.copy(con.getInputStream, tempFilePath)
+      con.disconnect()
+      val (tempFileWidth, tempFileHeight) = imageProcessor.dimensions(tempFilePath)
+      val imageMetadata = ImageMetadata("image/jpeg", tempFileName, tempFileWidth, tempFileHeight)
+      imageUploader.uploadImageAndResizedCopies(imageMetadata, tempFilePath)
+    }).toEither.leftMap[Error](t => GeneralError(t.getMessage))
   }
 
   override def wishListFor(sessionId: UUID): Option[UserWishes] = {
@@ -432,5 +452,17 @@ class DelegatingPublicApi(commandProcessor: CommandProcessor,
         HomeScreenData(bs, ws.copy(ws.friends.diff(bs.friends)))
       }
     }
+  }
+
+  override def imageDimensionsFor(url: String): EitherT[Future, Error, ImageMetadata] = {
+    EitherT(Future {
+      Try {
+        val (width, height) = imageProcessor.dimensions(url)
+        ImageMetadata("", "", width, height)
+      }.toEither.leftMap[Error](t => {
+        t.printStackTrace()
+        GeneralError(t.getMessage)
+      })
+    })
   }
 }
