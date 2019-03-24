@@ -2,13 +2,13 @@ version: 2
 jobs:
   test:
     docker:
-      - image: circleci/openjdk:8u181-jdk
+      - image: openjdk:8
     steps:
       - checkout
       - run: echo "deb https://dl.bintray.com/sbt/debian /" | sudo tee -a /etc/apt/sources.list.d/sbt.list
       - run: sudo apt-key adv --keyserver hkp://keyserver.ubuntu.com:80 --recv 2EE0EA64E40A89B84B2DF73499E82A75642AC823
       - run: sudo apt-get update
-      - run: sudo apt-get install sbt
+      - run: sudo apt-get install -y sbt
       - run: sbt -J-Xss8M -mem 4096 test
 workflows:
   version: 2
