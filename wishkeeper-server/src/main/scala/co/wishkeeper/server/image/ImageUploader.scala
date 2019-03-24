@@ -25,23 +25,25 @@ class ImageUploader(imageStore: ImageStore, userImageStore: ImageStore, imagePro
                                   extensions: List[(String, Int)] = ImageUploader.sizeExtensions): ImageLinks = {
 
     val sizesAndExtensions = (".full", imageMetadata.width) :: extensions
+    val (origImageWidth, _) = imageProcessor.dimensions(origFile)
 
     val eventualLinks: List[Future[ImageLink]] = sizesAndExtensions.filter {
-      case (_, width) => width <= imageMetadata.width
+      case (_, width) => width <= origImageWidth
     }.map { case (ext, width) =>
       Future {
-        val file = if (width == imageMetadata.width)
+        val file = if (width == origImageWidth)
           imageProcessor.compress(origFile, ext)
-        else
+        else {
           imageProcessor.resizeToWidth(origFile, ext, width)
+        }
         val fileName = file.getFileName.toString
-        val (_, height) = imageProcessor.dimensions(file)
+        val (processedWidth, processedHeight) = imageProcessor.dimensions(file)
         toImageStore.save(ImageData(Files.newInputStream(file), ContentTypes.jpeg), fileName)
-        Files.deleteIfExists(file)
-        ImageLink(s"${toImageStore.imageLinkBase}/$fileName", width, height, ContentTypes.jpeg)
+        ImageLink(s"${toImageStore.imageLinkBase}/$fileName", processedWidth, processedHeight, ContentTypes.jpeg)
       }
     }
 
+    //TODO return a future from this function instead of blocking
     val imageLinks: List[ImageLink] = Await.result(Future.sequence(eventualLinks), timeout)
 
     Files.deleteIfExists(origFile)

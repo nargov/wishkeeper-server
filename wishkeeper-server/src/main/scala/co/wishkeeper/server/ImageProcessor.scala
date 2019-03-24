@@ -46,7 +46,8 @@ class ScrimageImageProcessor extends ImageProcessor {
 
   override def compress(src: Path, extension: String): Path = {
     val compressed = addExtension(src, extension)
-    Image.fromPath(src).output(compressed)(jpegWriter)
+    val image = Image.fromPath(src)
+    image.output(compressed)(jpegWriter)
   }
 
   override def resizeToWidth(src: Path, extension: String, width: Int): Path = {

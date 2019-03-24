@@ -93,7 +93,7 @@ lazy val server = (project in file("wishkeeper-server")).
       "com.google.cloud" % "google-cloud-pubsub" % "1.31.0",
       "com.google.apis" % "google-api-services-people" % "v1-rev352-1.25.0",
       "com.google.firebase" % "firebase-admin" % "6.2.0",
-      "com.sksamuel.scrimage" %% "scrimage-core" % "2.1.8"
+      "com.sksamuel.scrimage" %% "scrimage-core" % "3.0.0-alpha4"
         exclude("commons-io", "commons-io"),
       "io.appium" % "java-client" % "5.0.0-BETA6" % "it" exclude("com.codeborne", "phantomjsdriver"),
       "org.scalatra.scalate" %% "scalate-core" % "1.9.0",
