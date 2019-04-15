@@ -97,7 +97,8 @@ lazy val server = (project in file("wishkeeper-server")).
         exclude("commons-io", "commons-io"),
       "io.appium" % "java-client" % "5.0.0-BETA6" % "it" exclude("com.codeborne", "phantomjsdriver"),
       "org.scalatra.scalate" %% "scalate-core" % "1.9.0",
-      "com.github.tomakehurst" % "wiremock-jre8" % "2.21.0" % "it"
+      "com.github.tomakehurst" % "wiremock-jre8" % "2.21.0" % "it",
+      "com.cloudinary" % "cloudinary-http44" % "1.22.1"
     ),
     packAutoSettings,
     addArtifact(Artifact("wishkeeper-server", "Bundled Archive", "tar.gz"), packArchiveTgz).settings

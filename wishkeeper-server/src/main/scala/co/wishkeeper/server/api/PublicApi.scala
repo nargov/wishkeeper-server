@@ -128,6 +128,8 @@ trait PublicApi {
 
   def uploadImage(url: String): Either[Error, ImageLinks]
 
+  def uploadImage(url: String, wishId: UUID, userId: UUID): EitherT[Future, Error, Unit]
+
   def deleteWishImage(sessionId: UUID, wishId: UUID): Unit
 
   def userIdForSession(sessionId: UUID): Option[UUID]
@@ -147,7 +149,8 @@ class DelegatingPublicApi(commandProcessor: CommandProcessor,
                           userHistoryProjection: UserHistoryProjection,
                           googleAuth: GoogleAuthAdapter,
                           firebaseAuth: EmailAuthProvider,
-                          emailSender: EmailSender)
+                          emailSender: EmailSender,
+                          wishImageStore: BetterImageStore)
                          (implicit actorSystem: ActorSystem, ec: ExecutionContext, am: ActorMaterializer) extends PublicApi {
 
   private val imageProcessor: ImageProcessor = new ScrimageImageProcessor
@@ -212,6 +215,12 @@ class DelegatingPublicApi(commandProcessor: CommandProcessor,
       val imageMetadata = ImageMetadata("image/jpeg", tempFileName, tempFileWidth, tempFileHeight)
       imageUploader.uploadImageAndResizedCopies(imageMetadata, tempFilePath)
     }).toEither.leftMap[Error](t => GeneralError(t.getMessage))
+  }
+
+  override def uploadImage(url: String, wishId: UUID, userId: UUID): EitherT[Future, Error, Unit] = {
+    wishImageStore.save(url, wishId.toString).subflatMap(links => {
+      commandProcessor.process(SetWishDetails(Wish(wishId, image = Option(links))), userId)
+    })
   }
 
   override def wishListFor(sessionId: UUID): Option[UserWishes] = {

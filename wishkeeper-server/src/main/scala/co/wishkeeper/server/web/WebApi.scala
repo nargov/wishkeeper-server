@@ -25,7 +25,7 @@ import co.wishkeeper.server.search.SearchQuery
 import co.wishkeeper.server.user._
 import co.wishkeeper.server.user.commands._
 import co.wishkeeper.server.web.WebApi.{imageDimensionsHeader, sessionIdHeader}
-import co.wishkeeper.server.{ConnectFirebaseUser, ConnectGoogleUser, Error, GeneralError, GeneralSettings}
+import co.wishkeeper.server.{ConnectFirebaseUser, ConnectGoogleUser, Error, FeatureToggles, GeneralError, GeneralSettings}
 import de.heikoseeberger.akkahttpcirce.FailFastCirceSupport._
 import io.circe.generic.extras.Configuration
 import io.circe.generic.extras.auto._
@@ -37,14 +37,14 @@ import scala.concurrent.{ExecutionContextExecutor, Future}
 import scala.language.postfixOps
 import scala.util.{Failure, Success, Try}
 
-class WebApi(publicApi: PublicApi, managementApi: ManagementApi, clientRegistry: ClientRegistry)
+class WebApi(publicApi: PublicApi, managementApi: ManagementApi, clientRegistry: ClientRegistry, featureToggles: FeatureToggles)
             (implicit system: ActorSystem, mat: ActorMaterializer, ec: ExecutionContextExecutor) {
 
   private implicit val timeout: Timeout = 4.seconds
 
   private implicit val circeConfig = Configuration.default.withDefaults
 
-  private implicit val uuidUnmarshaller: Unmarshaller[String, UUID] = Unmarshaller.apply[String, UUID](ec => uuid => Try {
+  private implicit val uuidUnmarshaller: Unmarshaller[String, UUID] = Unmarshaller.apply[String, UUID](_ => uuid => Try {
     UUID.fromString(uuid)
   }.fold(Future.failed, Future.successful))
 
@@ -418,7 +418,7 @@ class WebApi(publicApi: PublicApi, managementApi: ManagementApi, clientRegistry:
                       sessionUUID.
                         map(publicApi.userProfileFor(_, friendId)).
                         map {
-                          case Right(profile) => complete(profile)
+                          case Right(prof) => complete(prof)
                           case Left(reason) if reason == NotFriends => complete(StatusCodes.Forbidden -> reason)
                         }.get
                     }
@@ -471,9 +471,9 @@ class WebApi(publicApi: PublicApi, managementApi: ManagementApi, clientRegistry:
                 pathPrefix(JavaUUID / "image") { wishId =>
                   post {
                     withRequestTimeout(2.minutes) {
-                      headerValueByName(imageDimensionsHeader) { imageDimensionsHeader =>
-                        val imageWidth :: imageHeight :: Nil = imageDimensionsHeader.split(",").toList
-                        pathEnd {
+                      pathEnd {
+                        headerValueByName(imageDimensionsHeader) { imageDimensionsHeader =>
+                          val imageWidth :: imageHeight :: Nil = imageDimensionsHeader.split(",").toList
                           fileUpload("file") { case (metadata, byteSource) =>
                             val inputStream = byteSource.runWith(StreamConverters.asInputStream())
                             publicApi.uploadImage(inputStream,
@@ -486,23 +486,36 @@ class WebApi(publicApi: PublicApi, managementApi: ManagementApi, clientRegistry:
                               map(_ => complete(StatusCodes.Created)).get //TODO Handle upload failure
 
                           }
-                        } ~
-                          path("url") {
-                            parameters('filename, 'contentType, 'url) { (filename, contentType, url) =>
-                              sessionUUID.map { sessionId =>
-                                val uploadResult = publicApi.uploadImage(
-                                  url,
-                                  ImageMetadata(contentType, filename, imageWidth.toInt, imageHeight.toInt),
-                                  wishId,
-                                  sessionId) //TODO handle error
-                                uploadResult match {
-                                  case Success(_) => complete(StatusCodes.Created)
-                                  case Failure(e) => throw e
+                        }
+                      } ~
+                        path("url") {
+                          parameters('filename, 'contentType, 'url) { (filename, contentType, url) =>
+                            userIdFromSessionHeader { userId =>
+                              if (featureToggles.isTestUser(userId)) {
+                                onComplete(publicApi.uploadImage(url, wishId, userId).value) {
+                                  case Success(r) => handleCommandResult(r)
+                                  case Failure(t) => handleErrors(GeneralError(t.getMessage))
                                 }
-                              }.get
+                              } else {
+                                headerValueByName(imageDimensionsHeader) { imageDimensionsHeader =>
+                                  val imageWidth :: imageHeight :: Nil = imageDimensionsHeader.split(",").toList
+
+                                  sessionUUID.map { sessionId =>
+                                    val uploadResult = publicApi.uploadImage(
+                                      url,
+                                      ImageMetadata(contentType, filename, imageWidth.toInt, imageHeight.toInt),
+                                      wishId,
+                                      sessionId) //TODO handle error
+                                    uploadResult match {
+                                      case Success(_) => complete(StatusCodes.Created)
+                                      case Failure(e) => throw e
+                                    }
+                                  }.get
+                                }
+                              }
                             }
                           }
-                      }
+                        }
                     }
                   } ~
                     delete {

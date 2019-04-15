@@ -13,7 +13,7 @@ import co.wishkeeper.server.UserEventInstant.UserEventInstants
 import co.wishkeeper.server.UserTestHelper._
 import co.wishkeeper.server.WishStatus.{Reserved, WishStatus}
 import co.wishkeeper.server._
-import co.wishkeeper.server.image.ImageStore
+import co.wishkeeper.server.image.{BetterImageStore, ImageStore}
 import co.wishkeeper.server.messaging.{EmailProvider, EmailSender, TemplateEngineAdapter}
 import co.wishkeeper.server.projections._
 import co.wishkeeper.server.search.SimpleScanUserSearchProjection
@@ -509,6 +509,7 @@ class DelegatingPublicApiTest(implicit ee: ExecutionEnv) extends Specification w
     val templateEngineAdapter = mock[TemplateEngineAdapter]
     val emailSender = new EmailSender(emailProvider, templateEngineAdapter)
     val executor = new DeterministicExecutor
+    val wishImageStore = mock[BetterImageStore]
 
     val api: PublicApi = new DelegatingPublicApi(
       commandProcessor,
@@ -523,7 +524,8 @@ class DelegatingPublicApiTest(implicit ee: ExecutionEnv) extends Specification w
       userHistoryProjection,
       googleAuth,
       firebaseAuth,
-      emailSender
+      emailSender,
+      wishImageStore
     )(null, ExecutionContext.fromExecutor(executor), null)
     val friendId: UUID = randomUUID()
     val friendRequestId = randomUUID()
@@ -533,7 +535,7 @@ class DelegatingPublicApiTest(implicit ee: ExecutionEnv) extends Specification w
     val apiWithStoreOnly = new DelegatingPublicApi(null, dataStore, null, null,
       new EventBasedUserFriendsProjection(null, null, null, dataStore),
       null, null, null, null, null, null, null,
-      null)(null, ee.executionContext, null)
+      null, null)(null, ee.executionContext, null)
   }
 
   trait LoggedInContext extends Context {

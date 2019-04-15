@@ -224,6 +224,7 @@ class RouteTest extends Specification with Specs2RouteTest with JMock {
       val url = "http://my.image.url"
 
       checking {
+        allowing(toggles).isTestUser(userId).willReturn(false)
         oneOf(publicApi).uploadImage(url, imageMetadata, wishId, sessionId).willReturn(Success(()))
       }
 
@@ -239,6 +240,7 @@ class RouteTest extends Specification with Specs2RouteTest with JMock {
       val url = "http://my.image.url"
 
       checking {
+        allowing(toggles).isTestUser(userId).willReturn(false)
         oneOf(publicApi).uploadImage(url, imageMetadata, wishId, sessionId).willReturn(Failure(new RuntimeException("Shit happened")))
       }
 
@@ -828,15 +830,32 @@ class RouteTest extends Specification with Specs2RouteTest with JMock {
         responseAs[ImageLinks] must beEqualTo(imageLinks)
       }
     }
+
+    "Upload image through URL to new image store if feature toggle is on" in new LoggedInUserContext {
+      val url = "http://example.com/image"
+      val response: EitherT[Future, Error, Unit] = EitherT.rightT(())
+
+      checking {
+        oneOf(toggles).isTestUser(userId).willReturn(true)
+        oneOf(publicApi).uploadImage(url, wishId, userId).willReturn(response)
+      }
+
+      val imageMetadata = ImageMetadata("content-type", "filename", width = 1, height = 1)
+      val params = s"filename=${imageMetadata.fileName}&contentType=${imageMetadata.contentType}&url=$url"
+      Post(s"/users/wishes/${wishId.toString}/image/url?$params").withHeaders(sessionIdHeader) ~> webApi.userRoute ~> check {
+        handled must beTrue
+      }
+    }
   }
 
   trait BaseContext extends Scope {
     val publicApi = mock[PublicApi]
     val managementApi = mock[ManagementApi]
+    val toggles = mock[FeatureToggles]
     val sessionId = randomUUID()
     val userId = randomUUID()
 
-    val webApi = new WebApi(publicApi, managementApi, new MemStateClientRegistry)
+    val webApi = new WebApi(publicApi, managementApi, new MemStateClientRegistry, toggles)
   }
 
   trait LoggedInUserContext extends BaseContext {
