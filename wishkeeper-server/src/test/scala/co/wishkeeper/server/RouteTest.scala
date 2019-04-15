@@ -219,38 +219,6 @@ class RouteTest extends Specification with Specs2RouteTest with JMock {
       }
     }
 
-    "upload image through url" in new LoggedInUserContext {
-      val imageMetadata = ImageMetadata("content-type", "filename", width = 1, height = 1)
-      val url = "http://my.image.url"
-
-      checking {
-        allowing(toggles).isTestUser(userId).willReturn(false)
-        oneOf(publicApi).uploadImage(url, imageMetadata, wishId, sessionId).willReturn(Success(()))
-      }
-
-      val imageDimensionsHeader = RawHeader(WebApi.imageDimensionsHeader, s"${imageMetadata.width},${imageMetadata.height}")
-      val params = s"filename=${imageMetadata.fileName}&contentType=${imageMetadata.contentType}&url=$url"
-      Post(s"/users/wishes/$wishId/image/url?$params").withHeaders(sessionIdHeader, imageDimensionsHeader) ~> webApi.userRoute ~> check {
-        status must beEqualTo(StatusCodes.Created)
-      }
-    }
-
-    "print error on upload failure" in new LoggedInUserContext {
-      val imageMetadata = ImageMetadata("content-type", "filename", width = 1, height = 1)
-      val url = "http://my.image.url"
-
-      checking {
-        allowing(toggles).isTestUser(userId).willReturn(false)
-        oneOf(publicApi).uploadImage(url, imageMetadata, wishId, sessionId).willReturn(Failure(new RuntimeException("Shit happened")))
-      }
-
-      val imageDimensionsHeader = RawHeader(WebApi.imageDimensionsHeader, s"${imageMetadata.width},${imageMetadata.height}")
-      val params = s"filename=${imageMetadata.fileName}&contentType=${imageMetadata.contentType}&url=$url"
-      Post(s"/users/wishes/$wishId/image/url?$params").withHeaders(sessionIdHeader, imageDimensionsHeader) ~> webApi.userRoute ~> check {
-        status must beEqualTo(StatusCodes.InternalServerError)
-      }
-    }
-
     "Set facebook friends list flag" in new LoggedInUserContext {
       checking {
         oneOf(publicApi).processCommand(SetFlagFacebookFriendsListSeen(), Option(sessionId))
@@ -836,7 +804,7 @@ class RouteTest extends Specification with Specs2RouteTest with JMock {
       val response: EitherT[Future, Error, Unit] = EitherT.rightT(())
 
       checking {
-        oneOf(toggles).isTestUser(userId).willReturn(true)
+        allowing(toggles).isTestUser(userId).willReturn(true)
         oneOf(publicApi).uploadImage(url, wishId, userId).willReturn(response)
       }
 

@@ -489,29 +489,11 @@ class WebApi(publicApi: PublicApi, managementApi: ManagementApi, clientRegistry:
                         }
                       } ~
                         path("url") {
-                          parameters('filename, 'contentType, 'url) { (filename, contentType, url) =>
+                          parameters('url) { (url) =>
                             userIdFromSessionHeader { userId =>
-                              if (featureToggles.isTestUser(userId)) {
-                                onComplete(publicApi.uploadImage(url, wishId, userId).value) {
-                                  case Success(r) => handleCommandResult(r)
-                                  case Failure(t) => handleErrors(GeneralError(t.getMessage))
-                                }
-                              } else {
-                                headerValueByName(imageDimensionsHeader) { imageDimensionsHeader =>
-                                  val imageWidth :: imageHeight :: Nil = imageDimensionsHeader.split(",").toList
-
-                                  sessionUUID.map { sessionId =>
-                                    val uploadResult = publicApi.uploadImage(
-                                      url,
-                                      ImageMetadata(contentType, filename, imageWidth.toInt, imageHeight.toInt),
-                                      wishId,
-                                      sessionId) //TODO handle error
-                                    uploadResult match {
-                                      case Success(_) => complete(StatusCodes.Created)
-                                      case Failure(e) => throw e
-                                    }
-                                  }.get
-                                }
+                              onComplete(publicApi.uploadImage(url, wishId, userId).value) {
+                                case Success(r) => handleCommandResult(r)
+                                case Failure(t) => handleErrors(GeneralError(t.getMessage))
                               }
                             }
                           }
