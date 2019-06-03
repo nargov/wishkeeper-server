@@ -2,8 +2,9 @@ package co.wishkeeper.server.user.events
 
 import java.util.UUID
 
-import co.wishkeeper.server.Events.{WishReservedNotificationCreated, WishUnreservedNotificationCreated}
-import co.wishkeeper.server.NotificationsData.{WishReservedNotification, WishUnreservedNotification}
+import co.wishkeeper.server.Events.{FriendRequestAcceptedNotificationCreated, FriendRequestNotificationCreated, FriendRequestStatusChanged, NotificationViewed, WishReservedNotificationCreated, WishUnreservedNotificationCreated}
+import co.wishkeeper.server.FriendRequestStatus.{Approved, Pending}
+import co.wishkeeper.server.NotificationsData.{FriendRequestAcceptedNotification, FriendRequestNotification, WishReservedNotification, WishUnreservedNotification}
 import co.wishkeeper.server.{Notification, User}
 import org.joda.time.DateTime
 
@@ -58,8 +59,8 @@ object NotificationEventHandlers {
     user.copy(notifications = user.notifications.patch(reserveIndex, Nil, 1))
   }
 
-  implicit val wishUnReservedNotificationHandler = new UserEventHandler[WishUnreservedNotificationCreated] {
-    override def apply(user: User, event: WishUnreservedNotificationCreated, time: DateTime): User = {
+  implicit val wishUnReservedNotificationHandler: UserEventHandler[WishUnreservedNotificationCreated] =
+    (user: User, event: WishUnreservedNotificationCreated, time: DateTime) => {
       val lastReserveNotification = aWishReservedNotificationFor(event.wishId)
 
       user.notifications.find(lastReserveNotification).flatMap { reservedNotification =>
@@ -74,25 +75,64 @@ object NotificationEventHandlers {
         }
       }.getOrElse(user)
     }
-  }
 
-  implicit val wishReservedNotificationHandler = new UserEventHandler[WishReservedNotificationCreated] {
-    override def apply(user: User, event: WishReservedNotificationCreated, time: DateTime): User = {
+  implicit val wishReservedNotificationHandler: UserEventHandler[WishReservedNotificationCreated] =
+    (user: User, event: WishReservedNotificationCreated, time: DateTime) => {
       val lastUnreserveNotification = aWishUnreservedNotificationFor(event.wishId)
       user.notifications.find(lastUnreserveNotification).map { unreserveNotification =>
-        if(isTimeSinceLastReciprocalOverThreshold(unreserveNotification.time, time)) {
-          if(overDelayThreshold(time))
-            addWishReservedNotification(user, event, time)
-          else
-            addPendingWishReservedNotification(user, event, time)
-        }
-        else removeNotification(user, lastUnreserveNotification)
-      }.getOrElse{
-        if(overDelayThreshold(time))
-          addWishReservedNotification(user, event, time)
+        if (isTimeSinceLastReciprocalOverThreshold(unreserveNotification.time, time))
+          scheduleReservedNotification(user, event, time)
         else
-          addPendingWishReservedNotification(user, event, time)
+          removeNotification(user, lastUnreserveNotification)
+      }.getOrElse {
+        scheduleReservedNotification(user, event, time)
       }
     }
+
+  private def scheduleReservedNotification(user: User, event: WishReservedNotificationCreated, time: DateTime): User = {
+    if (overDelayThreshold(time))
+      addWishReservedNotification(user, event, time)
+    else
+      addPendingWishReservedNotification(user, event, time)
   }
+
+  implicit val friendRequestNotificationCreatedHandler: UserEventHandler[FriendRequestNotificationCreated] =
+    (user: User, event: FriendRequestNotificationCreated, time: DateTime) => user.copy(notifications =
+      Notification(event.id, FriendRequestNotification(event.from, event.requestId), time = time) :: user.notifications)
+
+  implicit val friendRequestStatusChangedHandler: UserEventHandler[FriendRequestStatusChanged] =
+    (user: User, event: FriendRequestStatusChanged, time: DateTime) => user.copy(
+      friends = user.friends.copy(
+        receivedRequests =
+          if (event.from != user.id) user.friends.receivedRequests.filterNot(_.id == event.requestId)
+          else user.friends.receivedRequests,
+        sentRequests =
+          if (event.from == user.id) user.friends.sentRequests.filterNot(_.id == event.requestId)
+          else user.friends.sentRequests,
+        current = event.status match {
+          case Approved => if (event.from == user.id) {
+            user.friends.sentRequests.find(_.id == event.requestId).map(_.userId).map(user.friends.current :+ _).getOrElse(user.friends.current)
+          } else user.friends.current :+ event.from
+          case _ => user.friends.current
+        }),
+      notifications = user.notifications.map {
+        case n@Notification(_, notif@FriendRequestNotification(_, friendReqId, status, _), _, _) if friendReqId == event.requestId && status == Pending =>
+          n.copy(data = notif.copy(status = event.status))
+        case n => n
+      }
+    )
+
+  implicit val friendRequestAcceptedNotificationCreatedHandler: UserEventHandler[FriendRequestAcceptedNotificationCreated] =
+    (user: User, event: FriendRequestAcceptedNotificationCreated, time: DateTime) => user.copy(notifications =
+      Notification(event.id, FriendRequestAcceptedNotification(event.by, event.requestId), time = time) :: user.notifications)
+
+  implicit val notificationViewedHandler: UserEventHandler[NotificationViewed] = (user: User, event: NotificationViewed, time: DateTime) => {
+    val index = user.notifications.indexWhere(_.id == event.id)
+    if (index >= 0) {
+      val updatedNotification = user.notifications(index).copy(viewed = true)
+      user.copy(notifications = user.notifications.updated(index, updatedNotification))
+    }
+    else user
+  }
+
 }
