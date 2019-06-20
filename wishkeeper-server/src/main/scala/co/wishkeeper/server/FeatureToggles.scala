@@ -2,7 +2,7 @@ package co.wishkeeper.server
 
 import java.util.UUID
 
-import org.slf4j.LoggerFactory
+import org.slf4j.{Logger, LoggerFactory}
 
 import scala.io.Source
 import scala.util.Try
@@ -13,13 +13,13 @@ trait FeatureToggles {
 }
 
 class StaticFileFeatureToggles extends FeatureToggles {
-  val logger = LoggerFactory.getLogger(getClass.getName)
+  private val logger: Logger = LoggerFactory.getLogger(getClass.getName)
 
   val testUsers: Set[UUID] = Try {
     Source.fromResource("test-users").getLines().toSet.map(UUID.fromString)
   }.recover {
     case t: Throwable =>
-      logger.error("Error loading test users from file", t)
+      logger.info("No test users file found")
       Set.empty[UUID]
   }.get
 

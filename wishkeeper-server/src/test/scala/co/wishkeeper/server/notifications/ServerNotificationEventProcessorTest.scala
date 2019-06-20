@@ -8,6 +8,7 @@ import co.wishkeeper.server.EventsTestHelper.EventsList
 import co.wishkeeper.server.FriendRequestStatus.Approved
 import co.wishkeeper.server.NotificationsData.{EmailVerifiedNotification, FriendRequestAcceptedNotification, FriendRequestNotification, NotificationData}
 import co.wishkeeper.server.messaging._
+import co.wishkeeper.server.user.Platform
 import co.wishkeeper.server.{DataStore, PushNotification, UserEventInstance, UserProfile}
 import com.wixpress.common.specs2.JMock
 import org.specs2.matcher.Matcher
@@ -80,7 +81,7 @@ class ServerNotificationEventProcessorTest extends Specification with JMock {
       oneOf(pushNotifications).send(deviceToken, PushNotification(userId, notificationId,
         FriendRequestNotification(friendId, requestId, profile = Option(UserProfile(
           name = Option(friendName), firstName = Option(friendFirstName), picture = Option(friendPicture)
-        )))))
+        )))), Platform.Android)
     }
 
     processEvent(FriendRequestNotificationCreated(notificationId, userId, friendId, requestId))
@@ -95,7 +96,7 @@ class ServerNotificationEventProcessorTest extends Specification with JMock {
       allowing(dataStore).userEvents(friendId).willReturn(EventsList(friendId).withName(friendName).withFirstName(friendFirstName).
         withPic(friendPicture).list)
       oneOf(pushNotifications).send(deviceToken, PushNotification(userId, notificationId, FriendRequestAcceptedNotification(friendId, requestId,
-        profile = Option(UserProfile(name = Option(friendName), firstName = Option(friendFirstName), picture = Option(friendPicture))))))
+        profile = Option(UserProfile(name = Option(friendName), firstName = Option(friendFirstName), picture = Option(friendPicture))))), Platform.Android)
     }
 
     processEvent(FriendRequestAcceptedNotificationCreated(notificationId, userId, friendId, requestId))
@@ -105,7 +106,8 @@ class ServerNotificationEventProcessorTest extends Specification with JMock {
     checking {
       ignoring(clientNotifier)
       allowing(dataStore).userEvents(userId).willReturn(EventsList(userId).withDeviceId(deviceToken).list)
-      oneOf(pushNotifications).send(having(===(deviceToken)), having(aPushNotificationWith(userId, EmailVerifiedNotification)))
+      oneOf(pushNotifications).send(having(===(deviceToken)),
+        having(aPushNotificationWith(userId, EmailVerifiedNotification)), having(===(Platform.Android)))
     }
 
     processEvent(EmailVerified("email"))

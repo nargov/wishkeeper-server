@@ -12,7 +12,13 @@ object NotificationsData {
 
   sealed trait NotificationData
 
-  sealed trait WishNotification extends NotificationData {
+  sealed trait UserNotification extends NotificationData {
+    def title: String
+
+    def content: String
+  }
+
+  sealed trait WishNotification extends UserNotification {
     val wishId: UUID
   }
 
@@ -21,26 +27,45 @@ object NotificationsData {
   case class FriendRequestNotification(from: UUID,
                                        requestId: UUID,
                                        status: FriendRequestStatus = Pending,
-                                       profile: Option[UserProfile] = None) extends NotificationData {
+                                       profile: Option[UserProfile] = None) extends UserNotification {
+
+    override def title: String = "New friend request"
+
+    override def content: String = s"\u202A${profile.map(_.name).getOrElse("Someone")} sent you a friend request."
 
     def withProfile(profile: UserProfile): FriendRequestNotification = this.copy(profile = Option(profile))
   }
 
-  case class FriendRequestAcceptedNotification(friendId: UUID, requestId: UUID, profile: Option[UserProfile] = None) extends NotificationData {
+  case class FriendRequestAcceptedNotification(friendId: UUID, requestId: UUID, profile: Option[UserProfile] = None) extends UserNotification {
+
+    override def title: String = "Friend request accepted"
+
+    override def content: String = s"\u202A${profile.map(_.name).getOrElse("Someone")} accepted your friend request."
+
     def withProfile(profile: UserProfile): FriendRequestAcceptedNotification = this.copy(profile = Option(profile))
   }
 
   case class WishReservedNotification(wishId: UUID,
                                       reserver: UUID,
                                       reserverProfile: Option[UserProfile] = None,
-                                      wishName: Option[String] = None) extends WishNotification
+                                      wishName: Option[String] = None) extends WishNotification {
+
+    override val content: String = s"Someone reserved the wish $wishName from your wishlist."
+
+    override val title: String = "Someone reserved one of your wishes"
+  }
 
   case class WishUnreservedNotification(wishId: UUID,
                                         reserver: UUID,
                                         reserverProfile: Option[UserProfile] = None,
-                                        wishName: Option[String] = None) extends WishNotification
+                                        wishName: Option[String] = None) extends WishNotification {
+    override def title: String = "Your wish is no longer reserved"
+
+    override def content: String = s"Someone changed their mind about getting you $wishName."
+  }
 
   case object EmailVerifiedNotification extends NotificationData
+
 }
 
 case class Notification(id: UUID, data: NotificationData, viewed: Boolean = false, time: DateTime = DateTime.now())

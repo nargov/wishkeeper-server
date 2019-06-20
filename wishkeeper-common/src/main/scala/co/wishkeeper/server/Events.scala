@@ -3,7 +3,7 @@ package co.wishkeeper.server
 import java.util.UUID
 
 import co.wishkeeper.server.Events.UserEvent
-import co.wishkeeper.server.user.{Gender, GenderPronoun}
+import co.wishkeeper.server.user.{Gender, GenderPronoun, Platform}
 import org.joda.time.DateTime
 
 object Events {
@@ -99,6 +99,8 @@ object Events {
   case class GeneralSettingVibrateEnabledSet(enabled: Boolean) extends UserEvent
 
   case class EmailVerified(email: String) extends UserEvent
+
+  case class SessionPlatformSet(sessionId: UUID, platform: Platform) extends UserEvent
 }
 
 case class UserEventInstant[E <: UserEvent](event: E, time: DateTime)

@@ -5,6 +5,7 @@ import java.util.UUID
 import co.wishkeeper.server.Events._
 import co.wishkeeper.server.UserEventInstant.UserEventInstants
 import co.wishkeeper.server.WishStatus.{Active, Reserved, WishStatus}
+import co.wishkeeper.server.user.Platform
 import co.wishkeeper.server.user.events.FlagsHandlers._
 import co.wishkeeper.server.user.events.FriendsEventHandlers._
 import co.wishkeeper.server.user.events.NotificationEventHandlers._
@@ -71,6 +72,7 @@ case class User(id: UUID,
     case UserEventInstant(e@EmailConnectStarted(_), time) => handleEventWithHandler(e, time)
     case UserEventInstant(e@EmailVerified(_), time) => handleEventWithHandler(e, time)
     case UserEventInstant(e@UserConnected(_, _, _), time) => handleEventWithHandler(e, time)
+    case UserEventInstant(e@SessionPlatformSet(_, _), time) => handleEventWithHandler(e, time)
     case _ => this
   }
 
@@ -128,7 +130,8 @@ case class Flags(seenFacebookFriendsList: Boolean = false, seenGoogleFriendsList
 
 }
 
-case class Settings(deviceNotificationId: Option[String] = None, general: GeneralSettings = GeneralSettings())
+case class Settings(deviceNotificationId: Option[String] = None, general: GeneralSettings = GeneralSettings(),
+                    platform: Option[Platform] = None)
 
 case class GeneralSettings(pushNotificationsEnabled: Boolean = true, vibrate: Boolean = true)
 

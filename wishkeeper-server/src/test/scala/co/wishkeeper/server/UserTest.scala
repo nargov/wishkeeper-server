@@ -9,7 +9,7 @@ import co.wishkeeper.server.FriendRequestStatus.Approved
 import co.wishkeeper.server.NotificationsData.{FriendRequestNotification, WishReservedNotification, WishUnreservedNotification}
 import co.wishkeeper.server.UserTestHelper._
 import co.wishkeeper.server.WishStatus.WishStatus
-import co.wishkeeper.server.user.{Gender, GenderPronoun}
+import co.wishkeeper.server.user.{Gender, GenderPronoun, Platform}
 import co.wishkeeper.test.utils.WishMatchers._
 import com.wixpress.common.specs2.JMock
 import org.joda.time.DateTime
@@ -454,6 +454,10 @@ class UserTest extends Specification with MatcherMacros with JMock with Notifica
     user.withEvent(UserGenderSet(user.id, "male")).userProfile.genderData must beSome(GenderData(Gender.Male))
     user.withEvent(UserGenderSet(user.id, "female")).userProfile.genderData must beSome(GenderData(Gender.Female))
     user.withEvent(UserGenderSet(user.id, "other")).userProfile.genderData must beSome(GenderData(Gender.Custom))
+  }
+
+  "apply SessionPlatformSet" in new Context {
+    user.withEvent(SessionPlatformSet(randomUUID(), Platform.iOS)).settings.platform must beSome(Platform.iOS)
   }
 
   trait Context extends Scope {

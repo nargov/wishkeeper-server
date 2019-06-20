@@ -5,6 +5,7 @@ import java.util.concurrent._
 
 import co.wishkeeper.server._
 import co.wishkeeper.server.messaging._
+import co.wishkeeper.server.user.Platform
 import org.joda.time
 import org.joda.time.DateTime
 
@@ -15,7 +16,8 @@ import scala.util.{Success, Try}
 trait NotificationsScheduler {
   def scheduleNotification(userId: UUID, notification: ServerNotification): Unit
 
-  def schedulePushNotification(deviceId: String, notification: PushNotification, shouldSend: () => Boolean = () => true): Future[Try[String]]
+  def schedulePushNotification(deviceId: String, notification: PushNotification, shouldSend: () => Boolean = () => true,
+                               platform: Option[Platform]): Future[Try[String]]
 }
 
 class ExecutorNotificationsScheduler(config: NotificationDelayConfig = NotificationDelayConfig(),
@@ -31,7 +33,7 @@ class ExecutorNotificationsScheduler(config: NotificationDelayConfig = Notificat
   private val periodicWakeup = {
     val now = DateTime.now()
     scheduler.scheduleAtFixedRate(
-      () => pushNotifications.sendToTopic(PushNotificationSender.periodicWakeup, BroadcastNotifications.periodicWakeup),
+      () => pushNotifications.sendToTopic(PushNotificationSender.periodicWakeup, BroadcastNotifications.periodicWakeup, Platform.Android),
       ((60 - now.minuteOfHour().get) * 60) + (60 - now.secondOfMinute().get), 1.hour.toSeconds, SECONDS
     )
   }
@@ -42,12 +44,13 @@ class ExecutorNotificationsScheduler(config: NotificationDelayConfig = Notificat
     }), config.default.toMillis, MILLISECONDS)
   }
 
-  override def schedulePushNotification(deviceId: String, notification: PushNotification, shouldSend: () => Boolean): Future[Try[String]] =
+  override def schedulePushNotification(deviceId: String, notification: PushNotification, shouldSend: () => Boolean,
+                                        platform: Option[Platform]): Future[Try[String]] =
     Future {
       scheduler.schedule(
         toCallable(() =>
           if (shouldSend())
-            pushNotifications.send(deviceId, notification)
+            pushNotifications.send(deviceId, notification, platform.getOrElse(Platform.Android))
           else
             Success("")
         ), config.default.toMillis, MILLISECONDS).get()
@@ -76,7 +79,8 @@ class ExecutorNotificationsScheduler(config: NotificationDelayConfig = Notificat
 object NoOpNotificationsScheduler extends NotificationsScheduler {
   override def scheduleNotification(userId: UUID, notification: ServerNotification): Unit = {}
 
-  override def schedulePushNotification(deviceId: String, notification: PushNotification, shouldSend: () => Boolean): Future[Try[String]] =
+  override def schedulePushNotification(deviceId: String, notification: PushNotification, shouldSend: () => Boolean,
+                                        platform: Option[Platform]): Future[Try[String]] =
     Future.successful(Success(""))
 }
 

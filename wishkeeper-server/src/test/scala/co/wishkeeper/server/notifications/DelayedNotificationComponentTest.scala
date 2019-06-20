@@ -9,6 +9,7 @@ import co.wishkeeper.server.Events.{DeviceNotificationIdSet, WishReservedNotific
 import co.wishkeeper.server.EventsTestHelper.EventsList
 import co.wishkeeper.server.NotificationsData.{PeriodicWakeup, WishReservedNotification, WishUnreservedNotification}
 import co.wishkeeper.server.messaging.{MemStateClientRegistry, NotificationsUpdated, PushNotificationSender, ServerNotification}
+import co.wishkeeper.server.user.Platform
 import co.wishkeeper.server.{BroadcastNotification, DataStore, PushNotification, UserEventInstance}
 import com.wixpress.common.specs2.JMock
 import org.jmock.lib.concurrent.{DeterministicExecutor, DeterministicScheduler}
@@ -81,7 +82,7 @@ class DelayedNotificationComponentTest extends Specification with JMock {
         withWish(event.wishId, wishName).
         withReservedWishNotification(notificationId, event.wishId, event.reserverId).
         list)
-      oneOf(pushNotifications).send(idSet.id, pushNotification)
+      oneOf(pushNotifications).send(idSet.id, pushNotification, Platform.Android)
     }
 
     userConnects()
@@ -108,7 +109,7 @@ class DelayedNotificationComponentTest extends Specification with JMock {
         withReservedWishNotification(notificationId, wishId, friendId, DateTime.now().minusHours(1)).
         withUnreservedWishNotification(notificationId, wishId, DateTime.now()).
         list)
-      oneOf(pushNotifications).send(idSet.id, pushNotification)
+      oneOf(pushNotifications).send(idSet.id, pushNotification, Platform.Android)
     }
 
     userConnects()
@@ -131,7 +132,7 @@ class DelayedNotificationComponentTest extends Specification with JMock {
         withEvent(idSet).
         withWish(wishId, "Some wish").
         list)
-      never(pushNotifications).send(having(any), having(any))
+      never(pushNotifications).send(having(any), having(any), having(any))
     }
 
     serverNotificationEventProcessor.process(UserEventInstance(userId, reserveEvent))
@@ -142,7 +143,8 @@ class DelayedNotificationComponentTest extends Specification with JMock {
 
   "Send periodic wakeup" in new Context {
     checking {
-      oneOf(pushNotifications).sendToTopic(having(===(PushNotificationSender.periodicWakeup)), having(aPeriodicWakeup))
+      oneOf(pushNotifications).sendToTopic(having(===(PushNotificationSender.periodicWakeup)), having(aPeriodicWakeup),
+        having(===(Platform.Android)))
     }
 
     scheduler.tick(config.periodic.toHours, HOURS)

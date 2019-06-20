@@ -3,17 +3,21 @@ package co.wishkeeper.server.user.commands
 import java.util.UUID
 
 import co.wishkeeper.server.Events._
+import co.wishkeeper.server.user.Platform
 import co.wishkeeper.server.{AgeRange, User}
 import org.joda.time.DateTime
 
 trait FacebookUserCommand extends UserCommand
 
-case class ConnectFacebookUser(facebookId: String, authToken: String, sessionId: UUID, email: Option[String] = None) extends FacebookUserCommand {
+case class ConnectFacebookUser(facebookId: String, authToken: String, sessionId: UUID, email: Option[String] = None,
+                               platform: Option[Platform] = None) extends FacebookUserCommand {
   override def process(user: User): List[UserEvent] = {
     val now = DateTime.now()
     val userConnectedEvent = UserConnected(user.id, now, sessionId)
-    val facebookIdSetEvent = UserFacebookIdSet(user.id, facebookId) //TODO only do this if facebook id was never set
-    List(userConnectedEvent, facebookIdSetEvent)
+    val facebookIdSetEvent = UserFacebookIdSet(user.id, facebookId)
+    val sessionPlatformSetEvent = SessionPlatformSet(sessionId, platform.getOrElse(Platform.Android))
+    val events = List(userConnectedEvent, sessionPlatformSetEvent)
+    user.userProfile.socialData.flatMap(_.facebookId).fold(events :+ facebookIdSetEvent)(_ => events)
   }
 }
 

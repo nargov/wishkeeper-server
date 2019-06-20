@@ -45,6 +45,8 @@ class UserCommandProcessorTest extends Specification with JMock with MatcherMacr
       oneOf(eventProcessor).process(having(any[UserEventInstance[UserConnected]])).willReturn(Nil)
     }
 
+    ignoringSessionPlatformSet()
+
     processConnectWithFacebook()
   }
 
@@ -58,6 +60,8 @@ class UserCommandProcessorTest extends Specification with JMock with MatcherMacr
     checking {
       oneOf(eventProcessor).process(having(aUserEventInstance(aUserConnectedEventFor(userId), ===(userId)))).willReturn(Nil)
     }
+
+    ignoringSessionPlatformSet()
 
     processConnectWithFacebook()
 
@@ -413,6 +417,8 @@ class UserCommandProcessorTest extends Specification with JMock with MatcherMacr
       oneOf(eventProcessor).process(having(aUserEventInstance(aUserConnectedEventFor(userId), ===(userId)))).willReturn(Nil)
     }
 
+    ignoringSessionPlatformSet()
+
     processConnectWithFacebook()
   }
 
@@ -491,6 +497,10 @@ class UserCommandProcessorTest extends Specification with JMock with MatcherMacr
 
     def ignoringProcessFacebookIdSet() = checking {
       ignoring(eventProcessor).process(having(aUserEventInstance(any[UserFacebookIdSet], any[UUID]))).willReturn(Nil)
+    }
+
+    def ignoringSessionPlatformSet() = checking {
+      ignoring(eventProcessor).process(having(any[UserEventInstance[SessionPlatformSet]])).willReturn(Nil)
     }
   }
 

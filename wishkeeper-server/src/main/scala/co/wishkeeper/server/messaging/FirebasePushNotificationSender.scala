@@ -6,9 +6,11 @@ import akka.actor.ActorSystem
 import akka.http.scaladsl.Http
 import akka.http.scaladsl.model.HttpRequest
 import akka.stream.ActorMaterializer
-import co.wishkeeper.server.{BroadcastNotification, PushNotification, TypedJson}
+import co.wishkeeper.server.NotificationsData.UserNotification
+import co.wishkeeper.server.user.Platform
+import co.wishkeeper.server.{BroadcastNotification, NotificationsData, PushNotification, TypedJson, UserNotifications}
 import com.google.auth.oauth2.GoogleCredentials
-import com.google.firebase.messaging.{AndroidConfig, FirebaseMessaging, Message}
+import com.google.firebase.messaging.{AndroidConfig, FirebaseMessaging, Message, Notification}
 import com.google.firebase.{FirebaseApp, FirebaseOptions}
 import io.circe.generic.auto._
 import io.circe.parser._
@@ -21,9 +23,9 @@ import scala.concurrent.{ExecutionContext, Future}
 import scala.util.Try
 
 trait PushNotificationSender {
-  def send(deviceToken: String, notification: PushNotification): Try[String]
+  def send(deviceToken: String, notification: PushNotification, platform: Platform = Platform.Android): Try[String]
 
-  def sendToTopic(topic: String, notification: BroadcastNotification): Try[String]
+  def sendToTopic(topic: String, notification: BroadcastNotification, platform: Platform = Platform.Android): Try[String]
 }
 
 trait TopicManager {
@@ -51,11 +53,27 @@ class FirebasePushNotificationSender(executionContext: ExecutionContext = fromEx
 
   private val androidConfig = AndroidConfig.builder().setPriority(AndroidConfig.Priority.HIGH).build()
 
-  private def createMessage[T](notification: T, configure: Message.Builder => Message.Builder)(implicit typedJson: TypedJson[T]) =
-    configure(Message.builder().
+  private def createPushMessage(notification: PushNotification, configure: Message.Builder => Message.Builder,
+                                                  platform: Platform)(implicit typedJson: TypedJson[PushNotification]): Message = {
+
+    val builder = Message.builder().putData("body", typedJson.toJson(notification))
+
+    platform match {
+      case Platform.Android => configure(builder.setAndroidConfig(androidConfig)).build()
+      case Platform.iOS => notification.data match {
+        case n: UserNotification => configure(builder.setNotification(new Notification(n.title, n.content))).build()
+        case _ => configure(builder).build()
+      }
+    }
+  }
+
+  private def createMessage[T](notification: T, configure: Message.Builder => Message.Builder, platform: Platform)(implicit typedJson: TypedJson[T]) = {
+    val messageBuilder = Message.builder().
       putData("body", typedJson.toJson(notification)).
       setAndroidConfig(androidConfig)
-    ).build()
+
+    configure(messageBuilder).build()
+  }
 
   private val send: Message => Try[String] = msg => {
     val result = Try(FirebaseMessaging.getInstance().send(msg))
@@ -63,11 +81,11 @@ class FirebasePushNotificationSender(executionContext: ExecutionContext = fromEx
     result
   }
 
-  def send(deviceToken: String, notification: PushNotification): Try[String] =
-    send(createMessage(notification, _.setToken(deviceToken)))
+  def send(deviceToken: String, notification: PushNotification, platform: Platform): Try[String] =
+    send(createPushMessage(notification, _.setToken(deviceToken), platform))
 
-  def sendToTopic(topic: String, notification: BroadcastNotification): Try[String] =
-    send(createMessage(notification, _.setTopic(topic)))
+  def sendToTopic(topic: String, notification: BroadcastNotification, platform: Platform): Try[String] =
+    send(createMessage(notification, _.setTopic(topic), platform))
 
   def subscribeTo(topic: String, deviceIds: List[String]): Future[Unit] = Future {
     deviceIds.grouped(MaxRegistrationDevicesPerRequest).foreach { ids =>
