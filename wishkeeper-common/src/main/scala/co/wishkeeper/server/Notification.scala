@@ -31,7 +31,7 @@ object NotificationsData {
 
     override def title: String = "New friend request"
 
-    override def content: String = s"\u202A${profile.map(_.name).getOrElse("Someone")} sent you a friend request."
+    override def content: String = s"\u202A${profile.flatMap(_.name).getOrElse("Someone")} sent you a friend request."
 
     def withProfile(profile: UserProfile): FriendRequestNotification = this.copy(profile = Option(profile))
   }
@@ -40,7 +40,7 @@ object NotificationsData {
 
     override def title: String = "Friend request accepted"
 
-    override def content: String = s"\u202A${profile.map(_.name).getOrElse("Someone")} accepted your friend request."
+    override def content: String = s"\u202A${profile.flatMap(_.name).getOrElse("Someone")} accepted your friend request."
 
     def withProfile(profile: UserProfile): FriendRequestAcceptedNotification = this.copy(profile = Option(profile))
   }
@@ -50,7 +50,7 @@ object NotificationsData {
                                       reserverProfile: Option[UserProfile] = None,
                                       wishName: Option[String] = None) extends WishNotification {
 
-    override val content: String = s"Someone reserved the wish $wishName from your wishlist."
+    override val content: String = s"Someone reserved the wish ${wishName.getOrElse("Unknown")} from your wishlist."
 
     override val title: String = "Someone reserved one of your wishes"
   }
@@ -61,7 +61,7 @@ object NotificationsData {
                                         wishName: Option[String] = None) extends WishNotification {
     override def title: String = "Your wish is no longer reserved"
 
-    override def content: String = s"Someone changed their mind about getting you $wishName."
+    override def content: String = s"Someone changed their mind about getting you ${wishName.getOrElse("Unknown")}."
   }
 
   case object EmailVerifiedNotification extends NotificationData
