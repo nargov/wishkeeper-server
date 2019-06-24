@@ -422,6 +422,23 @@ class UserCommandProcessorTest extends Specification with JMock with MatcherMacr
     processConnectWithFacebook()
   }
 
+  "Connecting with google sets platform" in new Context {
+    assumeNewUser()
+    ignoringSaveUserSession()
+    ignoringGoogleUserData()
+
+    checking {
+      ignoring(dataStore).saveUserByEmail(having(any), having(any))
+      allowing(dataStore).userIdByEmail(email).willReturn(None)
+      allowing(googleAuth).validateIdToken(idToken).willReturn(Right(googleUser))
+      allowing(googleAuth).fetchAdditionalUserData(accessToken, googleUserId).willReturn(Right(GoogleUserData()))
+      oneOf(dataStore).saveUserEvents(having(any[UUID]), having(beNone), having(any[DateTime]),
+        having(contain(anInstanceOf[SessionPlatformSet]))).willReturn(true)
+    }
+
+    commandProcessor.connectWithGoogle(ConnectGoogleUser(accessToken, idToken, sessionId))
+  }
+
   trait Context extends Scope {
     val userId: UUID = UUID.randomUUID()
     val dataStore: DataStore = mock[DataStore]

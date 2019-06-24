@@ -10,7 +10,7 @@ import co.wishkeeper.server.NotificationsData.UserNotification
 import co.wishkeeper.server.user.Platform
 import co.wishkeeper.server.{BroadcastNotification, NotificationsData, PushNotification, TypedJson, UserNotifications}
 import com.google.auth.oauth2.GoogleCredentials
-import com.google.firebase.messaging.{AndroidConfig, FirebaseMessaging, Message, Notification}
+import com.google.firebase.messaging.{AndroidConfig, ApnsConfig, Aps, ApsAlert, FirebaseMessaging, Message, Notification}
 import com.google.firebase.{FirebaseApp, FirebaseOptions}
 import io.circe.generic.auto._
 import io.circe.parser._
@@ -54,23 +54,36 @@ class FirebasePushNotificationSender(executionContext: ExecutionContext = fromEx
   private val androidConfig = AndroidConfig.builder().setPriority(AndroidConfig.Priority.HIGH).build()
 
   private def createPushMessage(notification: PushNotification, configure: Message.Builder => Message.Builder,
-                                                  platform: Platform)(implicit typedJson: TypedJson[PushNotification]): Message = {
+                                platform: Platform)(implicit typedJson: TypedJson[PushNotification]): Message = {
 
     val builder = Message.builder().putData("body", typedJson.toJson(notification))
 
     platform match {
       case Platform.Android => configure(builder.setAndroidConfig(androidConfig)).build()
-      case Platform.iOS => notification.data match {
-        case n: UserNotification => configure(builder.setNotification(new Notification(n.title, n.content))).build()
-        case _ => configure(builder).build()
-      }
+      case Platform.iOS =>
+        notification.data match {
+          case n: UserNotification =>
+            configure(builder
+              .setNotification(new Notification(n.title, n.content)))
+              .setApnsConfig(ApnsConfig.builder()
+                .setAps(Aps.builder()
+                  .setSound("default")
+                  .setAlert(ApsAlert.builder()
+                    .setTitle(n.title)
+                    .setBody(n.content)
+                    .build())
+                  .build())
+                .build())
+              .build()
+          case _ => configure(builder).build()
+        }
     }
   }
 
   private def createMessage[T](notification: T, configure: Message.Builder => Message.Builder, platform: Platform)(implicit typedJson: TypedJson[T]) = {
-    val messageBuilder = Message.builder().
-      putData("body", typedJson.toJson(notification)).
-      setAndroidConfig(androidConfig)
+    val messageBuilder = Message.builder()
+      .putData("body", typedJson.toJson(notification))
+      .setAndroidConfig(androidConfig)
 
     configure(messageBuilder).build()
   }
